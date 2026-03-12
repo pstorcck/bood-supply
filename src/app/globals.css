@@ -1,27 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    @apply font-body text-brand-gray-dark bg-white antialiased;
+  }
+  h1, h2, h3, h4, h5 {
+    @apply font-heading;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+@layer components {
+  .btn-primary {
+    @apply bg-brand-orange text-white font-body font-semibold px-6 py-3 rounded-button hover:bg-brand-orange-light transition-all duration-200 shadow-orange focus:outline-none focus:ring-2 focus:ring-brand-orange focus:ring-offset-2;
   }
+  .btn-secondary {
+    @apply bg-transparent text-brand-navy font-body font-semibold px-6 py-3 rounded-button border-2 border-brand-navy hover:bg-brand-navy hover:text-white transition-all duration-200;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-brand-orange font-body font-semibold px-6 py-3 rounded-button border-2 border-brand-orange hover:bg-brand-orange hover:text-white transition-all duration-200;
+  }
+  .card {
+    @apply bg-white rounded-card shadow-card border border-gray-100 p-6;
+  }
+  .card-hover {
+    @apply card hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300 cursor-pointer;
+  }
+  .input-field {
+    @apply w-full px-4 py-3 rounded-button border border-gray-200 bg-white font-body text-brand-gray-dark placeholder-brand-gray-mid focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-all duration-200;
+  }
+  .section-title {
+    @apply font-heading text-4xl font-bold text-brand-navy;
+  }
+  .section-subtitle {
+    @apply font-body text-brand-gray-mid text-lg mt-3 max-w-2xl;
+  }
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  }
+  .badge-orange {
+    @apply badge bg-orange-50 text-brand-orange;
+  }
+  .status-new { @apply badge bg-gray-100 text-gray-600; }
+  .status-review { @apply badge bg-blue-50 text-blue-700; }
+  .status-approved { @apply badge bg-teal-50 text-teal-700; }
+  .status-invoiced { @apply badge bg-purple-50 text-purple-700; }
+  .status-preparing { @apply badge bg-amber-50 text-amber-700; }
+  .status-dispatched { @apply badge bg-orange-50 text-orange-700; }
+  .status-delivered { @apply badge bg-green-50 text-green-700; }
+  .status-cancelled { @apply badge bg-red-50 text-red-700; }
 }

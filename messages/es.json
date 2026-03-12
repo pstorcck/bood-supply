@@ -1,0 +1,40 @@
+{
+  "nav": {
+    "home": "Inicio",
+    "about": "Sobre Nosotros",
+    "products": "Nuestros Productos",
+    "contact": "Contacto",
+    "becomeClient": "Hazte Cliente",
+    "login": "Iniciar Sesión",
+    "myAccount": "Mi Cuenta"
+  },
+  "hero": {
+    "badge": "Distribuidora para restaurantes en Chicago",
+    "title": "Tu proveedor de confianza,",
+    "titleAccent": "siempre al precio justo.",
+    "subtitle": "Distribuimos productos de calidad para restaurantes con el mejor servicio al cliente. Entregas puntuales, precios transparentes y una relación comercial que dura.",
+    "ctaPrimary": "Hazte Cliente",
+    "ctaSecondary": "Ver Productos",
+    "stat1": "Restaurantes atendidos",
+    "stat2": "Años de experiencia",
+    "stat3": "Entregas a tiempo"
+  },
+  "features": {
+    "title": "¿Por qué elegir BOOD SUPPLY?",
+    "subtitle": "Construimos relaciones comerciales duraderas basadas en precio justo, calidad y servicio excepcional.",
+    "f1_title": "Precio Justo Siempre",
+    "f1_desc": "Transparencia total en cada orden. Sin sorpresas, sin costos ocultos. El precio que ves es el precio que pagas.",
+    "f2_title": "Calidad Garantizada",
+    "f2_desc": "Seleccionamos cuidadosamente cada producto para que tu restaurante reciba exactamente lo que necesitas.",
+    "f3_title": "Servicio al Cliente",
+    "f3_desc": "Equipo dedicado disponible para resolver cualquier inconveniente de manera rápida y profesional.",
+    "f4_title": "Entrega Confiable",
+    "f4_desc": "Rutas optimizadas y logística eficiente para que tus productos lleguen en tiempo y forma."
+  },
+  "footer": {
+    "tagline": "Distribuidora para restaurantes en Chicago.",
+    "nav_title": "Navegación",
+    "contact_title": "Contacto",
+    "rights": "Todos los derechos reservados."
+  }
+}

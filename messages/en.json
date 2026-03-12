@@ -1,0 +1,40 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "About Us",
+    "products": "Our Products",
+    "contact": "Contact",
+    "becomeClient": "Be a Customer",
+    "login": "Sign In",
+    "myAccount": "My Account"
+  },
+  "hero": {
+    "badge": "Restaurant distributor in Chicago",
+    "title": "Your trusted supplier,",
+    "titleAccent": "always at the right price.",
+    "subtitle": "We distribute quality products for restaurants with the best customer service. Timely deliveries, transparent pricing and a commercial relationship that lasts.",
+    "ctaPrimary": "Become a Customer",
+    "ctaSecondary": "View Products",
+    "stat1": "Restaurants served",
+    "stat2": "Years of experience",
+    "stat3": "On-time deliveries"
+  },
+  "features": {
+    "title": "Why choose BOOD SUPPLY?",
+    "subtitle": "We build lasting commercial relationships based on fair pricing, quality and exceptional service.",
+    "f1_title": "Fair Price Always",
+    "f1_desc": "Full transparency in every order. No surprises, no hidden costs. The price you see is the price you pay.",
+    "f2_title": "Guaranteed Quality",
+    "f2_desc": "We carefully select every product so your restaurant receives exactly what it needs.",
+    "f3_title": "Customer Service",
+    "f3_desc": "Dedicated team available to resolve any issue quickly and professionally.",
+    "f4_title": "Reliable Delivery",
+    "f4_desc": "Optimized routes and efficient logistics so your products arrive on time."
+  },
+  "footer": {
+    "tagline": "Restaurant distributor in Chicago.",
+    "nav_title": "Navigation",
+    "contact_title": "Contact",
+    "rights": "All rights reserved."
+  }
+}
