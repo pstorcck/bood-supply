@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
 
@@ -17,7 +17,7 @@ export default function LoginPage() {
     try {
       await new Promise(r => setTimeout(r, 1000))
       window.location.href = '/dashboard'
-    } catch (err: any) {
+    } catch {
       setError('Error al iniciar sesión')
     } finally {
       setLoading(false)
@@ -39,7 +39,6 @@ export default function LoginPage() {
           <h1 className="font-heading font-bold text-brand-navy text-2xl mt-6 mb-1">Iniciar Sesión</h1>
           <p className="text-brand-gray-mid text-sm">Accede a tu cuenta BOOD SUPPLY</p>
         </div>
-
         <div className="card">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-button px-4 py-3 mb-6 text-sm">
@@ -79,4 +78,30 @@ export default function LoginPage() {
               </div>
             </div>
             <div className="flex justify-end">
-              <Link href="/recuperar-contrasen
+              <Link href="/recuperar-contrasena" className="text-brand-orange text-sm hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <React.Fragment><LogIn size={18} />Entrar</React.Fragment>
+              )}
+            </button>
+          </form>
+          <p className="text-center text-brand-gray-mid text-sm mt-6">
+            ¿No tienes cuenta?{' '}
+            <Link href="/registro" className="text-brand-orange font-medium hover:underline">
+              Regístrate
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, UserPlus } from 'lucide-react'
 
@@ -47,11 +47,3 @@ export default function RegisterPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-brand-gray-light flex items-center justify-center p-4">
-        <div className="card max-w-md w-full text-center py-12">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 size={32} class
