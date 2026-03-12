@@ -1,3 +1,4 @@
+'use client'
 import Link from 'next/link'
 import { ArrowRight, CheckCircle2, DollarSign, ShieldCheck, HeadphonesIcon, Truck, MapPin, Phone, Mail } from 'lucide-react'
 
