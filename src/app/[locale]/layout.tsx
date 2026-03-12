@@ -6,7 +6,11 @@ export const metadata: Metadata = {
   description: 'Distribuimos productos de calidad para restaurantes.',
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function LocaleLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="es">
       <body>{children}</body>
