@@ -1,7 +1,6 @@
 "use client"
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -9,7 +8,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   async function handleLogin() {
@@ -23,9 +21,9 @@ export default function LoginPage() {
       return
     }
     if (email === 'boodsupplies@gmail.com') {
-      router.push('/es/admin')
+      window.location.href = '/es/admin'
     } else {
-      router.push('/es/dashboard')
+      window.location.href = '/es/dashboard'
     }
   }
 
