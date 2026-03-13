@@ -1,4 +1,3 @@
-cat > ~/Desktop/bood-supply/src/app/\[locale\]/admin/page.tsx << 'ENDOFFILE'
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -169,4 +168,3 @@ export default function AdminPage() {
     </div>
   )
 }
-ENDOFFILE
