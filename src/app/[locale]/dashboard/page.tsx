@@ -1,241 +1,183 @@
 "use client"
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import { ShoppingBag, LogOut, ShoppingCart, X, Minus, Plus, Package } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
 
-const CATEGORIAS = ['Todas', 'Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos']
+const PRODUCTS = [
+  { name: 'Vasos Desechables', emoji: '🥤', desc: 'Vasos transparentes 8oz, 12oz, 16oz y 32oz' },
+  { name: 'Platos Desechables', emoji: '🍽️', desc: 'Platos de cartón y foam en diferentes tamaños' },
+  { name: 'Cubiertos', emoji: '🍴', desc: 'Tenedores, cuchillos, cucharas y sets completos' },
+  { name: 'Bolsas y Contenedores', emoji: '🛍️', desc: 'Bolsas de papel, plástico y contenedores con tapa' },
+  { name: 'Servilletas', emoji: '🗒️', desc: 'Servilletas de papel blancas en paquetes grandes' },
+  { name: 'Papel para Baño', emoji: '🧻', desc: 'Papel higiénico y papel toalla para tu negocio' },
+  { name: 'Papel', emoji: '📄', desc: 'Papel encerado y papel para envolver alimentos' },
+  { name: 'Palillos', emoji: '🪥', desc: 'Palillos de dientes y palillos removedores' },
+]
 
-export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [productos, setProductos] = useState<any[]>([])
-  const [pedidos, setPedidos] = useState<any[]>([])
-  const [categoria, setCategoria] = useState('Todas')
-  const [carrito, setCarrito] = useState<any[]>([])
-  const [showCarrito, setShowCarrito] = useState(false)
-  const [tab, setTab] = useState<'catalogo' | 'pedidos'>('catalogo')
-  const [pedidoEnviado, setPedidoEnviado] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
+const AREAS = ['Chicago', 'Cicero', 'Berwyn', 'Oak Park', 'Evanston', 'Skokie', 'Schaumburg', 'Naperville', 'Aurora', 'Joliet', 'Waukegan', 'Elgin', 'Arlington Heights', 'Bolingbrook']
 
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/es/login'); return }
-      setUser(user)
-      const { data: prods } = await supabase.from('productos').select('*').eq('activo', true).order('categoria')
-      setProductos(prods || [])
-      const { data: peds } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').eq('cliente_id', user.id).order('created_at', { ascending: false })
-      setPedidos(peds || [])
-      setLoading(false)
-    }
-    init()
-  }, [])
-
-  function agregarAlCarrito(producto: any) {
-    setCarrito(prev => {
-      const existe = prev.find(i => i.id === producto.id)
-      if (existe) return prev.map(i => i.id === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i)
-      return [...prev, { ...producto, cantidad: 1 }]
-    })
-  }
-
-  function cambiarCantidad(id: string, delta: number) {
-    setCarrito(prev => prev.map(i => i.id === id ? { ...i, cantidad: Math.max(1, i.cantidad + delta) } : i).filter(i => i.cantidad > 0))
-  }
-
-  function quitarDelCarrito(id: string) {
-    setCarrito(prev => prev.filter(i => i.id !== id))
-  }
-
-  const total = carrito.reduce((sum, i) => sum + i.precio * i.cantidad, 0)
-  const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0)
-  const productosFiltrados = categoria === 'Todas' ? productos : productos.filter(p => p.categoria === categoria)
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/es')
-  }
-
-  async function enviarPedido() {
-    if (carrito.length === 0) return
-    const { data: pedido } = await supabase.from('pedidos').insert({ cliente_id: user.id, total, estado: 'pendiente' }).select().single()
-    if (pedido) {
-      await supabase.from('pedido_items').insert(carrito.map(i => ({ pedido_id: pedido.id, producto_id: i.id, cantidad: i.cantidad, precio_unitario: i.precio })))
-      const { data: peds } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').eq('cliente_id', user.id).order('created_at', { ascending: false })
-      setPedidos(peds || [])
-      setCarrito([])
-      setShowCarrito(false)
-      setPedidoEnviado(true)
-      setTimeout(() => setPedidoEnviado(false), 4000)
-    }
-  }
-
-  if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-brand-gray-light">
+    <div className="min-h-screen bg-white font-body">
 
-      {pedidoEnviado && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">
-          ¡Pedido enviado! Te contactaremos pronto. ✓
-        </div>
-      )}
-
-      <nav className="bg-white border-b border-gray-100 shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <span className="font-heading font-bold text-xl text-brand-navy">BOOD <span className="text-brand-orange">SUPPLY</span></span>
-        <div className="flex items-center gap-4">
-          <button onClick={() => { setShowCarrito(true) }} className="relative flex items-center gap-2 text-sm font-medium text-brand-navy hover:text-brand-orange transition-colors">
-            <ShoppingCart size={22} />
-            {totalItems > 0 && <span className="absolute -top-2 -right-2 bg-brand-orange text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">{totalItems}</span>}
-          </button>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-brand-gray-mid hover:text-brand-orange transition-colors">
-            <LogOut size={16} /> Salir
-          </button>
+      {/* NAV */}
+      <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Image src="/logo.png" alt="Bood Supply" width={40} height={40} className="rounded-lg" />
+            <span className="font-heading font-bold text-xl text-brand-navy">BOOD <span className="text-brand-orange">SUPPLY</span></span>
+          </div>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-brand-gray-dark">
+            <a href="#productos" className="hover:text-brand-orange transition-colors">Productos</a>
+            <a href="#areas" className="hover:text-brand-orange transition-colors">Áreas</a>
+            <a href="#contacto" className="hover:text-brand-orange transition-colors">Contacto</a>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/es/login" className="text-sm font-medium text-brand-navy hover:text-brand-orange transition-colors">Iniciar Sesión</Link>
+            <Link href="/es/registro" className="btn-primary text-sm !py-2 !px-4">Crear Cuenta</Link>
+          </div>
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-
-        <div className="mb-6">
-          <h1 className="font-heading text-2xl font-bold text-brand-navy">Bienvenido</h1>
-          <p className="text-brand-gray-mid text-sm mt-0.5">{user?.email}</p>
+      {/* HERO */}
+      <section className="bg-gradient-to-br from-brand-navy via-brand-blue to-brand-navy text-white py-24 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-block bg-brand-orange/20 border border-brand-orange/30 text-brand-orange-light px-4 py-1.5 rounded-full text-sm font-medium mb-6">
+            Distribuidor de Suministros en Chicago
+          </div>
+          <h1 className="font-heading text-5xl md:text-6xl font-bold leading-tight mb-6">
+            Los suministros que necesitas<br />
+            <span className="text-brand-orange">en un solo lugar</span>
+          </h1>
+          <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
+            Vasos, platos, cubiertos, bolsas y más — entregados directo a tu restaurante en Chicago y área metropolitana.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/es/registro" className="bg-brand-orange hover:bg-brand-orange-light text-white font-heading font-bold px-8 py-4 rounded-button text-lg transition-all hover:shadow-lg">
+              Crear Cuenta Gratis
+            </Link>
+            <a href="#productos" className="bg-white/10 hover:bg-white/20 text-white font-heading font-bold px-8 py-4 rounded-button text-lg transition-all border border-white/20">
+              Ver Productos
+            </a>
+          </div>
         </div>
+      </section>
 
-        <div className="flex gap-3 mb-8">
-          <button onClick={() => setTab('catalogo')} className={`font-heading font-semibold px-6 py-2.5 rounded-button transition-all ${tab === 'catalogo' ? 'bg-brand-navy text-white' : 'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>Catálogo</button>
-          <button onClick={() => setTab('pedidos')} className={`font-heading font-semibold px-6 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab === 'pedidos' ? 'bg-brand-navy text-white' : 'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
-            Mis Pedidos
-            {pedidos.length > 0 && <span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${tab === 'pedidos' ? 'bg-white text-brand-navy' : 'bg-brand-orange text-white'}`}>{pedidos.length}</span>}
-          </button>
+      {/* STATS */}
+      <section className="bg-brand-gray-light py-12">
+        <div className="max-w-4xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          {[
+            { value: '200+', label: 'Productos disponibles' },
+            { value: '5+', label: 'Años de experiencia' },
+            { value: '98%', label: 'Clientes satisfechos' },
+            { value: '24h', label: 'Entrega rápida' },
+          ].map(({ value, label }) => (
+            <div key={label}>
+              <div className="font-heading text-3xl font-bold text-brand-navy">{value}</div>
+              <div className="text-sm text-brand-gray-mid mt-1">{label}</div>
+            </div>
+          ))}
         </div>
+      </section>
 
-        {tab === 'catalogo' && (
-          <>
-            <div className="flex gap-2 flex-wrap mb-6">
-              {CATEGORIAS.map(cat => (
-                <button key={cat} onClick={() => setCategoria(cat)} className={`text-sm px-4 py-1.5 rounded-full font-medium transition-all ${categoria === cat ? 'bg-brand-orange text-white' : 'bg-white text-brand-gray-dark border border-gray-200 hover:border-brand-orange'}`}>{cat}</button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {productosFiltrados.map(p => {
-                const enCarrito = carrito.find(i => i.id === p.id)
-                return (
-                  <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow">
-                    <div className="text-xs text-brand-orange font-semibold mb-1 uppercase tracking-wide">{p.categoria}</div>
-                    <h3 className="font-heading font-bold text-brand-navy text-base mb-1">{p.nombre}</h3>
-                    <p className="text-brand-gray-mid text-xs mb-1 flex-1">{p.descripcion}</p>
-                    <p className="text-xs text-gray-400 mb-3">{p.unidad}</p>
-                    <div className="flex items-center justify-between mt-auto">
-                      <span className="font-heading font-bold text-xl text-brand-navy">${p.precio}</span>
-                      {enCarrito ? (
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => cambiarCantidad(p.id, -1)} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors"><Minus size={12} /></button>
-                          <span className="font-bold text-sm w-5 text-center text-brand-navy">{enCarrito.cantidad}</span>
-                          <button onClick={() => cambiarCantidad(p.id, 1)} className="w-7 h-7 rounded-full bg-brand-orange text-white flex items-center justify-center hover:bg-orange-600 transition-colors"><Plus size={12} /></button>
-                        </div>
-                      ) : (
-                        <button onClick={() => agregarAlCarrito(p)} className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1">
-                          <Plus size={14} /> Agregar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </>
-        )}
-
-        {tab === 'pedidos' && (
-          <div>
-            {pedidos.length === 0 ? (
-              <div className="card text-center py-16 text-brand-gray-mid">
-                <ShoppingBag size={44} className="mx-auto mb-3 opacity-25" />
-                <p className="font-heading font-semibold text-lg">No tienes pedidos aún</p>
-                <p className="text-sm mt-1">Ve al catálogo y haz tu primer pedido</p>
-                <button onClick={() => setTab('catalogo')} className="btn-primary mt-6 inline-flex">Ver Catálogo</button>
+      {/* PRODUCTOS */}
+      <section id="productos" className="py-20 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="font-heading text-4xl font-bold text-brand-navy mb-3">Nuestros Productos</h2>
+            <p className="text-brand-gray-mid text-lg max-w-xl mx-auto">Suministros de calidad para restaurantes, cafeterías y negocios de food service</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            {PRODUCTS.map(({ name, emoji, desc }) => (
+              <div key={name} className="card hover:shadow-lg hover:-translate-y-1 transition-all cursor-default group">
+                <div className="text-4xl mb-3">{emoji}</div>
+                <h3 className="font-heading font-bold text-brand-navy text-base mb-1 group-hover:text-brand-orange transition-colors">{name}</h3>
+                <p className="text-brand-gray-mid text-sm">{desc}</p>
               </div>
-            ) : (
+            ))}
+          </div>
+          <div className="text-center mt-10">
+            <Link href="/es/registro" className="btn-primary text-base px-8 py-3 inline-block">
+              Ver Precios y Hacer Pedido →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* AREAS */}
+      <section id="areas" className="bg-brand-gray-light py-20 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="font-heading text-4xl font-bold text-brand-navy mb-3">Áreas de Servicio</h2>
+            <p className="text-brand-gray-mid text-lg">Entregamos en Chicago y toda el área metropolitana</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-10 items-start">
+            <div>
+              <div className="flex flex-wrap gap-2">
+                {AREAS.map(area => (
+                  <span key={area} className="bg-white border border-gray-200 text-brand-navy text-sm font-medium px-4 py-2 rounded-full shadow-sm">{area}</span>
+                ))}
+              </div>
+            </div>
+            <div className="card">
+              <h3 className="font-heading font-bold text-brand-navy text-xl mb-4">¿Cómo funciona?</h3>
               <div className="space-y-4">
-                {pedidos.map(ped => (
-                  <div key={ped.id} className="card">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="font-heading font-bold text-brand-navy">Pedido #{ped.id.slice(0,8).toUpperCase()}</p>
-                        <p className="text-sm text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${ped.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700' : ped.estado === 'entregado' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {ped.estado.charAt(0).toUpperCase() + ped.estado.slice(1)}
-                        </span>
-                        <p className="font-heading font-bold text-brand-orange text-lg mt-1">${ped.total.toFixed(2)}</p>
-                      </div>
-                    </div>
-                    <div className="border-t pt-3 space-y-1">
-                      {ped.pedido_items?.map((item: any) => (
-                        <div key={item.id} className="flex justify-between text-sm">
-                          <span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span>
-                          <span className="font-medium">${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
-                        </div>
-                      ))}
+                {[
+                  { num: '1', title: 'Crea tu cuenta', desc: 'Registro gratis en menos de 1 minuto' },
+                  { num: '2', title: 'Haz tu pedido', desc: 'Elige productos y cantidades desde tu catálogo' },
+                  { num: '3', title: 'Recibe en tu negocio', desc: 'Entregamos directo a tu puerta' },
+                ].map(({ num, title, desc }) => (
+                  <div key={num} className="flex gap-4 items-start">
+                    <div className="w-8 h-8 bg-brand-orange text-white rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0">{num}</div>
+                    <div>
+                      <p className="font-semibold text-brand-navy">{title}</p>
+                      <p className="text-brand-gray-mid text-sm">{desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {showCarrito && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-black/40" onClick={() => setShowCarrito(false)} />
-          <div className="w-full max-w-md bg-white flex flex-col h-full shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="font-heading font-bold text-xl text-brand-navy">Tu Pedido</h2>
-              <button onClick={() => setShowCarrito(false)} className="text-brand-gray-mid hover:text-brand-navy"><X size={22} /></button>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {carrito.length === 0 ? (
-                <div className="text-center py-16 text-brand-gray-mid">
-                  <ShoppingCart size={44} className="mx-auto mb-3 opacity-25" />
-                  <p>Tu carrito está vacío</p>
-                </div>
-              ) : carrito.map(item => (
-                <div key={item.id} className="flex items-center gap-3 py-3 border-b last:border-0">
-                  <div className="flex-1">
-                    <p className="font-medium text-brand-navy text-sm">{item.nombre}</p>
-                    <p className="text-brand-gray-mid text-xs">{item.unidad}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => cambiarCantidad(item.id, -1)} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-red-50"><Minus size={12} /></button>
-                    <span className="font-bold text-sm w-5 text-center">{item.cantidad}</span>
-                    <button onClick={() => cambiarCantidad(item.id, 1)} className="w-7 h-7 rounded-full bg-brand-orange text-white flex items-center justify-center"><Plus size={12} /></button>
-                  </div>
-                  <div className="text-right min-w-16">
-                    <p className="font-bold text-sm">${(item.precio * item.cantidad).toFixed(2)}</p>
-                    <button onClick={() => quitarDelCarrito(item.id)} className="text-red-400 text-xs hover:text-red-600">Quitar</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {carrito.length > 0 && (
-              <div className="px-6 py-5 border-t bg-gray-50">
-                <div className="flex justify-between mb-4">
-                  <span className="font-heading font-bold text-brand-navy text-lg">Total</span>
-                  <span className="font-heading font-bold text-2xl text-brand-orange">${total.toFixed(2)}</span>
-                </div>
-                <button onClick={enviarPedido} className="btn-primary w-full py-3 text-base">
-                  Enviar Pedido
-                </button>
-                <p className="text-xs text-center text-brand-gray-mid mt-3">Te contactaremos para confirmar la entrega</p>
-              </div>
-            )}
           </div>
         </div>
-      )}
+      </section>
+
+      {/* CTA */}
+      <section className="bg-brand-orange py-16 px-6 text-white text-center">
+        <h2 className="font-heading text-4xl font-bold mb-4">¿Listo para ordenar?</h2>
+        <p className="text-orange-100 text-lg mb-8 max-w-xl mx-auto">Crea tu cuenta gratis y accede a nuestro catálogo completo con precios especiales</p>
+        <Link href="/es/registro" className="bg-white text-brand-orange font-heading font-bold px-10 py-4 rounded-button text-lg hover:shadow-lg transition-all inline-block">
+          Empezar Ahora
+        </Link>
+      </section>
+
+      {/* FOOTER */}
+      <footer id="contacto" className="bg-brand-navy text-white py-12 px-6">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <Image src="/logo.png" alt="Bood Supply" width={36} height={36} className="rounded-lg" />
+              <span className="font-heading font-bold text-lg">BOOD SUPPLY</span>
+            </div>
+            <p className="text-blue-200 text-sm">Distribuidor de suministros para restaurantes en Chicago y área metropolitana.</p>
+          </div>
+          <div>
+            <h4 className="font-heading font-bold mb-4">Productos</h4>
+            <ul className="space-y-1 text-blue-200 text-sm">
+              {['Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Palillos'].map(p => <li key={p}>{p}</li>)}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-heading font-bold mb-4">Contacto</h4>
+            <div className="space-y-2 text-blue-200 text-sm">
+              <p>📍 2900 N Richmond St, Chicago, IL 60618</p>
+              <p>📞 +1 (312) 409-0106</p>
+              <p>✉️ boodsupplies@gmail.com</p>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto mt-8 pt-6 border-t border-white/10 text-center text-blue-300 text-sm">
+          © 2025 Bood Supply. Todos los derechos reservados.
+        </div>
+      </footer>
     </div>
   )
 }
