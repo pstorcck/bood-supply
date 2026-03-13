@@ -33,8 +33,8 @@ export default function HomePage() {
               <Link href="#productos" className="text-brand-gray-dark hover:text-brand-orange font-medium text-sm transition-colors">Productos</Link>
               <Link href="#areas" className="text-brand-gray-dark hover:text-brand-orange font-medium text-sm transition-colors">Áreas de Servicio</Link>
               <Link href="#contacto" className="text-brand-gray-dark hover:text-brand-orange font-medium text-sm transition-colors">Contacto</Link>
-              <Link href="/login" className="text-brand-navy border-2 border-brand-navy font-semibold text-sm px-4 py-2 rounded-button hover:bg-brand-navy hover:text-white transition-all">Iniciar Sesión</Link>
-              <Link href="/registro" className="btn-primary !py-2 !px-5 text-sm">Hazte Cliente</Link>
+              <Link href="/es/login" className="text-brand-navy border-2 border-brand-navy font-semibold text-sm px-4 py-2 rounded-button hover:bg-brand-navy hover:text-white transition-all">Iniciar Sesión</Link>
+              <Link href="/es/registro" className="btn-primary !py-2 !px-5 text-sm">Hazte Cliente</Link>
             </div>
           </div>
         </div>
@@ -57,7 +57,7 @@ export default function HomePage() {
               Distribuimos todo lo que tu restaurante necesita en Chicago y sus suburbios. Precio justo, calidad garantizada y entrega puntual.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mb-12">
-              <Link href="/registro" className="btn-primary flex items-center justify-center gap-2 text-lg !px-8 !py-4">
+              <Link href="/es/registro" className="btn-primary flex items-center justify-center gap-2 text-lg !px-8 !py-4">
                 Hazte Cliente Gratis <ArrowRight size={20} />
               </Link>
               <Link href="#productos" className="btn-ghost flex items-center justify-center gap-2 text-lg !px-8 !py-4">
@@ -121,7 +121,7 @@ export default function HomePage() {
             ))}
           </div>
           <div className="text-center mt-12">
-            <Link href="/registro" className="btn-primary inline-flex items-center gap-2 text-base">
+            <Link href="/es/registro" className="btn-primary inline-flex items-center gap-2 text-base">
               Ver Catálogo Completo <ArrowRight size={18} />
             </Link>
           </div>
@@ -145,7 +145,7 @@ export default function HomePage() {
                   </span>
                 ))}
               </div>
-              <Link href="/registro" className="btn-primary inline-flex items-center gap-2">
+              <Link href="/es/registro" className="btn-primary inline-flex items-center gap-2">
                 Empezar Ahora <ArrowRight size={18} />
               </Link>
             </div>
@@ -178,7 +178,7 @@ export default function HomePage() {
           <p className="text-orange-100 text-lg mb-10">
             Únete a los restaurantes que ya confían en BOOD SUPPLY en Chicago.
           </p>
-          <Link href="/registro" className="bg-white text-brand-orange font-heading font-bold text-lg px-10 py-4 rounded-button hover:bg-orange-50 transition-all inline-flex items-center gap-2 shadow-lg">
+          <Link href="/es/registro" className="bg-white text-brand-orange font-heading font-bold text-lg px-10 py-4 rounded-button hover:bg-orange-50 transition-all inline-flex items-center gap-2 shadow-lg">
             Crear Cuenta Gratis <ArrowRight size={20} />
           </Link>
         </div>
@@ -199,8 +199,8 @@ export default function HomePage() {
               <ul className="space-y-2">
                 <li><Link href="#productos" className="text-blue-200 hover:text-brand-orange text-sm transition-colors">Productos</Link></li>
                 <li><Link href="#areas" className="text-blue-200 hover:text-brand-orange text-sm transition-colors">Áreas de Servicio</Link></li>
-                <li><Link href="/registro" className="text-blue-200 hover:text-brand-orange text-sm transition-colors">Hazte Cliente</Link></li>
-                <li><Link href="/login" className="text-blue-200 hover:text-brand-orange text-sm transition-colors">Iniciar Sesión</Link></li>
+                <li><Link href="/es/registro" className="text-blue-200 hover:text-brand-orange text-sm transition-colors">Hazte Cliente</Link></li>
+                <li><Link href="/es/login" className="text-blue-200 hover:text-brand-orange text-sm transition-colors">Iniciar Sesión</Link></li>
               </ul>
             </div>
             <div>
