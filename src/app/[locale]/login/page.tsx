@@ -1,103 +1,82 @@
-'use client'
-
-import React, { useState } from 'react'
+"use client"
+import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
-import { Eye, EyeOff, LogIn } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-  const [showPwd, setShowPwd] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
+  const supabase = createClient()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
-    try {
-      await new Promise(r => setTimeout(r, 1000))
-      window.location.href = '/dashboard'
-    } catch {
-      setError('Error al iniciar sesión')
-    } finally {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setError('Correo o contraseña incorrectos')
       setLoading(false)
+    } else {
+      router.push('/es/dashboard')
     }
   }
 
   return (
-    <div className="min-h-screen bg-brand-gray-light flex items-center justify-center p-4">
+    <div className="min-h-screen bg-brand-gray-light flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 bg-brand-navy rounded-xl flex items-center justify-center">
-              <span className="font-heading font-bold text-white">BS</span>
-            </div>
-            <span className="font-heading font-bold text-brand-navy text-2xl">
-              BOOD <span className="text-brand-orange">SUPPLY</span>
-            </span>
+          <Link href="/es">
+            <Image src="/logo.png" alt="BOOD SUPPLY" width={120} height={60} className="object-contain mx-auto mb-4" />
           </Link>
-          <h1 className="font-heading font-bold text-brand-navy text-2xl mt-6 mb-1">Iniciar Sesión</h1>
-          <p className="text-brand-gray-mid text-sm">Accede a tu cuenta BOOD SUPPLY</p>
+          <h1 className="font-heading text-3xl font-bold text-brand-navy">Iniciar Sesión</h1>
+          <p className="text-brand-gray-mid mt-2">Accede a tu cuenta de BOOD SUPPLY</p>
         </div>
         <div className="card">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-button px-4 py-3 mb-6 text-sm">
-              {error}
-            </div>
-          )}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleLogin} className="space-y-5">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
             <div>
-              <label className="block font-medium text-brand-gray-dark text-sm mb-1.5">Correo electrónico</label>
+              <label className="block text-sm font-medium text-brand-gray-dark mb-1.5">Correo electrónico</label>
               <input
                 type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
                 required
-                className="input-field"
-                placeholder="correo@turestaurante.com"
-                value={form.email}
-                onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                placeholder="tu@restaurante.com"
+                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block font-medium text-brand-gray-dark text-sm mb-1.5">Contraseña</label>
-              <div className="relative">
-                <input
-                  type={showPwd ? 'text' : 'password'}
-                  required
-                  className="input-field pr-12"
-                  placeholder="••••••••"
-                  value={form.password}
-                  onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-gray-mid hover:text-brand-navy"
-                >
-                  {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Link href="/recuperar-contrasena" className="text-brand-orange text-sm hover:underline">
-                ¿Olvidaste tu contraseña?
-              </Link>
+              <label className="block text-sm font-medium text-brand-gray-dark mb-1.5">Contraseña</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+              />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full flex items-center justify-center gap-2"
+              className="btn-primary w-full py-3 text-base disabled:opacity-60"
             >
-              {loading ? (
-                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <React.Fragment><LogIn size={18} />Entrar</React.Fragment>
-              )}
+              {loading ? 'Entrando...' : 'Iniciar Sesión'}
             </button>
           </form>
-          <p className="text-center text-brand-gray-mid text-sm mt-6">
+          <p className="text-center text-sm text-brand-gray-mid mt-6">
             ¿No tienes cuenta?{' '}
-            <Link href="/registro" className="text-brand-orange font-medium hover:underline">
-              Regístrate
+            <Link href="/es/registro" className="text-brand-orange font-semibold hover:underline">
+              Regístrate gratis
             </Link>
           </p>
         </div>
