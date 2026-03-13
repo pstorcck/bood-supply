@@ -1,23 +1,24 @@
-// v2
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag } from 'lucide-react'
 
-const CATEGORIAS = ['Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos']
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
 
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'productos' | 'pedidos' | 'clientes'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias'>('pedidos')
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
-  const [showForm, setShowForm] = useState(false)
+  const [categorias, setCategorias] = useState<string[]>([])
+  const [showFormProducto, setShowFormProducto] = useState(false)
+  const [showFormCategoria, setShowFormCategoria] = useState(false)
   const [guardando, setGuardando] = useState(false)
-  const [form, setForm] = useState({ nombre: '', descripcion: '', categoria: CATEGORIAS[0], precio: '', unidad: '' })
+  const [nuevaCategoria, setNuevaCategoria] = useState('')
+  const [formProducto, setFormProducto] = useState({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
   const supabase = createClient()
 
   useEffect(() => {
@@ -33,7 +34,10 @@ export default function AdminPage() {
 
   async function cargarProductos() {
     const { data } = await supabase.from('productos').select('*').order('categoria').order('nombre')
-    setProductos(data || [])
+    const prods = data || []
+    setProductos(prods)
+    const cats = [...new Set(prods.map((p: any) => p.categoria))].filter(Boolean) as string[]
+    setCategorias(cats)
   }
 
   async function cargarPedidos() {
@@ -47,13 +51,27 @@ export default function AdminPage() {
   }
 
   async function agregarProducto() {
-    if (!form.nombre || !form.precio || !form.unidad) return alert('Llena todos los campos')
+    if (!formProducto.nombre || !formProducto.precio || !formProducto.unidad || !formProducto.categoria) return alert('Llena todos los campos')
     setGuardando(true)
-    await supabase.from('productos').insert({ ...form, precio: parseFloat(form.precio), activo: true })
-    setForm({ nombre: '', descripcion: '', categoria: CATEGORIAS[0], precio: '', unidad: '' })
-    setShowForm(false)
+    await supabase.from('productos').insert({ ...formProducto, precio: parseFloat(formProducto.precio), activo: true })
+    setFormProducto({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
+    setShowFormProducto(false)
     await cargarProductos()
     setGuardando(false)
+  }
+
+  async function agregarCategoria() {
+    if (!nuevaCategoria.trim()) return alert('Escribe un nombre')
+    if (categorias.includes(nuevaCategoria.trim())) return alert('Ya existe esa categoría')
+    setCategorias(prev => [...prev, nuevaCategoria.trim()])
+    setNuevaCategoria('')
+    setShowFormCategoria(false)
+  }
+
+  async function eliminarCategoria(cat: string) {
+    if (!confirm(`¿Eliminar categoría "${cat}"? Los productos de esta categoría quedarán sin categoría.`)) return
+    await supabase.from('productos').update({ categoria: '' }).eq('categoria', cat)
+    await cargarProductos()
   }
 
   async function toggleActivo(id: string, activo: boolean) {
@@ -72,13 +90,6 @@ export default function AdminPage() {
     await cargarPedidos()
   }
 
-  if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
-
-  const porCategoria = CATEGORIAS.reduce((acc, cat) => {
-    acc[cat] = productos.filter(p => p.categoria === cat)
-    return acc
-  }, {} as Record<string, any[]>)
-
   const estadoColor: Record<string, string> = {
     pendiente: 'bg-yellow-100 text-yellow-700',
     confirmado: 'bg-blue-100 text-blue-700',
@@ -87,6 +98,8 @@ export default function AdminPage() {
     entregado: 'bg-green-100 text-green-700',
     cancelado: 'bg-red-100 text-red-700',
   }
+
+  if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
 
   return (
     <div className="min-h-screen bg-brand-gray-light">
@@ -105,26 +118,26 @@ export default function AdminPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-8">
 
-        {/* STATS */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
             { label: 'Pedidos totales', value: pedidos.length, color: 'text-brand-navy' },
-            { label: 'Pedidos pendientes', value: pedidos.filter(p => p.estado === 'pendiente').length, color: 'text-yellow-600' },
-            { label: 'Clientes registrados', value: clientes.length, color: 'text-brand-orange' },
+            { label: 'Pendientes', value: pedidos.filter(p => p.estado === 'pendiente').length, color: 'text-yellow-600' },
+            { label: 'Clientes', value: clientes.length, color: 'text-brand-orange' },
+            { label: 'Productos', value: productos.length, color: 'text-green-600' },
           ].map(({ label, value, color }) => (
-            <div key={label} className="card text-center">
+            <div key={label} className="card text-center py-4">
               <div className={`font-heading text-3xl font-bold ${color}`}>{value}</div>
               <div className="text-brand-gray-mid text-sm mt-1">{label}</div>
             </div>
           ))}
         </div>
 
-        {/* TABS */}
-        <div className="flex gap-3 mb-8">
+        <div className="flex gap-2 flex-wrap mb-8">
           {[
             { key: 'pedidos', label: 'Pedidos', icon: ShoppingBag },
             { key: 'clientes', label: 'Clientes', icon: Users },
             { key: 'productos', label: 'Productos', icon: Package },
+            { key: 'categorias', label: 'Categorías', icon: Tag },
           ].map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab === key ? 'bg-brand-navy text-white' : 'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
               <Icon size={16} /> {label}
@@ -142,19 +155,17 @@ export default function AdminPage() {
               </div>
             ) : pedidos.map(ped => (
               <div key={ped.id} className="card">
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
                   <div>
                     <p className="font-heading font-bold text-brand-navy">Pedido #{ped.id.slice(0,8).toUpperCase()}</p>
                     <p className="text-sm text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                    <p className="text-xs text-brand-gray-mid mt-0.5">Cliente: {ped.cliente_id}</p>
+                    <p className="text-xs text-brand-gray-mid mt-0.5">Cliente ID: {ped.cliente_id?.slice(0,8)}...</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
-                    <div className="relative">
-                      <select value={ped.estado} onChange={e => cambiarEstado(ped.id, e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado] || 'bg-gray-100'}`}>
-                        {ESTADOS.map(e => <option key={e} value={e}>{e.replace('_', ' ').charAt(0).toUpperCase() + e.replace('_', ' ').slice(1)}</option>)}
-                      </select>
-                    </div>
+                    <select value={ped.estado} onChange={e => cambiarEstado(ped.id, e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado] || 'bg-gray-100'}`}>
+                      {ESTADOS.map(e => <option key={e} value={e}>{e.replace('_', ' ').charAt(0).toUpperCase() + e.replace('_', ' ').slice(1)}</option>)}
+                    </select>
                   </div>
                 </div>
                 <div className="border-t pt-3 space-y-1">
@@ -206,48 +217,49 @@ export default function AdminPage() {
           <>
             <div className="flex items-center justify-between mb-6">
               <p className="text-brand-gray-mid text-sm">{productos.length} productos · {productos.filter(p => p.activo).length} activos</p>
-              <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
+              <button onClick={() => setShowFormProducto(!showFormProducto)} className="btn-primary flex items-center gap-2">
                 <Plus size={18} /> Agregar Producto
               </button>
             </div>
-            {showForm && (
+            {showFormProducto && (
               <div className="card mb-6 border-2 border-brand-orange/30">
                 <h2 className="font-heading font-bold text-brand-navy text-lg mb-5">Nuevo Producto</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre *</label>
-                    <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                    <input value={formProducto.nombre} onChange={e => setFormProducto({...formProducto, nombre: e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-brand-gray-dark mb-1">Categoría *</label>
-                    <select value={form.categoria} onChange={e => setForm({...form, categoria: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
-                      {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
+                    <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
+                      <option value="">Selecciona categoría</option>
+                      {categorias.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-brand-gray-dark mb-1">Precio * (USD)</label>
-                    <input value={form.precio} onChange={e => setForm({...form, precio: e.target.value})} placeholder="Ej: 9.99" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                    <input value={formProducto.precio} onChange={e => setFormProducto({...formProducto, precio: e.target.value})} placeholder="Ej: 9.99" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-brand-gray-dark mb-1">Unidad *</label>
-                    <input value={form.unidad} onChange={e => setForm({...form, unidad: e.target.value})} placeholder="Ej: paquete 100u" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                    <input value={formProducto.unidad} onChange={e => setFormProducto({...formProducto, unidad: e.target.value})} placeholder="Ej: paquete 100u" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripción</label>
-                    <input value={form.descripcion} onChange={e => setForm({...form, descripcion: e.target.value})} placeholder="Descripción breve del producto" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                    <input value={formProducto.descripcion} onChange={e => setFormProducto({...formProducto, descripcion: e.target.value})} placeholder="Descripción breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
                   </div>
                 </div>
                 <div className="flex gap-3 mt-5">
                   <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">
                     {guardando ? 'Guardando...' : <><Plus size={16} /> Guardar</>}
                   </button>
-                  <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
+                  <button onClick={() => setShowFormProducto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                 </div>
               </div>
             )}
             <div className="space-y-6">
-              {CATEGORIAS.map(cat => {
-                const prods = porCategoria[cat]
+              {categorias.map(cat => {
+                const prods = productos.filter(p => p.categoria === cat)
                 if (prods.length === 0) return null
                 return (
                   <div key={cat} className="card">
@@ -281,6 +293,49 @@ export default function AdminPage() {
               })}
             </div>
           </>
+        )}
+
+        {/* CATEGORIAS */}
+        {tab === 'categorias' && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Categorías</h2>
+              <button onClick={() => setShowFormCategoria(!showFormCategoria)} className="btn-primary flex items-center gap-2">
+                <Plus size={18} /> Nueva Categoría
+              </button>
+            </div>
+            {showFormCategoria && (
+              <div className="border-2 border-brand-orange/30 rounded-xl p-4 mb-6">
+                <label className="block text-sm font-medium text-brand-gray-dark mb-2">Nombre de la categoría *</label>
+                <div className="flex gap-3">
+                  <input value={nuevaCategoria} onChange={e => setNuevaCategoria(e.target.value)} placeholder="Ej: Empaques Especiales" className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e => e.key === 'Enter' && agregarCategoria()} />
+                  <button onClick={agregarCategoria} className="btn-primary flex items-center gap-2"><Plus size={16} /> Agregar</button>
+                  <button onClick={() => setShowFormCategoria(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
+                </div>
+              </div>
+            )}
+            {categorias.length === 0 ? (
+              <div className="text-center py-12 text-brand-gray-mid">
+                <Tag size={40} className="mx-auto mb-3 opacity-25" />
+                <p>No hay categorías aún</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {categorias.map(cat => (
+                  <div key={cat} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <Tag size={16} className="text-brand-orange" />
+                      <span className="font-medium text-brand-navy">{cat}</span>
+                      <span className="text-xs text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{productos.filter(p => p.categoria === cat).length} productos</span>
+                    </div>
+                    <button onClick={() => eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400 hover:text-red-600">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
