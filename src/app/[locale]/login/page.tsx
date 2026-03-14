@@ -14,12 +14,8 @@ export default function LoginPage() {
     if (!email || !password) return setError('Llena todos los campos')
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError('Correo o contraseña incorrectos')
-      setLoading(false)
-      return
-    }
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInError) { setError('Correo o contraseña incorrectos'); setLoading(false); return }
     if (email === 'boodsupplies@gmail.com') {
       window.location.href = '/es/admin'
     } else {
