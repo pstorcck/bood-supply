@@ -1,17 +1,17 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save } from 'lucide-react'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
 
 const GRUPOS = [
-  { key: ['pendiente'], label: '📥 Recibidos', color: 'border-yellow-300 bg-yellow-50', badge: 'bg-yellow-100 text-yellow-700' },
-  { key: ['confirmado', 'en_preparacion'], label: '⏳ En Proceso', color: 'border-blue-300 bg-blue-50', badge: 'bg-blue-100 text-blue-700' },
-  { key: ['despachado'], label: '🚚 Despachados', color: 'border-orange-300 bg-orange-50', badge: 'bg-orange-100 text-orange-700' },
-  { key: ['entregado'], label: '✅ Entregados', color: 'border-green-300 bg-green-50', badge: 'bg-green-100 text-green-700' },
-  { key: ['cancelado'], label: '❌ Cancelados', color: 'border-red-300 bg-red-50', badge: 'bg-red-100 text-red-700' },
+  { key: ['pendiente'], label: '📥 Recibidos', color: 'border-yellow-300 bg-yellow-50' },
+  { key: ['confirmado', 'en_preparacion'], label: '⏳ En Proceso', color: 'border-blue-300 bg-blue-50' },
+  { key: ['despachado'], label: '🚚 Despachados', color: 'border-orange-300 bg-orange-50' },
+  { key: ['entregado'], label: '✅ Entregados', color: 'border-green-300 bg-green-50' },
+  { key: ['cancelado'], label: '❌ Cancelados', color: 'border-red-300 bg-red-50' },
 ]
 
 const estadoColor: Record<string, string> = {
@@ -31,11 +31,13 @@ export default function AdminPage() {
   const [pedidos, setPedidos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
   const [categorias, setCategorias] = useState<string[]>([])
+  const [seleccionados, setSeleccionados] = useState<string[]>([])
+  const [editandoCliente, setEditandoCliente] = useState<string | null>(null)
+  const [formCliente, setFormCliente] = useState<any>({})
   const [showFormProducto, setShowFormProducto] = useState(false)
   const [showFormCategoria, setShowFormCategoria] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [nuevaCategoria, setNuevaCategoria] = useState('')
-  const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [formProducto, setFormProducto] = useState({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
   const supabase = createClient()
 
@@ -59,15 +61,13 @@ export default function AdminPage() {
   }
 
   async function cargarPedidos() {
-    const { data } = await supabase.from('pedidos')
-      .select('*, pedido_items(*, productos(*))')
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').order('created_at', { ascending: false })
     setPedidos(data || [])
   }
 
   async function cargarClientes() {
-    const { data: authData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-    setClientes(authData || [])
+    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+    setClientes(data || [])
   }
 
   function getCliente(cliente_id: string) {
@@ -81,6 +81,19 @@ export default function AdminPage() {
   async function cambiarEstado(id: string, estado: string) {
     await supabase.from('pedidos').update({ estado }).eq('id', id)
     await cargarPedidos()
+  }
+
+  function iniciarEdicionCliente(c: any) {
+    setEditandoCliente(c.id)
+    setFormCliente({ nombre: c.nombre || '', negocio: c.negocio || '', telefono: c.telefono || '', direccion: c.direccion || '', ein: c.ein || '' })
+  }
+
+  async function guardarCliente(id: string) {
+    setGuardando(true)
+    await supabase.from('profiles').update(formCliente).eq('id', id)
+    await cargarClientes()
+    setEditandoCliente(null)
+    setGuardando(false)
   }
 
   async function agregarProducto() {
@@ -155,7 +168,10 @@ export default function AdminPage() {
         <div class="orden">
           <div class="header">
             <div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div>
-            <div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p><p>Estado: ${ped.estado.replace('_',' ')}</p></div>
+            <div style="text-align:right">
+              <p>${new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              <p>Estado: ${ped.estado.replace('_',' ')}</p>
+            </div>
           </div>
           <div class="seccion">
             <h3>Datos del Cliente</h3>
@@ -171,12 +187,12 @@ export default function AdminPage() {
             <h3>Detalle del Pedido</h3>
             ${ped.pedido_items?.map((item: any) => `
               <div class="item-row">
-                <span>${item.productos?.nombre || 'Producto'} &nbsp;<span style="color:#888">x${item.cantidad}</span></span>
+                <span>${item.productos?.nombre || 'Producto'} &nbsp;x${item.cantidad}</span>
                 <span><b>$${(item.precio_unitario * item.cantidad).toFixed(2)}</b></span>
               </div>
             `).join('')}
           </div>
-          <div class="total">Total del Pedido: $${ped.total?.toFixed(2)}</div>
+          <div class="total">Total: $${ped.total?.toFixed(2)}</div>
         </div>`
       }).join('')}
       </body></html>
@@ -185,7 +201,7 @@ export default function AdminPage() {
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
   }
 
-  const totalGeneral = pedidos.reduce((sum, p) => sum + (p.total || 0), 0)
+  const totalVentas = pedidos.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
 
   if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
 
@@ -211,7 +227,7 @@ export default function AdminPage() {
             { label: 'Pedidos totales', value: pedidos.length, color: 'text-brand-navy' },
             { label: 'Recibidos', value: pedidos.filter(p => p.estado === 'pendiente').length, color: 'text-yellow-600' },
             { label: 'Clientes', value: clientes.length, color: 'text-brand-orange' },
-            { label: 'Total ventas', value: `$${totalGeneral.toFixed(2)}`, color: 'text-green-600' },
+            { label: 'Total ventas', value: `$${totalVentas.toFixed(2)}`, color: 'text-green-600' },
           ].map(({ label, value, color }) => (
             <div key={label} className="card text-center py-4">
               <div className={`font-heading text-2xl font-bold ${color}`}>{value}</div>
@@ -296,8 +312,8 @@ export default function AdminPage() {
                                 <div><span className="text-brand-gray-mid">Negocio:</span> <span className="font-medium text-brand-navy">{cliente?.negocio || '—'}</span></div>
                                 <div><span className="text-brand-gray-mid">Teléfono:</span> <span className="font-medium text-brand-navy">{cliente?.telefono || '—'}</span></div>
                                 <div><span className="text-brand-gray-mid">EIN:</span> <span className="font-medium text-brand-navy">{cliente?.ein || '—'}</span></div>
-                                <div className="col-span-2"><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email || '—'}</span></div>
-                                <div className="col-span-2"><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion || '—'}</span></div>
                               </div>
                               <div className="border-t pt-2 space-y-1">
                                 {ped.pedido_items?.map((item: any) => (
@@ -321,69 +337,95 @@ export default function AdminPage() {
 
         {/* CLIENTES */}
         {tab === 'clientes' && (
-          <div className="card">
-            <h2 className="font-heading font-bold text-brand-navy text-xl mb-5">Clientes Registrados — {clientes.length}</h2>
+          <div className="space-y-3">
+            <h2 className="font-heading font-bold text-brand-navy text-xl mb-5">Clientes — {clientes.length}</h2>
             {clientes.length === 0 ? (
-              <div className="text-center py-12 text-brand-gray-mid">
+              <div className="card text-center py-12 text-brand-gray-mid">
                 <Users size={40} className="mx-auto mb-3 opacity-25" />
                 <p>No hay clientes aún</p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {clientes.map(c => {
-                  const pedidosCliente = getPedidosCliente(c.id)
-                  const ultimoPedido = pedidosCliente[0]
-                  const totalGastado = pedidosCliente.reduce((sum, p) => sum + (p.total || 0), 0)
-                  return (
-                    <div key={c.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50 hover:bg-white transition-colors">
-                      <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-brand-navy text-white rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0">
-                            {(c.nombre || c.email || '?')[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-heading font-bold text-brand-navy">{c.nombre || '—'}</p>
-                            <p className="text-xs text-brand-gray-mid">{c.email}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-3 text-right">
-                          <div className="text-center">
-                            <p className="font-heading font-bold text-brand-orange text-lg">{pedidosCliente.length}</p>
-                            <p className="text-xs text-brand-gray-mid">pedidos</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-heading font-bold text-green-600 text-lg">${totalGastado.toFixed(2)}</p>
-                            <p className="text-xs text-brand-gray-mid">total</p>
-                          </div>
-                        </div>
+            ) : clientes.map(c => {
+              const pedidosCliente = getPedidosCliente(c.id)
+              const ultimoPedido = pedidosCliente[0]
+              const totalGastado = pedidosCliente.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
+              const editando = editandoCliente === c.id
+
+              return (
+                <div key={c.id} className="card">
+                  <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-brand-navy text-white rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0">
+                        {(c.nombre || c.email || '?')[0].toUpperCase()}
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                        <div className="bg-white rounded-lg p-2 border border-gray-100">
-                          <p className="text-brand-gray-mid">Negocio</p>
-                          <p className="font-medium text-brand-navy">{c.negocio || '—'}</p>
-                        </div>
-                        <div className="bg-white rounded-lg p-2 border border-gray-100">
-                          <p className="text-brand-gray-mid">Teléfono</p>
-                          <p className="font-medium text-brand-navy">{c.telefono || '—'}</p>
-                        </div>
-                        <div className="bg-white rounded-lg p-2 border border-gray-100">
-                          <p className="text-brand-gray-mid">EIN</p>
-                          <p className="font-medium text-brand-navy">{c.ein || '—'}</p>
-                        </div>
-                        <div className="bg-white rounded-lg p-2 border border-gray-100 col-span-2">
-                          <p className="text-brand-gray-mid">Dirección</p>
-                          <p className="font-medium text-brand-navy">{c.direccion || '—'}</p>
-                        </div>
-                        <div className="bg-white rounded-lg p-2 border border-gray-100">
-                          <p className="text-brand-gray-mid">Último pedido</p>
-                          <p className="font-medium text-brand-navy">{ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : '—'}</p>
-                        </div>
+                      <div>
+                        <p className="font-heading font-bold text-brand-navy">{c.nombre || '—'}</p>
+                        <p className="text-xs text-brand-gray-mid">{c.email}</p>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            )}
+                    <div className="flex items-center gap-4">
+                      <div className="text-center">
+                        <p className="font-heading font-bold text-brand-orange text-lg">{pedidosCliente.length}</p>
+                        <p className="text-xs text-brand-gray-mid">pedidos</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-heading font-bold text-green-600 text-lg">${totalGastado.toFixed(2)}</p>
+                        <p className="text-xs text-brand-gray-mid">total</p>
+                      </div>
+                      {!editando ? (
+                        <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm text-brand-blue hover:text-brand-orange transition-colors border border-gray-200 px-3 py-1.5 rounded-lg">
+                          <Pencil size={14} /> Editar
+                        </button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button onClick={() => guardarCliente(c.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
+                            <Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}
+                          </button>
+                          <button onClick={() => setEditandoCliente(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-mid hover:text-brand-navy">
+                            <X size={14} /> Cancelar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {editando ? (
+                    <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
+                      {[
+                        { key: 'nombre', label: 'Nombre', placeholder: 'Nombre completo' },
+                        { key: 'negocio', label: 'Negocio', placeholder: 'Nombre del negocio' },
+                        { key: 'telefono', label: 'Teléfono', placeholder: '(312) 000-0000' },
+                        { key: 'ein', label: 'EIN', placeholder: 'XX-XXXXXXX' },
+                      ].map(({ key, label, placeholder }) => (
+                        <div key={key}>
+                          <label className="block text-xs font-medium text-brand-gray-dark mb-1">{label}</label>
+                          <input value={formCliente[key] || ''} onChange={e => setFormCliente({...formCliente, [key]: e.target.value})} placeholder={placeholder} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                        </div>
+                      ))}
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label>
+                        <input value={formCliente.direccion || ''} onChange={e => setFormCliente({...formCliente, direccion: e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs mt-3 border-t pt-3">
+                      {[
+                        { label: 'Negocio', value: c.negocio },
+                        { label: 'Teléfono', value: c.telefono },
+                        { label: 'EIN', value: c.ein },
+                        { label: 'Dirección', value: c.direccion, full: true },
+                        { label: 'Último pedido', value: ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : null },
+                        { label: 'Registro', value: new Date(c.created_at).toLocaleDateString('es-MX') },
+                      ].map(({ label, value, full }: any) => (
+                        <div key={label} className={`bg-gray-50 rounded-lg p-2 border border-gray-100 ${full ? 'col-span-2' : ''}`}>
+                          <p className="text-brand-gray-mid">{label}</p>
+                          <p className="font-medium text-brand-navy">{value || '—'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 
