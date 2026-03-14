@@ -1,17 +1,17 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, FileText, CheckSquare, Square } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square } from 'lucide-react'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
+
 const GRUPOS = [
-  { key: 'pendiente', label: 'Pendientes', color: 'border-yellow-300 bg-yellow-50' },
-  { key: 'confirmado', label: 'Confirmados', color: 'border-blue-300 bg-blue-50' },
-  { key: 'en_preparacion', label: 'En Preparación', color: 'border-purple-300 bg-purple-50' },
-  { key: 'despachado', label: 'Despachados', color: 'border-orange-300 bg-orange-50' },
-  { key: 'entregado', label: 'Entregados', color: 'border-green-300 bg-green-50' },
-  { key: 'cancelado', label: 'Cancelados', color: 'border-red-300 bg-red-50' },
+  { key: ['pendiente'], label: '📥 Recibidos', color: 'border-yellow-300 bg-yellow-50', badge: 'bg-yellow-100 text-yellow-700' },
+  { key: ['confirmado', 'en_preparacion'], label: '⏳ En Proceso', color: 'border-blue-300 bg-blue-50', badge: 'bg-blue-100 text-blue-700' },
+  { key: ['despachado'], label: '🚚 Despachados', color: 'border-orange-300 bg-orange-50', badge: 'bg-orange-100 text-orange-700' },
+  { key: ['entregado'], label: '✅ Entregados', color: 'border-green-300 bg-green-50', badge: 'bg-green-100 text-green-700' },
+  { key: ['cancelado'], label: '❌ Cancelados', color: 'border-red-300 bg-red-50', badge: 'bg-red-100 text-red-700' },
 ]
 
 const estadoColor: Record<string, string> = {
@@ -59,17 +59,23 @@ export default function AdminPage() {
   }
 
   async function cargarPedidos() {
-    const { data } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').order('created_at', { ascending: false })
+    const { data } = await supabase.from('pedidos')
+      .select('*, pedido_items(*, productos(*))')
+      .order('created_at', { ascending: false })
     setPedidos(data || [])
   }
 
   async function cargarClientes() {
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-    setClientes(data || [])
+    const { data: authData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+    setClientes(authData || [])
   }
 
   function getCliente(cliente_id: string) {
     return clientes.find(c => c.id === cliente_id)
+  }
+
+  function getPedidosCliente(cliente_id: string) {
+    return pedidos.filter(p => p.cliente_id === cliente_id)
   }
 
   async function cambiarEstado(id: string, estado: string) {
@@ -116,91 +122,67 @@ export default function AdminPage() {
     setSeleccionados(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
   }
 
-  function generarPDF() {
-    const pedidosSeleccionados = pedidos.filter(p => seleccionados.includes(p.id))
-    const contenido = pedidosSeleccionados.map(ped => {
-      const cliente = getCliente(ped.cliente_id)
-      const items = ped.pedido_items?.map((item: any) =>
-        `  - ${item.productos?.nombre} x${item.cantidad} @ $${item.precio_unitario} = $${(item.precio_unitario * item.cantidad).toFixed(2)}`
-      ).join('\n')
-      return `
-ORDEN DE ENTREGA
-================
-Pedido: #${ped.id.slice(0,8).toUpperCase()}
-Fecha: ${new Date(ped.created_at).toLocaleDateString('es-MX')}
-Estado: ${ped.estado}
-
-CLIENTE:
-Nombre: ${cliente?.nombre || 'N/A'}
-Negocio: ${cliente?.negocio || 'N/A'}
-Dirección: ${cliente?.direccion || 'N/A'}
-Teléfono: ${cliente?.telefono || 'N/A'}
-EIN: ${cliente?.ein || 'N/A'}
-
-PRODUCTOS:
-${items}
-
-TOTAL: $${ped.total?.toFixed(2)}
---------------------------------
-`
-    }).join('\n')
-
-    const blob = new Blob([contenido], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `ordenes-entrega-${new Date().toISOString().slice(0,10)}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  function imprimirPDF() {
+  function imprimirOrdenes() {
     const pedidosSeleccionados = pedidos.filter(p => seleccionados.includes(p.id))
     const html = `
-      <html><head><title>Órdenes de Entrega</title>
+      <html><head><title>Órdenes de Entrega — BOOD SUPPLY</title>
       <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
-        .orden { border: 1px solid #ccc; padding: 16px; margin-bottom: 24px; page-break-inside: avoid; border-radius: 8px; }
-        .header { background: #0F2B5B; color: white; padding: 10px 16px; border-radius: 6px; margin-bottom: 12px; }
-        .header h2 { margin: 0; font-size: 14px; }
-        .header p { margin: 2px 0; font-size: 11px; opacity: 0.8; }
-        .seccion { margin-bottom: 10px; }
-        .seccion h3 { font-size: 11px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; border-bottom: 1px solid #eee; padding-bottom: 2px; }
-        .row { display: flex; justify-content: space-between; padding: 2px 0; }
-        .total { font-size: 14px; font-weight: bold; color: #F47B20; text-align: right; margin-top: 8px; }
-        @media print { body { margin: 0; } }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color: #2D3748; }
+        .orden { border: 1px solid #ccc; padding: 16px; margin-bottom: 28px; page-break-inside: avoid; border-radius: 8px; }
+        .header { background: #0F2B5B; color: white; padding: 10px 16px; border-radius: 6px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .header h2 { margin: 0; font-size: 15px; }
+        .header p { margin: 0; font-size: 11px; opacity: 0.8; }
+        .seccion { margin-bottom: 12px; }
+        .seccion h3 { font-size: 10px; text-transform: uppercase; color: #888; margin: 0 0 6px 0; border-bottom: 1px solid #eee; padding-bottom: 3px; letter-spacing: 1px; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+        .campo { font-size: 11px; padding: 2px 0; }
+        .campo b { color: #0F2B5B; }
+        .item-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #f5f5f5; font-size: 11px; }
+        .total { font-size: 15px; font-weight: bold; color: #F47B20; text-align: right; margin-top: 10px; padding-top: 8px; border-top: 2px solid #F47B20; }
+        .logo-header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #0F2B5B; padding-bottom: 12px; }
+        .logo-header h1 { color: #0F2B5B; margin: 0; font-size: 20px; }
+        .logo-header p { color: #888; margin: 4px 0 0; font-size: 11px; }
+        @media print { body { margin: 10px; } }
       </style></head><body>
-      <h1 style="color:#0F2B5B;margin-bottom:20px">BOOD SUPPLY — Órdenes de Entrega</h1>
+      <div class="logo-header">
+        <h1>BOOD SUPPLY</h1>
+        <p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p>
+        <p style="margin-top:4px">Órdenes de Entrega — ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      </div>
       ${pedidosSeleccionados.map(ped => {
         const cliente = getCliente(ped.cliente_id)
         return `
         <div class="orden">
           <div class="header">
-            <h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2>
-            <p>${new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })} · Estado: ${ped.estado}</p>
+            <div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div>
+            <div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p><p>Estado: ${ped.estado.replace('_',' ')}</p></div>
           </div>
           <div class="seccion">
             <h3>Datos del Cliente</h3>
-            <div class="row"><span><b>Nombre:</b> ${cliente?.nombre || 'N/A'}</span><span><b>Negocio:</b> ${cliente?.negocio || 'N/A'}</span></div>
-            <div class="row"><span><b>Dirección:</b> ${cliente?.direccion || 'N/A'}</span></div>
-            <div class="row"><span><b>Teléfono:</b> ${cliente?.telefono || 'N/A'}</span><span><b>EIN:</b> ${cliente?.ein || 'N/A'}</span></div>
+            <div class="grid2">
+              <div class="campo"><b>Nombre:</b> ${cliente?.nombre || cliente?.email || 'N/A'}</div>
+              <div class="campo"><b>Negocio:</b> ${cliente?.negocio || 'N/A'}</div>
+              <div class="campo"><b>Teléfono:</b> ${cliente?.telefono || 'N/A'}</div>
+              <div class="campo"><b>EIN:</b> ${cliente?.ein || 'N/A'}</div>
+              <div class="campo" style="grid-column:span 2"><b>Dirección:</b> ${cliente?.direccion || 'N/A'}</div>
+            </div>
           </div>
           <div class="seccion">
-            <h3>Productos</h3>
+            <h3>Detalle del Pedido</h3>
             ${ped.pedido_items?.map((item: any) => `
-              <div class="row">
-                <span>${item.productos?.nombre} x${item.cantidad}</span>
-                <span>$${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
+              <div class="item-row">
+                <span>${item.productos?.nombre || 'Producto'} &nbsp;<span style="color:#888">x${item.cantidad}</span></span>
+                <span><b>$${(item.precio_unitario * item.cantidad).toFixed(2)}</b></span>
               </div>
             `).join('')}
           </div>
-          <div class="total">Total: $${ped.total?.toFixed(2)}</div>
+          <div class="total">Total del Pedido: $${ped.total?.toFixed(2)}</div>
         </div>`
       }).join('')}
       </body></html>
     `
     const win = window.open('', '_blank')
-    if (win) { win.document.write(html); win.document.close(); win.print() }
+    if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
   }
 
   const totalGeneral = pedidos.reduce((sum, p) => sum + (p.total || 0), 0)
@@ -223,10 +205,11 @@ TOTAL: $${ped.total?.toFixed(2)}
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
             { label: 'Pedidos totales', value: pedidos.length, color: 'text-brand-navy' },
-            { label: 'Pendientes', value: pedidos.filter(p => p.estado === 'pendiente').length, color: 'text-yellow-600' },
+            { label: 'Recibidos', value: pedidos.filter(p => p.estado === 'pendiente').length, color: 'text-yellow-600' },
             { label: 'Clientes', value: clientes.length, color: 'text-brand-orange' },
             { label: 'Total ventas', value: `$${totalGeneral.toFixed(2)}`, color: 'text-green-600' },
           ].map(({ label, value, color }) => (
@@ -255,66 +238,72 @@ TOTAL: $${ped.total?.toFixed(2)}
           <div>
             {seleccionados.length > 0 && (
               <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
-                <span className="text-sm">{seleccionados.length} pedido(s) seleccionado(s)</span>
+                <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
                 <div className="flex gap-3">
-                  <button onClick={imprimirPDF} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
-                    <FileText size={16} /> Imprimir Órdenes
+                  <button onClick={imprimirOrdenes} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
+                    🖨️ Imprimir Órdenes
                   </button>
                   <button onClick={() => setSeleccionados([])} className="text-sm text-blue-300 hover:text-white">Cancelar</button>
                 </div>
               </div>
             )}
 
+            {pedidos.length === 0 && (
+              <div className="card text-center py-12 text-brand-gray-mid">
+                <ShoppingBag size={40} className="mx-auto mb-3 opacity-25" />
+                <p>No hay pedidos aún</p>
+              </div>
+            )}
+
             {GRUPOS.map(grupo => {
-              const pedidosGrupo = pedidos.filter(p => p.estado === grupo.key)
+              const pedidosGrupo = pedidos.filter(p => grupo.key.includes(p.estado))
               if (pedidosGrupo.length === 0) return null
               const totalGrupo = pedidosGrupo.reduce((sum, p) => sum + (p.total || 0), 0)
               return (
-                <div key={grupo.key} className={`mb-8 border-2 ${grupo.color} rounded-2xl p-4`}>
+                <div key={grupo.label} className={`mb-8 border-2 ${grupo.color} rounded-2xl p-5`}>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="font-heading font-bold text-brand-navy text-lg flex items-center gap-2">
                       {grupo.label}
-                      <span className="text-sm font-normal text-brand-gray-mid bg-white px-2 py-0.5 rounded-full">{pedidosGrupo.length}</span>
+                      <span className="text-sm font-normal text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{pedidosGrupo.length}</span>
                     </h2>
-                    <span className="font-heading font-bold text-brand-orange">Total: ${totalGrupo.toFixed(2)}</span>
+                    <span className="font-heading font-bold text-brand-orange">Subtotal: ${totalGrupo.toFixed(2)}</span>
                   </div>
                   <div className="space-y-3">
                     {pedidosGrupo.map(ped => {
                       const cliente = getCliente(ped.cliente_id)
                       const seleccionado = seleccionados.includes(ped.id)
                       return (
-                        <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border transition-all ${seleccionado ? 'border-brand-orange' : 'border-gray-100'}`}>
+                        <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado ? 'border-brand-orange' : 'border-transparent'}`}>
                           <div className="flex items-start gap-3">
-                            <button onClick={() => toggleSeleccion(ped.id)} className="mt-1 text-brand-orange flex-shrink-0">
-                              {seleccionado ? <CheckSquare size={18} /> : <Square size={18} className="text-gray-300" />}
+                            <button onClick={() => toggleSeleccion(ped.id)} className="mt-1 flex-shrink-0">
+                              {seleccionado ? <CheckSquare size={18} className="text-brand-orange" /> : <Square size={18} className="text-gray-300" />}
                             </button>
                             <div className="flex-1">
-                              <div className="flex items-start justify-between flex-wrap gap-2 mb-2">
+                              <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
                                 <div>
                                   <p className="font-heading font-bold text-brand-navy">#{ped.id.slice(0,8).toUpperCase()}</p>
                                   <p className="text-xs text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className="font-heading font-bold text-brand-orange">${ped.total?.toFixed(2)}</span>
+                                  <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
                                   <select value={ped.estado} onChange={e => cambiarEstado(ped.id, e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>
-                                    {ESTADOS.map(e => <option key={e} value={e}>{e.replace('_', ' ').charAt(0).toUpperCase() + e.replace('_', ' ').slice(1)}</option>)}
+                                    {ESTADOS.map(e => <option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase() + e.replace('_',' ').slice(1)}</option>)}
                                   </select>
                                 </div>
                               </div>
-                              {cliente && (
-                                <div className="bg-gray-50 rounded-lg p-2 mb-2 text-xs text-brand-gray-dark grid grid-cols-2 gap-1">
-                                  <span><b>Cliente:</b> {cliente.nombre || 'N/A'}</span>
-                                  <span><b>Negocio:</b> {cliente.negocio || 'N/A'}</span>
-                                  <span><b>Tel:</b> {cliente.telefono || 'N/A'}</span>
-                                  <span><b>EIN:</b> {cliente.ein || 'N/A'}</span>
-                                  <span className="col-span-2"><b>Dirección:</b> {cliente.direccion || 'N/A'}</span>
-                                </div>
-                              )}
+                              <div className="bg-blue-50 rounded-lg p-3 mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                <div><span className="text-brand-gray-mid">Nombre:</span> <span className="font-medium text-brand-navy">{cliente?.nombre || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Negocio:</span> <span className="font-medium text-brand-navy">{cliente?.negocio || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Teléfono:</span> <span className="font-medium text-brand-navy">{cliente?.telefono || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">EIN:</span> <span className="font-medium text-brand-navy">{cliente?.ein || '—'}</span></div>
+                                <div className="col-span-2"><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email || '—'}</span></div>
+                                <div className="col-span-2"><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion || '—'}</span></div>
+                              </div>
                               <div className="border-t pt-2 space-y-1">
                                 {ped.pedido_items?.map((item: any) => (
                                   <div key={item.id} className="flex justify-between text-sm">
                                     <span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span>
-                                    <span className="font-medium">${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
+                                    <span className="font-medium text-brand-navy">${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
                                   </div>
                                 ))}
                               </div>
@@ -327,56 +316,73 @@ TOTAL: $${ped.total?.toFixed(2)}
                 </div>
               )
             })}
-
-            {pedidos.length === 0 && (
-              <div className="card text-center py-12 text-brand-gray-mid">
-                <ShoppingBag size={40} className="mx-auto mb-3 opacity-25" />
-                <p>No hay pedidos aún</p>
-              </div>
-            )}
           </div>
         )}
 
         {/* CLIENTES */}
         {tab === 'clientes' && (
-          <div className="card overflow-x-auto">
-            <h2 className="font-heading font-bold text-brand-navy text-xl mb-5">Clientes Registrados</h2>
+          <div className="card">
+            <h2 className="font-heading font-bold text-brand-navy text-xl mb-5">Clientes Registrados — {clientes.length}</h2>
             {clientes.length === 0 ? (
               <div className="text-center py-12 text-brand-gray-mid">
                 <Users size={40} className="mx-auto mb-3 opacity-25" />
                 <p>No hay clientes aún</p>
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-brand-gray-mid">
-                    <th className="pb-3 font-medium">Nombre</th>
-                    <th className="pb-3 font-medium">Negocio</th>
-                    <th className="pb-3 font-medium">Email</th>
-                    <th className="pb-3 font-medium">Teléfono</th>
-                    <th className="pb-3 font-medium">Dirección</th>
-                    <th className="pb-3 font-medium">EIN</th>
-                    <th className="pb-3 font-medium">Pedidos</th>
-                    <th className="pb-3 font-medium">Registro</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {clientes.map(c => (
-                    <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="py-3 font-medium text-brand-navy">{c.nombre || '—'}</td>
-                      <td className="py-3">{c.negocio || '—'}</td>
-                      <td className="py-3 text-brand-gray-mid">{c.email || '—'}</td>
-                      <td className="py-3">{c.telefono || '—'}</td>
-                      <td className="py-3 text-brand-gray-mid max-w-32 truncate">{c.direccion || '—'}</td>
-                      <td className="py-3">{c.ein || '—'}</td>
-                      <td className="py-3 text-center">
-                        <span className="bg-brand-orange/10 text-brand-orange font-bold px-2 py-0.5 rounded-full text-xs">{pedidos.filter(p => p.cliente_id === c.id).length}</span>
-                      </td>
-                      <td className="py-3 text-brand-gray-mid text-xs">{new Date(c.created_at).toLocaleDateString('es-MX')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-3">
+                {clientes.map(c => {
+                  const pedidosCliente = getPedidosCliente(c.id)
+                  const ultimoPedido = pedidosCliente[0]
+                  const totalGastado = pedidosCliente.reduce((sum, p) => sum + (p.total || 0), 0)
+                  return (
+                    <div key={c.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50 hover:bg-white transition-colors">
+                      <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-brand-navy text-white rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0">
+                            {(c.nombre || c.email || '?')[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-heading font-bold text-brand-navy">{c.nombre || '—'}</p>
+                            <p className="text-xs text-brand-gray-mid">{c.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3 text-right">
+                          <div className="text-center">
+                            <p className="font-heading font-bold text-brand-orange text-lg">{pedidosCliente.length}</p>
+                            <p className="text-xs text-brand-gray-mid">pedidos</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-heading font-bold text-green-600 text-lg">${totalGastado.toFixed(2)}</p>
+                            <p className="text-xs text-brand-gray-mid">total</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                        <div className="bg-white rounded-lg p-2 border border-gray-100">
+                          <p className="text-brand-gray-mid">Negocio</p>
+                          <p className="font-medium text-brand-navy">{c.negocio || '—'}</p>
+                        </div>
+                        <div className="bg-white rounded-lg p-2 border border-gray-100">
+                          <p className="text-brand-gray-mid">Teléfono</p>
+                          <p className="font-medium text-brand-navy">{c.telefono || '—'}</p>
+                        </div>
+                        <div className="bg-white rounded-lg p-2 border border-gray-100">
+                          <p className="text-brand-gray-mid">EIN</p>
+                          <p className="font-medium text-brand-navy">{c.ein || '—'}</p>
+                        </div>
+                        <div className="bg-white rounded-lg p-2 border border-gray-100 col-span-2">
+                          <p className="text-brand-gray-mid">Dirección</p>
+                          <p className="font-medium text-brand-navy">{c.direccion || '—'}</p>
+                        </div>
+                        <div className="bg-white rounded-lg p-2 border border-gray-100">
+                          <p className="text-brand-gray-mid">Último pedido</p>
+                          <p className="font-medium text-brand-navy">{ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : '—'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
         )}
@@ -475,7 +481,7 @@ TOTAL: $${ped.total?.toFixed(2)}
             </div>
             {showFormCategoria && (
               <div className="border-2 border-brand-orange/30 rounded-xl p-4 mb-6">
-                <label className="block text-sm font-medium text-brand-gray-dark mb-2">Nombre de la categoría *</label>
+                <label className="block text-sm font-medium text-brand-gray-dark mb-2">Nombre *</label>
                 <div className="flex gap-3">
                   <input value={nuevaCategoria} onChange={e => setNuevaCategoria(e.target.value)} placeholder="Ej: Empaques Especiales" className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e => e.key === 'Enter' && agregarCategoria()} />
                   <button onClick={agregarCategoria} className="btn-primary flex items-center gap-2"><Plus size={16} /> Agregar</button>
