@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText } from 'lucide-react'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
@@ -37,7 +37,7 @@ function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias'>('clientes')
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
@@ -50,6 +50,7 @@ export default function AdminPage() {
   const [guardando, setGuardando] = useState(false)
   const [nuevaCategoria, setNuevaCategoria] = useState('')
   const [formProducto, setFormProducto] = useState({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
+  const [aprobando, setAprobando] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -89,13 +90,29 @@ export default function AdminPage() {
     return pedidos.filter(p => p.cliente_id === cliente_id)
   }
 
+  async function aprobarCliente(c: any, aprobar: boolean) {
+    setAprobando(c.id)
+    await supabase.from('profiles').update({ aprobado: aprobar, aprobado_at: aprobar ? new Date().toISOString() : null }).eq('id', c.id)
+    if (aprobar) {
+      try {
+        await fetch('/api/aprobar-cliente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: c.email, nombre: c.nombre }),
+        })
+      } catch (e) { console.error('Email error:', e) }
+    }
+    await cargarClientes()
+    setAprobando(null)
+  }
+
   async function cambiarEstado(id: string, estado: string) {
     await supabase.from('pedidos').update({ estado }).eq('id', id)
     await cargarPedidos()
   }
 
   async function eliminarPedido(id: string) {
-    if (!confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return
+    if (!confirm('¿Eliminar este pedido?')) return
     await supabase.from('pedido_items').delete().eq('pedido_id', id)
     await supabase.from('pedidos').delete().eq('id', id)
     await cargarPedidos()
@@ -168,112 +185,64 @@ export default function AdminPage() {
     const headers = ['# Pedido', 'Fecha', 'Cliente', 'Negocio', 'Email', 'Dirección', 'EIN', 'Productos', 'Total', 'Estado']
     const filas = pedidos.map(ped => {
       const cliente = getCliente(ped.cliente_id)
-      const productos = ped.pedido_items?.map((i: any) => `${i.productos?.nombre} x${i.cantidad}`).join(' | ') || ''
-      return [
-        ped.id.slice(0,8).toUpperCase(),
-        new Date(ped.created_at).toLocaleDateString('es-MX'),
-        cliente?.nombre || '—',
-        cliente?.negocio || '—',
-        cliente?.email || '—',
-        cliente?.direccion || '—',
-        cliente?.ein || '—',
-        productos,
-        `$${ped.total?.toFixed(2)}`,
-        ped.estado,
-      ]
+      const prods = ped.pedido_items?.map((i: any) => `${i.productos?.nombre} x${i.cantidad}`).join(' | ') || ''
+      return [ped.id.slice(0,8).toUpperCase(), new Date(ped.created_at).toLocaleDateString('es-MX'), cliente?.nombre || '—', cliente?.negocio || '—', cliente?.email || '—', cliente?.direccion || '—', cliente?.ein || '—', prods, `$${ped.total?.toFixed(2)}`, ped.estado]
     })
     descargarCSV('ventas-bood-supply', filas, headers)
   }
 
   function exportarClientes() {
-    const headers = ['Nombre', 'Negocio', 'Email', 'Teléfono', 'Dirección', 'EIN', 'Pedidos', 'Total Gastado', 'Último Pedido', 'Fecha Registro']
+    const headers = ['Nombre', 'Negocio', 'Email', 'Teléfono', 'Dirección', 'EIN', 'Aprobado', 'Pedidos', 'Total Gastado', 'Último Pedido', 'Registro']
     const filas = clientes.map(c => {
       const pedidosC = getPedidosCliente(c.id)
       const totalGastado = pedidosC.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
       const ultimoPedido = pedidosC[0]
-      return [
-        c.nombre || '—',
-        c.negocio || '—',
-        c.email || '—',
-        c.telefono || '—',
-        c.direccion || '—',
-        c.ein || '—',
-        String(pedidosC.length),
-        `$${totalGastado.toFixed(2)}`,
-        ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : '—',
-        new Date(c.created_at).toLocaleDateString('es-MX'),
-      ]
+      return [c.nombre || '—', c.negocio || '—', c.email || '—', c.telefono || '—', c.direccion || '—', c.ein || '—', c.aprobado ? 'Sí' : 'No', String(pedidosC.length), `$${totalGastado.toFixed(2)}`, ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : '—', new Date(c.created_at).toLocaleDateString('es-MX')]
     })
     descargarCSV('clientes-bood-supply', filas, headers)
   }
 
   function imprimirOrdenes() {
     const pedidosSeleccionados = pedidos.filter(p => seleccionados.includes(p.id))
-    const html = `
-      <html><head><title>Órdenes de Entrega — BOOD SUPPLY</title>
-      <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color: #2D3748; }
-        .orden { border: 1px solid #ccc; padding: 16px; margin-bottom: 28px; page-break-inside: avoid; border-radius: 8px; }
-        .header { background: #0F2B5B; color: white; padding: 10px 16px; border-radius: 6px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
-        .header h2 { margin: 0; font-size: 15px; }
-        .header p { margin: 0; font-size: 11px; opacity: 0.8; }
-        .seccion { margin-bottom: 12px; }
-        .seccion h3 { font-size: 10px; text-transform: uppercase; color: #888; margin: 0 0 6px 0; border-bottom: 1px solid #eee; padding-bottom: 3px; letter-spacing: 1px; }
-        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
-        .campo { font-size: 11px; padding: 2px 0; }
-        .campo b { color: #0F2B5B; }
-        .item-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #f5f5f5; font-size: 11px; }
-        .total { font-size: 15px; font-weight: bold; color: #F47B20; text-align: right; margin-top: 10px; padding-top: 8px; border-top: 2px solid #F47B20; }
-        .logo-header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #0F2B5B; padding-bottom: 12px; }
-        .logo-header h1 { color: #0F2B5B; margin: 0; font-size: 20px; }
-        .logo-header p { color: #888; margin: 4px 0 0; font-size: 11px; }
-        @media print { body { margin: 10px; } }
-      </style></head><body>
-      <div class="logo-header">
-        <h1>BOOD SUPPLY</h1>
-        <p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p>
-        <p style="margin-top:4px">Órdenes de Entrega — ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-      </div>
-      ${pedidosSeleccionados.map(ped => {
-        const cliente = getCliente(ped.cliente_id)
-        return `
-        <div class="orden">
-          <div class="header">
-            <div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div>
-            <div style="text-align:right">
-              <p>${new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-              <p>Estado: ${ped.estado.replace('_',' ')}</p>
-            </div>
-          </div>
-          <div class="seccion">
-            <h3>Datos del Cliente</h3>
-            <div class="grid2">
-              <div class="campo"><b>Nombre:</b> ${cliente?.nombre || cliente?.email || 'N/A'}</div>
-              <div class="campo"><b>Negocio:</b> ${cliente?.negocio || 'N/A'}</div>
-              <div class="campo"><b>Teléfono:</b> ${cliente?.telefono || 'N/A'}</div>
-              <div class="campo"><b>EIN:</b> ${cliente?.ein || 'N/A'}</div>
-              <div class="campo" style="grid-column:span 2"><b>Dirección:</b> ${cliente?.direccion || 'N/A'}</div>
-            </div>
-          </div>
-          <div class="seccion">
-            <h3>Detalle del Pedido</h3>
-            ${ped.pedido_items?.map((item: any) => `
-              <div class="item-row">
-                <span>${item.productos?.nombre || 'Producto'} &nbsp;x${item.cantidad}</span>
-                <span><b>$${(item.precio_unitario * item.cantidad).toFixed(2)}</b></span>
-              </div>
-            `).join('')}
-          </div>
-          <div class="total">Total: $${ped.total?.toFixed(2)}</div>
-        </div>`
-      }).join('')}
-      </body></html>
-    `
+    const html = `<html><head><title>Órdenes — BOOD SUPPLY</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}
+      .orden{border:1px solid #ccc;padding:16px;margin-bottom:28px;page-break-inside:avoid;border-radius:8px}
+      .header{background:#0F2B5B;color:white;padding:10px 16px;border-radius:6px;margin-bottom:14px;display:flex;justify-content:space-between}
+      .header h2{margin:0;font-size:15px}.header p{margin:0;font-size:11px;opacity:.8}
+      .seccion{margin-bottom:12px}.seccion h3{font-size:10px;text-transform:uppercase;color:#888;margin:0 0 6px;border-bottom:1px solid #eee;padding-bottom:3px}
+      .grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.campo{font-size:11px;padding:2px 0}.campo b{color:#0F2B5B}
+      .item-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f5f5f5;font-size:11px}
+      .total{font-size:15px;font-weight:bold;color:#F47B20;text-align:right;margin-top:10px;padding-top:8px;border-top:2px solid #F47B20}
+      .logo-header{text-align:center;margin-bottom:24px;border-bottom:2px solid #0F2B5B;padding-bottom:12px}
+      .logo-header h1{color:#0F2B5B;margin:0;font-size:20px}
+    </style></head><body>
+    <div class="logo-header"><h1>BOOD SUPPLY</h1>
+    <p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p>
+    <p>Órdenes de Entrega — ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p></div>
+    ${pedidosSeleccionados.map(ped => {
+      const cliente = getCliente(ped.cliente_id)
+      return `<div class="orden">
+        <div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div>
+        <div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX', {year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')}</p></div></div>
+        <div class="seccion"><h3>Datos del Cliente</h3><div class="grid2">
+        <div class="campo"><b>Nombre:</b> ${cliente?.nombre||cliente?.email||'N/A'}</div>
+        <div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div>
+        <div class="campo"><b>Teléfono:</b> ${cliente?.telefono||'N/A'}</div>
+        <div class="campo"><b>EIN:</b> ${cliente?.ein||'N/A'}</div>
+        <div class="campo" style="grid-column:span 2"><b>Dirección:</b> ${cliente?.direccion||'N/A'}</div>
+        </div></div>
+        <div class="seccion"><h3>Detalle del Pedido</h3>
+        ${ped.pedido_items?.map((item: any) => `<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}
+        </div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`
+    }).join('')}
+    </body></html>`
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
   }
 
   const totalVentas = pedidos.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
+  const pendientesAprobacion = clientes.filter(c => !c.aprobado).length
 
   if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
 
@@ -309,118 +278,26 @@ export default function AdminPage() {
 
         <div className="flex gap-2 flex-wrap mb-8">
           {[
-            { key: 'pedidos', label: 'Pedidos', icon: ShoppingBag },
-            { key: 'clientes', label: 'Clientes', icon: Users },
-            { key: 'productos', label: 'Productos', icon: Package },
-            { key: 'categorias', label: 'Categorías', icon: Tag },
-          ].map(({ key, label, icon: Icon }) => (
+            { key: 'clientes', label: 'Clientes', icon: Users, badge: pendientesAprobacion },
+            { key: 'pedidos', label: 'Pedidos', icon: ShoppingBag, badge: 0 },
+            { key: 'productos', label: 'Productos', icon: Package, badge: 0 },
+            { key: 'categorias', label: 'Categorías', icon: Tag, badge: 0 },
+          ].map(({ key, label, icon: Icon, badge }) => (
             <button key={key} onClick={() => setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab === key ? 'bg-brand-navy text-white' : 'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
               <Icon size={16} /> {label}
+              {badge > 0 && <span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${tab === key ? 'bg-white text-brand-navy' : 'bg-red-500 text-white'}`}>{badge}</span>}
             </button>
           ))}
         </div>
-
-        {/* PEDIDOS */}
-        {tab === 'pedidos' && (
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <p className="text-brand-gray-mid text-sm">{pedidos.length} pedidos</p>
-              <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
-                <Download size={15} /> Exportar CSV
-              </button>
-            </div>
-
-            {seleccionados.length > 0 && (
-              <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
-                <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
-                <div className="flex gap-3">
-                  <button onClick={imprimirOrdenes} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
-                    🖨️ Imprimir Órdenes
-                  </button>
-                  <button onClick={() => setSeleccionados([])} className="text-sm text-blue-300 hover:text-white">Cancelar</button>
-                </div>
-              </div>
-            )}
-
-            {pedidos.length === 0 && (
-              <div className="card text-center py-12 text-brand-gray-mid">
-                <ShoppingBag size={40} className="mx-auto mb-3 opacity-25" />
-                <p>No hay pedidos aún</p>
-              </div>
-            )}
-
-            {GRUPOS.map(grupo => {
-              const pedidosGrupo = pedidos.filter(p => grupo.key.includes(p.estado))
-              if (pedidosGrupo.length === 0) return null
-              const totalGrupo = pedidosGrupo.reduce((sum, p) => sum + (p.total || 0), 0)
-              return (
-                <div key={grupo.label} className={`mb-8 border-2 ${grupo.color} rounded-2xl p-5`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-heading font-bold text-brand-navy text-lg flex items-center gap-2">
-                      {grupo.label}
-                      <span className="text-sm font-normal text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{pedidosGrupo.length}</span>
-                    </h2>
-                    <span className="font-heading font-bold text-brand-orange">Subtotal: ${totalGrupo.toFixed(2)}</span>
-                  </div>
-                  <div className="space-y-3">
-                    {pedidosGrupo.map(ped => {
-                      const cliente = getCliente(ped.cliente_id)
-                      const seleccionado = seleccionados.includes(ped.id)
-                      return (
-                        <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado ? 'border-brand-orange' : 'border-transparent'}`}>
-                          <div className="flex items-start gap-3">
-                            <button onClick={() => toggleSeleccion(ped.id)} className="mt-1 flex-shrink-0">
-                              {seleccionado ? <CheckSquare size={18} className="text-brand-orange" /> : <Square size={18} className="text-gray-300" />}
-                            </button>
-                            <div className="flex-1">
-                              <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
-                                <div>
-                                  <p className="font-heading font-bold text-brand-navy">#{ped.id.slice(0,8).toUpperCase()}</p>
-                                  <p className="text-xs text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
-                                  <select value={ped.estado} onChange={e => cambiarEstado(ped.id, e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>
-                                    {ESTADOS.map(e => <option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase() + e.replace('_',' ').slice(1)}</option>)}
-                                  </select>
-                                  <button onClick={() => eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400 hover:text-red-600">
-                                    <Trash2 size={15} />
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="bg-blue-50 rounded-lg p-3 mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                                <div><span className="text-brand-gray-mid">Nombre:</span> <span className="font-medium text-brand-navy">{cliente?.nombre || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Negocio:</span> <span className="font-medium text-brand-navy">{cliente?.negocio || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Teléfono:</span> <span className="font-medium text-brand-navy">{cliente?.telefono || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">EIN:</span> <span className="font-medium text-brand-navy">{cliente?.ein || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion || '—'}</span></div>
-                              </div>
-                              <div className="border-t pt-2 space-y-1">
-                                {ped.pedido_items?.map((item: any) => (
-                                  <div key={item.id} className="flex justify-between text-sm">
-                                    <span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span>
-                                    <span className="font-medium text-brand-navy">${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
 
         {/* CLIENTES */}
         {tab === 'clientes' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-5">
-              <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes — {clientes.length}</h2>
+              <h2 className="font-heading font-bold text-brand-navy text-xl">
+                Clientes — {clientes.length}
+                {pendientesAprobacion > 0 && <span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s) de aprobación</span>}
+              </h2>
               <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
                 <Download size={15} /> Exportar CSV
               </button>
@@ -437,35 +314,44 @@ export default function AdminPage() {
               const editando = editandoCliente === c.id
 
               return (
-                <div key={c.id} className="card">
+                <div key={c.id} className={`card border-l-4 ${c.aprobado ? 'border-l-green-400' : 'border-l-yellow-400'}`}>
                   <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-brand-navy text-white rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0 ${c.aprobado ? 'bg-green-500 text-white' : 'bg-yellow-400 text-white'}`}>
                         {(c.nombre || c.email || '?')[0].toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-heading font-bold text-brand-navy">{c.nombre || '—'}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-heading font-bold text-brand-navy">{c.nombre || '—'}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.aprobado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {c.aprobado ? '✓ Aprobado' : '⏳ Pendiente'}
+                          </span>
+                        </div>
                         <p className="text-xs text-brand-gray-mid">{c.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-center">
-                        <p className="font-heading font-bold text-brand-orange text-lg">{pedidosCliente.length}</p>
+                        <p className="font-heading font-bold text-brand-orange">{pedidosCliente.length}</p>
                         <p className="text-xs text-brand-gray-mid">pedidos</p>
                       </div>
                       <div className="text-center">
-                        <p className="font-heading font-bold text-green-600 text-lg">${totalGastado.toFixed(2)}</p>
+                        <p className="font-heading font-bold text-green-600">${totalGastado.toFixed(2)}</p>
                         <p className="text-xs text-brand-gray-mid">total</p>
                       </div>
+                      {!c.aprobado ? (
+                        <button onClick={() => aprobarCliente(c, true)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 transition-colors">
+                          <CheckCircle size={14} /> {aprobando === c.id ? 'Aprobando...' : 'Aprobar'}
+                        </button>
+                      ) : (
+                        <button onClick={() => aprobarCliente(c, false)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600 transition-colors">
+                          <XCircle size={14} /> Revocar
+                        </button>
+                      )}
                       {!editando ? (
-                        <div className="flex gap-2">
-                          <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange transition-colors">
-                            <Pencil size={14} /> Editar
-                          </button>
-                          <button onClick={() => eliminarCliente(c.id, c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors">
-                            <Trash2 size={14} /> Eliminar
-                          </button>
-                        </div>
+                        <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange transition-colors">
+                          <Pencil size={14} /> Editar
+                        </button>
                       ) : (
                         <div className="flex gap-2">
                           <button onClick={() => guardarCliente(c.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
@@ -476,8 +362,21 @@ export default function AdminPage() {
                           </button>
                         </div>
                       )}
+                      <button onClick={() => eliminarCliente(c.id, c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
+
+                  {c.sales_tax_url && (
+                    <div className="flex items-center gap-2 mb-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                      <FileText size={16} className="text-blue-500 flex-shrink-0" />
+                      <span className="text-xs text-blue-700 flex-1">Sales Tax Permit adjunto</span>
+                      <a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition-colors">
+                        Ver documento
+                      </a>
+                    </div>
+                  )}
 
                   {editando ? (
                     <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
@@ -514,6 +413,99 @@ export default function AdminPage() {
                       ))}
                     </div>
                   )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* PEDIDOS */}
+        {tab === 'pedidos' && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-brand-gray-mid text-sm">{pedidos.length} pedidos</p>
+              <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
+                <Download size={15} /> Exportar CSV
+              </button>
+            </div>
+            {seleccionados.length > 0 && (
+              <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
+                <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
+                <div className="flex gap-3">
+                  <button onClick={imprimirOrdenes} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
+                    🖨️ Imprimir Órdenes
+                  </button>
+                  <button onClick={() => setSeleccionados([])} className="text-sm text-blue-300 hover:text-white">Cancelar</button>
+                </div>
+              </div>
+            )}
+            {pedidos.length === 0 && (
+              <div className="card text-center py-12 text-brand-gray-mid">
+                <ShoppingBag size={40} className="mx-auto mb-3 opacity-25" />
+                <p>No hay pedidos aún</p>
+              </div>
+            )}
+            {GRUPOS.map(grupo => {
+              const pedidosGrupo = pedidos.filter(p => grupo.key.includes(p.estado))
+              if (pedidosGrupo.length === 0) return null
+              const totalGrupo = pedidosGrupo.reduce((sum, p) => sum + (p.total || 0), 0)
+              return (
+                <div key={grupo.label} className={`mb-8 border-2 ${grupo.color} rounded-2xl p-5`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-heading font-bold text-brand-navy text-lg flex items-center gap-2">
+                      {grupo.label}
+                      <span className="text-sm font-normal text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{pedidosGrupo.length}</span>
+                    </h2>
+                    <span className="font-heading font-bold text-brand-orange">Subtotal: ${totalGrupo.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {pedidosGrupo.map(ped => {
+                      const cliente = getCliente(ped.cliente_id)
+                      const seleccionado = seleccionados.includes(ped.id)
+                      return (
+                        <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado ? 'border-brand-orange' : 'border-transparent'}`}>
+                          <div className="flex items-start gap-3">
+                            <button onClick={() => toggleSeleccion(ped.id)} className="mt-1 flex-shrink-0">
+                              {seleccionado ? <CheckSquare size={18} className="text-brand-orange" /> : <Square size={18} className="text-gray-300" />}
+                            </button>
+                            <div className="flex-1">
+                              <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
+                                <div>
+                                  <p className="font-heading font-bold text-brand-navy">#{ped.id.slice(0,8).toUpperCase()}</p>
+                                  <p className="text-xs text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
+                                  <select value={ped.estado} onChange={e => cambiarEstado(ped.id, e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>
+                                    {ESTADOS.map(e => <option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase() + e.replace('_',' ').slice(1)}</option>)}
+                                  </select>
+                                  <button onClick={() => eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400">
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="bg-blue-50 rounded-lg p-3 mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                <div><span className="text-brand-gray-mid">Nombre:</span> <span className="font-medium text-brand-navy">{cliente?.nombre || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Negocio:</span> <span className="font-medium text-brand-navy">{cliente?.negocio || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Teléfono:</span> <span className="font-medium text-brand-navy">{cliente?.telefono || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">EIN:</span> <span className="font-medium text-brand-navy">{cliente?.ein || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion || '—'}</span></div>
+                              </div>
+                              <div className="border-t pt-2 space-y-1">
+                                {ped.pedido_items?.map((item: any) => (
+                                  <div key={item.id} className="flex justify-between text-sm">
+                                    <span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span>
+                                    <span className="font-medium text-brand-navy">${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )
             })}
