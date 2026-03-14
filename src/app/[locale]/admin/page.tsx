@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download } from 'lucide-react'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
@@ -21,6 +21,17 @@ const estadoColor: Record<string, string> = {
   despachado: 'bg-orange-100 text-orange-700',
   entregado: 'bg-green-100 text-green-700',
   cancelado: 'bg-red-100 text-red-700',
+}
+
+function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
+  const contenido = [headers, ...filas].map(r => r.map(c => `"${(c||'').replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob(['\uFEFF' + contenido], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${nombre}-${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export default function AdminPage() {
@@ -83,6 +94,24 @@ export default function AdminPage() {
     await cargarPedidos()
   }
 
+  async function eliminarPedido(id: string) {
+    if (!confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return
+    await supabase.from('pedido_items').delete().eq('pedido_id', id)
+    await supabase.from('pedidos').delete().eq('id', id)
+    await cargarPedidos()
+  }
+
+  async function eliminarCliente(id: string, email: string) {
+    if (!confirm(`¿Eliminar cliente ${email}? Se eliminarán también sus pedidos.`)) return
+    const pedidosCliente = pedidos.filter(p => p.cliente_id === id)
+    for (const ped of pedidosCliente) {
+      await supabase.from('pedido_items').delete().eq('pedido_id', ped.id)
+    }
+    await supabase.from('pedidos').delete().eq('cliente_id', id)
+    await supabase.from('profiles').delete().eq('id', id)
+    await Promise.all([cargarPedidos(), cargarClientes()])
+  }
+
   function iniciarEdicionCliente(c: any) {
     setEditandoCliente(c.id)
     setFormCliente({ nombre: c.nombre || '', negocio: c.negocio || '', telefono: c.telefono || '', direccion: c.direccion || '', ein: c.ein || '' })
@@ -133,6 +162,49 @@ export default function AdminPage() {
 
   function toggleSeleccion(id: string) {
     setSeleccionados(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
+  }
+
+  function exportarVentas() {
+    const headers = ['# Pedido', 'Fecha', 'Cliente', 'Negocio', 'Email', 'Dirección', 'EIN', 'Productos', 'Total', 'Estado']
+    const filas = pedidos.map(ped => {
+      const cliente = getCliente(ped.cliente_id)
+      const productos = ped.pedido_items?.map((i: any) => `${i.productos?.nombre} x${i.cantidad}`).join(' | ') || ''
+      return [
+        ped.id.slice(0,8).toUpperCase(),
+        new Date(ped.created_at).toLocaleDateString('es-MX'),
+        cliente?.nombre || '—',
+        cliente?.negocio || '—',
+        cliente?.email || '—',
+        cliente?.direccion || '—',
+        cliente?.ein || '—',
+        productos,
+        `$${ped.total?.toFixed(2)}`,
+        ped.estado,
+      ]
+    })
+    descargarCSV('ventas-bood-supply', filas, headers)
+  }
+
+  function exportarClientes() {
+    const headers = ['Nombre', 'Negocio', 'Email', 'Teléfono', 'Dirección', 'EIN', 'Pedidos', 'Total Gastado', 'Último Pedido', 'Fecha Registro']
+    const filas = clientes.map(c => {
+      const pedidosC = getPedidosCliente(c.id)
+      const totalGastado = pedidosC.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
+      const ultimoPedido = pedidosC[0]
+      return [
+        c.nombre || '—',
+        c.negocio || '—',
+        c.email || '—',
+        c.telefono || '—',
+        c.direccion || '—',
+        c.ein || '—',
+        String(pedidosC.length),
+        `$${totalGastado.toFixed(2)}`,
+        ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : '—',
+        new Date(c.created_at).toLocaleDateString('es-MX'),
+      ]
+    })
+    descargarCSV('clientes-bood-supply', filas, headers)
   }
 
   function imprimirOrdenes() {
@@ -221,7 +293,6 @@ export default function AdminPage() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
-
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
             { label: 'Pedidos totales', value: pedidos.length, color: 'text-brand-navy' },
@@ -252,6 +323,13 @@ export default function AdminPage() {
         {/* PEDIDOS */}
         {tab === 'pedidos' && (
           <div>
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-brand-gray-mid text-sm">{pedidos.length} pedidos</p>
+              <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
+                <Download size={15} /> Exportar CSV
+              </button>
+            </div>
+
             {seleccionados.length > 0 && (
               <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
                 <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
@@ -305,6 +383,9 @@ export default function AdminPage() {
                                   <select value={ped.estado} onChange={e => cambiarEstado(ped.id, e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>
                                     {ESTADOS.map(e => <option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase() + e.replace('_',' ').slice(1)}</option>)}
                                   </select>
+                                  <button onClick={() => eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400 hover:text-red-600">
+                                    <Trash2 size={15} />
+                                  </button>
                                 </div>
                               </div>
                               <div className="bg-blue-50 rounded-lg p-3 mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
@@ -338,7 +419,12 @@ export default function AdminPage() {
         {/* CLIENTES */}
         {tab === 'clientes' && (
           <div className="space-y-3">
-            <h2 className="font-heading font-bold text-brand-navy text-xl mb-5">Clientes — {clientes.length}</h2>
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes — {clientes.length}</h2>
+              <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
+                <Download size={15} /> Exportar CSV
+              </button>
+            </div>
             {clientes.length === 0 ? (
               <div className="card text-center py-12 text-brand-gray-mid">
                 <Users size={40} className="mx-auto mb-3 opacity-25" />
@@ -362,7 +448,7 @@ export default function AdminPage() {
                         <p className="text-xs text-brand-gray-mid">{c.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <div className="text-center">
                         <p className="font-heading font-bold text-brand-orange text-lg">{pedidosCliente.length}</p>
                         <p className="text-xs text-brand-gray-mid">pedidos</p>
@@ -372,15 +458,20 @@ export default function AdminPage() {
                         <p className="text-xs text-brand-gray-mid">total</p>
                       </div>
                       {!editando ? (
-                        <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm text-brand-blue hover:text-brand-orange transition-colors border border-gray-200 px-3 py-1.5 rounded-lg">
-                          <Pencil size={14} /> Editar
-                        </button>
+                        <div className="flex gap-2">
+                          <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange transition-colors">
+                            <Pencil size={14} /> Editar
+                          </button>
+                          <button onClick={() => eliminarCliente(c.id, c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors">
+                            <Trash2 size={14} /> Eliminar
+                          </button>
+                        </div>
                       ) : (
                         <div className="flex gap-2">
                           <button onClick={() => guardarCliente(c.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
                             <Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}
                           </button>
-                          <button onClick={() => setEditandoCliente(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-mid hover:text-brand-navy">
+                          <button onClick={() => setEditandoCliente(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-mid">
                             <X size={14} /> Cancelar
                           </button>
                         </div>
