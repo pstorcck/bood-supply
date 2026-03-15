@@ -1,14 +1,15 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import { ShoppingBag, LogOut, ShoppingCart, X, Minus, Plus } from 'lucide-react'
 
 const CATEGORIAS = ['Todas', 'Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos']
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [aprobado, setAprobado] = useState<boolean | null>(null)
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [categoria, setCategoria] = useState('Todas')
@@ -16,7 +17,6 @@ export default function DashboardPage() {
   const [showCarrito, setShowCarrito] = useState(false)
   const [tab, setTab] = useState<'catalogo' | 'pedidos'>('catalogo')
   const [pedidoEnviado, setPedidoEnviado] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
@@ -24,10 +24,31 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.href = '/es/login'; return }
       setUser(user)
-      const { data: prods } = await supabase.from('productos').select('*').eq('activo', true).order('categoria')
-      setProductos(prods || [])
-      const { data: peds } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').eq('cliente_id', user.id).order('created_at', { ascending: false })
-      setPedidos(peds || [])
+
+      const { data: prof, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      console.log('Profile loaded:', prof, 'Error:', error)
+
+      if (!prof) {
+        setAprobado(false)
+        setLoading(false)
+        return
+      }
+
+      setProfile(prof)
+      const estaAprobado = prof.aprobado === true
+      setAprobado(estaAprobado)
+
+      if (estaAprobado) {
+        const { data: prods } = await supabase.from('productos').select('*').eq('activo', true).order('categoria')
+        setProductos(prods || [])
+        const { data: peds } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').eq('cliente_id', user.id).order('created_at', { ascending: false })
+        setPedidos(peds || [])
+      }
       setLoading(false)
     }
     init()
@@ -67,7 +88,23 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
+  if (loading) return (
+    <div className="min-h-screen bg-brand-gray-light flex items-center justify-center">
+      <div className="text-brand-gray-mid">Cargando...</div>
+    </div>
+  )
+
+  if (aprobado === false) return (
+    <div className="min-h-screen bg-brand-gray-light flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-md p-8 text-center">
+        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">⏳</div>
+        <h2 className="font-heading text-2xl font-bold text-brand-navy mb-2">Cuenta en revisión</h2>
+        <p className="text-brand-gray-mid mb-2">Tu cuenta está siendo revisada por nuestro equipo.</p>
+        <p className="text-brand-gray-mid text-sm">Te enviaremos un correo a <strong>{user?.email}</strong> cuando sea aprobada.</p>
+        <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="mt-6 text-sm text-brand-gray-mid hover:text-brand-orange transition-colors block mx-auto">Cerrar Sesión</button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-brand-gray-light">
@@ -91,8 +128,8 @@ export default function DashboardPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="font-heading text-2xl font-bold text-brand-navy">Bienvenido</h1>
-          <p className="text-brand-gray-mid text-sm mt-0.5">{user?.email}</p>
+          <h1 className="font-heading text-2xl font-bold text-brand-navy">Bienvenido, {profile?.nombre || user?.email}</h1>
+          <p className="text-brand-gray-mid text-sm mt-0.5">{profile?.negocio}</p>
         </div>
         <div className="flex gap-3 mb-8">
           <button onClick={() => setTab('catalogo')} className={`font-heading font-semibold px-6 py-2.5 rounded-button transition-all ${tab === 'catalogo' ? 'bg-brand-navy text-white' : 'bg-white text-brand-navy border border-gray-200'}`}>Catálogo</button>
@@ -145,7 +182,6 @@ export default function DashboardPage() {
               <div className="card text-center py-16 text-brand-gray-mid">
                 <ShoppingBag size={44} className="mx-auto mb-3 opacity-25" />
                 <p className="font-heading font-semibold text-lg">No tienes pedidos aún</p>
-                <p className="text-sm mt-1">Ve al catálogo y haz tu primer pedido</p>
                 <button onClick={() => setTab('catalogo')} className="btn-primary mt-6 inline-flex">Ver Catálogo</button>
               </div>
             ) : (
@@ -161,7 +197,7 @@ export default function DashboardPage() {
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${ped.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700' : ped.estado === 'entregado' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                           {ped.estado.charAt(0).toUpperCase() + ped.estado.slice(1)}
                         </span>
-                        <p className="font-heading font-bold text-brand-orange text-lg mt-1">${ped.total.toFixed(2)}</p>
+                        <p className="font-heading font-bold text-brand-orange text-lg mt-1">${ped.total?.toFixed(2)}</p>
                       </div>
                     </div>
                     <div className="border-t pt-3 space-y-1">
