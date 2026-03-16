@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, Calendar } from 'lucide-react'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
@@ -37,7 +37,7 @@ function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias'>('clientes')
+  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes'>('clientes')
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
@@ -52,6 +52,13 @@ export default function AdminPage() {
   const [formProducto, setFormProducto] = useState({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
   const [imagenProducto, setImagenProducto] = useState<File | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [mensajeAsunto, setMensajeAsunto] = useState('')
+  const [mensajeCuerpo, setMensajeCuerpo] = useState('')
+  const [destinatarios, setDestinatarios] = useState<string[]>([])
+  const [enviandoMensaje, setEnviandoMensaje] = useState(false)
+  const [mensajeEnviado, setMensajeEnviado] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -90,6 +97,17 @@ export default function AdminPage() {
   function getPedidosCliente(cliente_id: string) {
     return pedidos.filter(p => p.cliente_id === cliente_id)
   }
+
+  const pedidosFiltrados = pedidos.filter(p => {
+    if (!fechaDesde && !fechaHasta) return true
+    const fecha = new Date(p.created_at)
+    if (fechaDesde && fecha < new Date(fechaDesde)) return false
+    if (fechaHasta && fecha > new Date(fechaHasta + 'T23:59:59')) return false
+    return true
+  })
+
+  const totalVentasFiltradas = pedidosFiltrados.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
+  const totalVentas = pedidos.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
 
   async function aprobarCliente(c: any, aprobar: boolean) {
     setAprobando(c.id)
@@ -143,6 +161,33 @@ export default function AdminPage() {
     setGuardando(false)
   }
 
+  async function enviarMensaje() {
+    if (!mensajeAsunto || !mensajeCuerpo) return alert('Llena asunto y mensaje')
+    if (destinatarios.length === 0) return alert('Selecciona al menos un destinatario')
+    setEnviandoMensaje(true)
+    try {
+      for (const email of destinatarios) {
+        const cliente = clientes.find(c => c.email === email)
+        await fetch('/api/aprobar-cliente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            nombre: cliente?.nombre || email,
+            asunto: mensajeAsunto,
+            cuerpo: mensajeCuerpo,
+          }),
+        })
+      }
+      setMensajeEnviado(true)
+      setMensajeAsunto('')
+      setMensajeCuerpo('')
+      setDestinatarios([])
+      setTimeout(() => setMensajeEnviado(false), 3000)
+    } catch (e) { console.error('Error:', e) }
+    setEnviandoMensaje(false)
+  }
+
   async function agregarProducto() {
     if (!formProducto.nombre || !formProducto.precio || !formProducto.unidad || !formProducto.categoria) return alert('Llena todos los campos')
     setGuardando(true)
@@ -174,9 +219,7 @@ export default function AdminPage() {
       const { error: updateError } = await supabase.from('productos').update({ imagen_url: urlData.publicUrl }).eq('id', id)
       if (updateError) { alert('Error actualizando producto: ' + updateError.message); return }
       await cargarProductos()
-    } catch (e: any) {
-      alert('Error: ' + e.message)
-    }
+    } catch (e: any) { alert('Error: ' + e.message) }
   }
 
   function seleccionarImagen(id: string) {
@@ -219,9 +262,13 @@ export default function AdminPage() {
     setSeleccionados(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
   }
 
+  function toggleDestinatario(email: string) {
+    setDestinatarios(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email])
+  }
+
   function exportarVentas() {
     const headers = ['# Pedido', 'Fecha', 'Cliente', 'Negocio', 'Email', 'Dirección', 'EIN', 'Método Pago', 'Productos', 'Subtotal', 'Fuel Surcharge', 'Total', 'Estado']
-    const filas = pedidos.map(ped => {
+    const filas = pedidosFiltrados.map(ped => {
       const cliente = getCliente(ped.cliente_id)
       const prods = ped.pedido_items?.map((i: any) => `${i.productos?.nombre} x${i.cantidad}`).join(' | ') || ''
       const subtotal = (ped.total || 0) - (ped.fuel_surcharge || 0)
@@ -231,12 +278,12 @@ export default function AdminPage() {
   }
 
   function exportarClientes() {
-    const headers = ['Nombre', 'Negocio', 'Email', 'Teléfono', 'Dirección', 'EIN', 'Aprobado', 'Pedidos', 'Total Gastado', 'Último Pedido', 'Registro']
+    const headers = ['Nombre', 'Negocio', 'Email', 'Teléfono', 'Dirección', 'EIN', 'Fecha Nacimiento', 'Aprobado', 'Pedidos', 'Total Gastado', 'Último Pedido', 'Registro']
     const filas = clientes.map(c => {
       const pedidosC = getPedidosCliente(c.id)
       const totalGastado = pedidosC.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
       const ultimoPedido = pedidosC[0]
-      return [c.nombre || '—', c.negocio || '—', c.email || '—', c.telefono || '—', c.direccion || '—', c.ein || '—', c.aprobado ? 'Sí' : 'No', String(pedidosC.length), `$${totalGastado.toFixed(2)}`, ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : '—', new Date(c.created_at).toLocaleDateString('es-MX')]
+      return [c.nombre || '—', c.negocio || '—', c.email || '—', c.telefono || '—', c.direccion || '—', c.ein || '—', c.fecha_nacimiento || '—', c.aprobado ? 'Sí' : 'No', String(pedidosC.length), `$${totalGastado.toFixed(2)}`, ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : '—', new Date(c.created_at).toLocaleDateString('es-MX')]
     })
     descargarCSV('clientes-bood-supply', filas, headers)
   }
@@ -282,7 +329,6 @@ export default function AdminPage() {
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
   }
 
-  const totalVentas = pedidos.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
   const pendientesAprobacion = clientes.filter(c => !c.aprobado).length
 
   if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
@@ -321,6 +367,7 @@ export default function AdminPage() {
           {[
             { key: 'clientes', label: 'Clientes', icon: Users, badge: pendientesAprobacion },
             { key: 'pedidos', label: 'Pedidos', icon: ShoppingBag, badge: 0 },
+            { key: 'mensajes', label: 'Mensajes', icon: Mail, badge: 0 },
             { key: 'productos', label: 'Productos', icon: Package, badge: 0 },
             { key: 'categorias', label: 'Categorías', icon: Tag, badge: 0 },
           ].map(({ key, label, icon: Icon, badge }) => (
@@ -444,6 +491,7 @@ export default function AdminPage() {
                         { label: 'Negocio', value: c.negocio },
                         { label: 'Teléfono', value: c.telefono },
                         { label: 'EIN', value: c.ein },
+                        { label: 'Fecha Nacimiento', value: c.fecha_nacimiento ? new Date(c.fecha_nacimiento).toLocaleDateString('es-MX', { timeZone: 'UTC' }) : null },
                         { label: 'Dirección', value: c.direccion, full: true },
                         { label: 'Último pedido', value: ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : null },
                         { label: 'Registro', value: new Date(c.created_at).toLocaleDateString('es-MX') },
@@ -464,12 +512,29 @@ export default function AdminPage() {
         {/* PEDIDOS */}
         {tab === 'pedidos' && (
           <div>
-            <div className="flex justify-between items-center mb-4">
-              <p className="text-brand-gray-mid text-sm">{pedidos.length} pedidos · Total: ${totalVentas.toFixed(2)}</p>
-              <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
-                <Download size={15} /> Exportar CSV
-              </button>
+            <div className="card mb-6">
+              <div className="flex flex-wrap items-end gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Desde</label>
+                  <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Hasta</label>
+                  <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                </div>
+                <button onClick={() => { setFechaDesde(''); setFechaHasta('') }} className="text-sm text-brand-gray-mid hover:text-brand-orange transition-colors px-3 py-2">Limpiar</button>
+                <div className="ml-auto flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-xs text-brand-gray-mid">Total período</p>
+                    <p className="font-heading font-bold text-xl text-green-600">${totalVentasFiltradas.toFixed(2)}</p>
+                  </div>
+                  <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
+                    <Download size={15} /> Exportar CSV
+                  </button>
+                </div>
+              </div>
             </div>
+
             {seleccionados.length > 0 && (
               <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
                 <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
@@ -481,14 +546,16 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-            {pedidos.length === 0 && (
+
+            {pedidosFiltrados.length === 0 && (
               <div className="card text-center py-12 text-brand-gray-mid">
                 <ShoppingBag size={40} className="mx-auto mb-3 opacity-25" />
-                <p>No hay pedidos aún</p>
+                <p>No hay pedidos en este período</p>
               </div>
             )}
+
             {GRUPOS.map(grupo => {
-              const pedidosGrupo = pedidos.filter(p => grupo.key.includes(p.estado))
+              const pedidosGrupo = pedidosFiltrados.filter(p => grupo.key.includes(p.estado))
               if (pedidosGrupo.length === 0) return null
               const totalGrupo = pedidosGrupo.reduce((sum, p) => sum + (p.total || 0), 0)
               return (
@@ -569,6 +636,56 @@ export default function AdminPage() {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {/* MENSAJES */}
+        {tab === 'mensajes' && (
+          <div className="card">
+            <h2 className="font-heading font-bold text-brand-navy text-xl mb-6">Enviar Mensaje a Clientes</h2>
+            {mensajeEnviado && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">
+                ✓ Mensaje enviado correctamente
+              </div>
+            )}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-brand-gray-dark mb-1">Asunto *</label>
+                <input value={mensajeAsunto} onChange={e => setMensajeAsunto(e.target.value)} placeholder="Asunto del mensaje" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-brand-gray-dark mb-1">Mensaje *</label>
+                <textarea value={mensajeCuerpo} onChange={e => setMensajeCuerpo(e.target.value)} placeholder="Escribe tu mensaje aquí..." rows={6} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange resize-none" />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-brand-gray-dark">Destinatarios *</label>
+                  <button onClick={() => setDestinatarios(clientes.filter(c => c.aprobado).map(c => c.email))} className="text-xs text-brand-orange hover:underline">
+                    Seleccionar todos los aprobados
+                  </button>
+                </div>
+                <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                  {clientes.map(c => (
+                    <div key={c.id} onClick={() => toggleDestinatario(c.email)} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 border-b last:border-0 ${destinatarios.includes(c.email) ? 'bg-blue-50' : ''}`}>
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${destinatarios.includes(c.email) ? 'bg-brand-orange border-brand-orange' : 'border-gray-300'}`}>
+                        {destinatarios.includes(c.email) && <span className="text-white text-xs">✓</span>}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-brand-navy">{c.nombre || c.email}</p>
+                        <p className="text-xs text-brand-gray-mid">{c.email}</p>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${c.aprobado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {c.aprobado ? 'Aprobado' : 'Pendiente'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {destinatarios.length > 0 && <p className="text-xs text-brand-gray-mid mt-1">{destinatarios.length} destinatario(s) seleccionado(s)</p>}
+              </div>
+              <button onClick={enviarMensaje} disabled={enviandoMensaje} className="btn-primary flex items-center gap-2">
+                <Mail size={16} /> {enviandoMensaje ? 'Enviando...' : 'Enviar Mensaje'}
+              </button>
+            </div>
           </div>
         )}
 
