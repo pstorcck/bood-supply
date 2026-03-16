@@ -182,11 +182,12 @@ export default function AdminPage() {
   }
 
   function exportarVentas() {
-    const headers = ['# Pedido', 'Fecha', 'Cliente', 'Negocio', 'Email', 'Dirección', 'EIN', 'Productos', 'Total', 'Estado']
+    const headers = ['# Pedido', 'Fecha', 'Cliente', 'Negocio', 'Email', 'Dirección', 'EIN', 'Método Pago', 'Productos', 'Subtotal', 'Fuel Surcharge', 'Total', 'Estado']
     const filas = pedidos.map(ped => {
       const cliente = getCliente(ped.cliente_id)
       const prods = ped.pedido_items?.map((i: any) => `${i.productos?.nombre} x${i.cantidad}`).join(' | ') || ''
-      return [ped.id.slice(0,8).toUpperCase(), new Date(ped.created_at).toLocaleDateString('es-MX'), cliente?.nombre || '—', cliente?.negocio || '—', cliente?.email || '—', cliente?.direccion || '—', cliente?.ein || '—', prods, `$${ped.total?.toFixed(2)}`, ped.estado]
+      const subtotal = (ped.total || 0) - (ped.fuel_surcharge || 0)
+      return [ped.id.slice(0,8).toUpperCase(), new Date(ped.created_at).toLocaleDateString('es-MX'), cliente?.nombre || '—', cliente?.negocio || '—', cliente?.email || '—', cliente?.direccion || '—', cliente?.ein || '—', ped.metodo_pago || '—', prods, `$${subtotal.toFixed(2)}`, `$${(ped.fuel_surcharge || 0).toFixed(2)}`, `$${ped.total?.toFixed(2)}`, ped.estado]
     })
     descargarCSV('ventas-bood-supply', filas, headers)
   }
@@ -222,9 +223,10 @@ export default function AdminPage() {
     <p>Órdenes de Entrega — ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p></div>
     ${pedidosSeleccionados.map(ped => {
       const cliente = getCliente(ped.cliente_id)
+      const subtotal = (ped.total || 0) - (ped.fuel_surcharge || 0)
       return `<div class="orden">
         <div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div>
-        <div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX', {year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')}</p></div></div>
+        <div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX', {year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')} · Pago: ${ped.metodo_pago || 'N/A'}</p></div></div>
         <div class="seccion"><h3>Datos del Cliente</h3><div class="grid2">
         <div class="campo"><b>Nombre:</b> ${cliente?.nombre||cliente?.email||'N/A'}</div>
         <div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div>
@@ -234,6 +236,7 @@ export default function AdminPage() {
         </div></div>
         <div class="seccion"><h3>Detalle del Pedido</h3>
         ${ped.pedido_items?.map((item: any) => `<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}
+        <div class="item-row" style="color:#888"><span>Fuel Surcharge</span><span>$${(ped.fuel_surcharge||0).toFixed(2)}</span></div>
         </div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`
     }).join('')}
     </body></html>`
@@ -296,23 +299,17 @@ export default function AdminPage() {
             <div className="flex justify-between items-center mb-5">
               <h2 className="font-heading font-bold text-brand-navy text-xl">
                 Clientes — {clientes.length}
-                {pendientesAprobacion > 0 && <span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s) de aprobación</span>}
+                {pendientesAprobacion > 0 && <span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s)</span>}
               </h2>
               <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
                 <Download size={15} /> Exportar CSV
               </button>
             </div>
-            {clientes.length === 0 ? (
-              <div className="card text-center py-12 text-brand-gray-mid">
-                <Users size={40} className="mx-auto mb-3 opacity-25" />
-                <p>No hay clientes aún</p>
-              </div>
-            ) : clientes.map(c => {
+            {clientes.map(c => {
               const pedidosCliente = getPedidosCliente(c.id)
               const ultimoPedido = pedidosCliente[0]
               const totalGastado = pedidosCliente.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
               const editando = editandoCliente === c.id
-
               return (
                 <div key={c.id} className={`card border-l-4 ${c.aprobado ? 'border-l-green-400' : 'border-l-yellow-400'}`}>
                   <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
@@ -340,16 +337,16 @@ export default function AdminPage() {
                         <p className="text-xs text-brand-gray-mid">total</p>
                       </div>
                       {!c.aprobado ? (
-                        <button onClick={() => aprobarCliente(c, true)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 transition-colors">
+                        <button onClick={() => aprobarCliente(c, true)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
                           <CheckCircle size={14} /> {aprobando === c.id ? 'Aprobando...' : 'Aprobar'}
                         </button>
                       ) : (
-                        <button onClick={() => aprobarCliente(c, false)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600 transition-colors">
+                        <button onClick={() => aprobarCliente(c, false)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600">
                           <XCircle size={14} /> Revocar
                         </button>
                       )}
                       {!editando ? (
-                        <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange transition-colors">
+                        <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange">
                           <Pencil size={14} /> Editar
                         </button>
                       ) : (
@@ -362,19 +359,29 @@ export default function AdminPage() {
                           </button>
                         </div>
                       )}
-                      <button onClick={() => eliminarCliente(c.id, c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors">
+                      <button onClick={() => eliminarCliente(c.id, c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50">
                         <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
 
-                  {c.sales_tax_url && (
-                    <div className="flex items-center gap-2 mb-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
-                      <FileText size={16} className="text-blue-500 flex-shrink-0" />
-                      <span className="text-xs text-blue-700 flex-1">Sales Tax Permit adjunto</span>
-                      <a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition-colors">
-                        Ver documento
-                      </a>
+                  {/* DOCUMENTOS */}
+                  {(c.sales_tax_url || c.id_foto_url) && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {c.sales_tax_url && (
+                        <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48">
+                          <FileText size={15} className="text-blue-500 flex-shrink-0" />
+                          <span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span>
+                          <a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600">Ver</a>
+                        </div>
+                      )}
+                      {c.id_foto_url && (
+                        <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48">
+                          <FileText size={15} className="text-purple-500 flex-shrink-0" />
+                          <span className="text-xs text-purple-700 flex-1">ID / Identificación</span>
+                          <a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600">Ver</a>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -423,7 +430,7 @@ export default function AdminPage() {
         {tab === 'pedidos' && (
           <div>
             <div className="flex justify-between items-center mb-4">
-              <p className="text-brand-gray-mid text-sm">{pedidos.length} pedidos</p>
+              <p className="text-brand-gray-mid text-sm">{pedidos.length} pedidos · Total ventas: ${totalVentas.toFixed(2)}</p>
               <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
                 <Download size={15} /> Exportar CSV
               </button>
@@ -462,6 +469,7 @@ export default function AdminPage() {
                     {pedidosGrupo.map(ped => {
                       const cliente = getCliente(ped.cliente_id)
                       const seleccionado = seleccionados.includes(ped.id)
+                      const subtotal = (ped.total || 0) - (ped.fuel_surcharge || 0)
                       return (
                         <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado ? 'border-brand-orange' : 'border-transparent'}`}>
                           <div className="flex items-start gap-3">
@@ -474,12 +482,12 @@ export default function AdminPage() {
                                   <p className="font-heading font-bold text-brand-navy">#{ped.id.slice(0,8).toUpperCase()}</p>
                                   <p className="text-xs text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
                                   <select value={ped.estado} onChange={e => cambiarEstado(ped.id, e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>
                                     {ESTADOS.map(e => <option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase() + e.replace('_',' ').slice(1)}</option>)}
                                   </select>
-                                  <button onClick={() => eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400">
+                                  <button onClick={() => eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400">
                                     <Trash2 size={15} />
                                   </button>
                                 </div>
@@ -491,6 +499,14 @@ export default function AdminPage() {
                                 <div><span className="text-brand-gray-mid">EIN:</span> <span className="font-medium text-brand-navy">{cliente?.ein || '—'}</span></div>
                                 <div><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email || '—'}</span></div>
                                 <div><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion || '—'}</span></div>
+                                <div className="col-span-2 flex items-center justify-between mt-1">
+                                  <div><span className="text-brand-gray-mid">Método de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago || '—'}</span></div>
+                                  {ped.comprobante_url && (
+                                    <a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">
+                                      <FileText size={11} /> Ver comprobante
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                               <div className="border-t pt-2 space-y-1">
                                 {ped.pedido_items?.map((item: any) => (
@@ -499,6 +515,15 @@ export default function AdminPage() {
                                     <span className="font-medium text-brand-navy">${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
                                   </div>
                                 ))}
+                                <div className="flex justify-between text-xs text-brand-gray-mid border-t pt-1">
+                                  <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-brand-gray-mid">
+                                  <span>Fuel Surcharge</span><span>${(ped.fuel_surcharge||0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm font-bold text-brand-navy border-t pt-1">
+                                  <span>Total</span><span>${ped.total?.toFixed(2)}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
