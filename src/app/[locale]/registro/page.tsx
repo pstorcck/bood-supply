@@ -5,18 +5,21 @@ import Link from 'next/link'
 
 export default function RegistroPage() {
   const [form, setForm] = useState({ email: '', password: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '' })
-  const [archivo, setArchivo] = useState<File | null>(null)
+  const [archivoTax, setArchivoTax] = useState<File | null>(null)
+  const [archivoId, setArchivoId] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [exitoso, setExitoso] = useState(false)
   const supabase = createClient()
 
-  useEffect(() => {
-    supabase.auth.signOut()
-  }, [])
+  useEffect(() => { supabase.auth.signOut() }, [])
 
   async function handleRegistro() {
-    if (!form.email || !form.password || !form.nombre || !form.negocio) return setError('Llena todos los campos obligatorios')
+    if (!form.email || !form.password || !form.nombre || !form.negocio || !form.telefono || !form.direccion || !form.ein) {
+      return setError('Todos los campos son obligatorios')
+    }
+    if (!archivoTax) return setError('Debes subir tu Sales Tax Permit')
+    if (!archivoId) return setError('Debes subir una foto de tu ID')
     setLoading(true)
     setError('')
 
@@ -24,17 +27,27 @@ export default function RegistroPage() {
     if (signUpError) { setError(signUpError.message); setLoading(false); return }
 
     let sales_tax_url = null
-    if (archivo && data.user) {
-      const ext = archivo.name.split('.').pop()
-      const path = `sales-tax/${data.user.id}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivo, { upsert: true })
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
-        sales_tax_url = urlData.publicUrl
-      }
-    }
+    let id_foto_url = null
 
     if (data.user) {
+      if (archivoTax) {
+        const ext = archivoTax.name.split('.').pop()
+        const path = `sales-tax/${data.user.id}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivoTax, { upsert: true })
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
+          sales_tax_url = urlData.publicUrl
+        }
+      }
+      if (archivoId) {
+        const ext = archivoId.name.split('.').pop()
+        const path = `ids/${data.user.id}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivoId, { upsert: true })
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
+          id_foto_url = urlData.publicUrl
+        }
+      }
       await supabase.from('profiles').upsert({
         id: data.user.id,
         email: form.email,
@@ -44,10 +57,10 @@ export default function RegistroPage() {
         direccion: form.direccion,
         ein: form.ein,
         sales_tax_url,
+        id_foto_url,
         aprobado: false,
       })
     }
-
     setExitoso(true)
     setLoading(false)
   }
@@ -73,34 +86,39 @@ export default function RegistroPage() {
         {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>}
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre *</label>
-              <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Tu nombre" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre Completo *</label>
+              <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Tu nombre completo" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
             </div>
             <div>
               <label className="block text-sm font-medium text-brand-gray-dark mb-1">Negocio *</label>
               <input value={form.negocio} onChange={e => setForm({...form, negocio: e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-brand-gray-dark mb-1">Teléfono</label>
-              <input value={form.telefono} onChange={e => setForm({...form, telefono: e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-brand-gray-dark mb-1">EIN</label>
+              <label className="block text-sm font-medium text-brand-gray-dark mb-1">EIN *</label>
               <input value={form.ein} onChange={e => setForm({...form, ein: e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Dirección</label>
-            <input value={form.direccion} onChange={e => setForm({...form, direccion: e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
+            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Teléfono *</label>
+            <input value={form.telefono} onChange={e => setForm({...form, telefono: e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Sales Tax Permit <span className="text-brand-gray-mid font-normal">(PDF o imagen)</span></label>
+            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Dirección del Negocio *</label>
+            <input value={form.direccion} onChange={e => setForm({...form, direccion: e.target.value})} placeholder="Dirección completa" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Sales Tax Permit * <span className="text-brand-gray-mid font-normal">(PDF o imagen)</span></label>
             <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors">
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivo(e.target.files?.[0] || null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer" />
-              {archivo && <p className="text-xs text-green-600 mt-2">✓ {archivo.name}</p>}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoTax(e.target.files?.[0] || null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer" />
+              {archivoTax && <p className="text-xs text-green-600 mt-2">✓ {archivoTax.name}</p>}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Foto de ID * <span className="text-brand-gray-mid font-normal">(licencia, pasaporte o identificación)</span></label>
+            <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors">
+              <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e => setArchivoId(e.target.files?.[0] || null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer" />
+              {archivoId && <p className="text-xs text-green-600 mt-2">✓ {archivoId.name}</p>}
             </div>
           </div>
           <div>

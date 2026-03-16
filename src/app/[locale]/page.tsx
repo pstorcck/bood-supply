@@ -11,6 +11,8 @@ const PRODUCTS = [
   { name: 'Papel para Baño', emoji: '🧻', desc: 'Papel higiénico y papel toalla para tu negocio' },
   { name: 'Papel', emoji: '📄', desc: 'Papel encerado y papel para envolver alimentos' },
   { name: 'Palillos', emoji: '🪥', desc: 'Palillos de dientes y palillos removedores' },
+  { name: 'Grocery', emoji: '🛒', desc: 'Productos de abarrotes y alimentos no perecederos' },
+  { name: 'Químicos y Limpieza', emoji: '🧴', desc: 'Productos de limpieza e higiene para tu negocio' },
 ]
 
 const AREAS = ['Chicago', 'Cicero', 'Berwyn', 'Oak Park', 'Evanston', 'Skokie', 'Schaumburg', 'Naperville', 'Aurora', 'Joliet', 'Waukegan', 'Elgin', 'Arlington Heights', 'Bolingbrook']
@@ -35,6 +37,7 @@ export default function HomePage() {
           </div>
         </div>
       </nav>
+
       <section className="bg-gradient-to-br from-brand-navy via-brand-blue to-brand-navy text-white py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-block bg-brand-orange/20 border border-brand-orange/30 text-brand-orange-light px-4 py-1.5 rounded-full text-sm font-medium mb-6">
@@ -57,13 +60,14 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
       <section className="bg-brand-gray-light py-12">
         <div className="max-w-4xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           {[
-            { value: '200+', label: 'Productos disponibles' },
-            { value: '5+', label: 'Años de experiencia' },
+            { value: 'Gran variedad', label: 'de productos disponibles' },
+            { value: '5+', label: 'Años en servicio al cliente y ventas' },
             { value: '98%', label: 'Clientes satisfechos' },
-            { value: '24h', label: 'Entrega rápida' },
+            { value: '48h', label: 'Entrega rápida garantizada' },
           ].map(({ value, label }) => (
             <div key={label}>
               <div className="font-heading text-3xl font-bold text-brand-navy">{value}</div>
@@ -72,6 +76,7 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
       <section id="productos" className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
@@ -94,6 +99,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
       <section id="areas" className="bg-brand-gray-light py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
@@ -101,10 +107,13 @@ export default function HomePage() {
             <p className="text-brand-gray-mid text-lg">Entregamos en Chicago y toda el área metropolitana</p>
           </div>
           <div className="grid md:grid-cols-2 gap-10 items-start">
-            <div className="flex flex-wrap gap-2">
-              {AREAS.map(area => (
-                <span key={area} className="bg-white border border-gray-200 text-brand-navy text-sm font-medium px-4 py-2 rounded-full shadow-sm">{area}</span>
-              ))}
+            <div>
+              <h3 className="font-heading font-bold text-brand-navy text-lg mb-4">Chicago y Suburbios</h3>
+              <div className="flex flex-wrap gap-2">
+                {AREAS.map(area => (
+                  <span key={area} className="bg-white border border-gray-200 text-brand-navy text-sm font-medium px-4 py-2 rounded-full shadow-sm">{area}</span>
+                ))}
+              </div>
             </div>
             <div className="card">
               <h3 className="font-heading font-bold text-brand-navy text-xl mb-4">¿Cómo funciona?</h3>
@@ -112,7 +121,7 @@ export default function HomePage() {
                 {[
                   { num: '1', title: 'Crea tu cuenta', desc: 'Registro gratis en menos de 1 minuto' },
                   { num: '2', title: 'Haz tu pedido', desc: 'Elige productos y cantidades desde tu catálogo' },
-                  { num: '3', title: 'Recibe en tu negocio', desc: 'Entregamos directo a tu puerta' },
+                  { num: '3', title: 'Recibe en tu negocio', desc: 'Entregamos directo a tu puerta en 48 horas' },
                 ].map(({ num, title, desc }) => (
                   <div key={num} className="flex gap-4 items-start">
                     <div className="w-8 h-8 bg-brand-orange text-white rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0">{num}</div>
@@ -127,6 +136,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
       <section className="bg-brand-orange py-16 px-6 text-white text-center">
         <h2 className="font-heading text-4xl font-bold mb-4">¿Listo para ordenar?</h2>
         <p className="text-orange-100 text-lg mb-8 max-w-xl mx-auto">Crea tu cuenta gratis y accede a nuestro catálogo completo con precios especiales</p>
@@ -134,6 +144,7 @@ export default function HomePage() {
           Empezar Ahora
         </Link>
       </section>
+
       <footer id="contacto" className="bg-brand-navy text-white py-12 px-6">
         <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
           <div>
@@ -146,7 +157,7 @@ export default function HomePage() {
           <div>
             <h4 className="font-heading font-bold mb-4">Productos</h4>
             <ul className="space-y-1 text-blue-200 text-sm">
-              {['Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Palillos'].map(p => <li key={p}>{p}</li>)}
+              {['Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Grocery', 'Químicos y Limpieza'].map(p => <li key={p}>{p}</li>)}
             </ul>
           </div>
           <div>

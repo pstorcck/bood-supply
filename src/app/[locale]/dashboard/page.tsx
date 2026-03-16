@@ -1,9 +1,11 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { ShoppingBag, LogOut, ShoppingCart, X, Minus, Plus } from 'lucide-react'
+import { ShoppingBag, LogOut, ShoppingCart, X, Minus, Plus, Upload } from 'lucide-react'
 
-const CATEGORIAS = ['Todas', 'Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos']
+const CATEGORIAS = ['Todas', 'Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos', 'Grocery', 'Químicos y Limpieza']
+const METODOS_PAGO = ['Efectivo', 'ACH', 'Tarjeta de crédito', 'Cheque']
+const FUEL_SURCHARGE = 5.00
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
@@ -17,6 +19,9 @@ export default function DashboardPage() {
   const [showCarrito, setShowCarrito] = useState(false)
   const [tab, setTab] = useState<'catalogo' | 'pedidos'>('catalogo')
   const [pedidoEnviado, setPedidoEnviado] = useState(false)
+  const [metodoPago, setMetodoPago] = useState('')
+  const [comprobante, setComprobante] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -24,25 +29,11 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.href = '/es/login'; return }
       setUser(user)
-
-      const { data: prof, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      console.log('Profile loaded:', prof, 'Error:', error)
-
-      if (!prof) {
-        setAprobado(false)
-        setLoading(false)
-        return
-      }
-
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      if (!prof) { setAprobado(false); setLoading(false); return }
       setProfile(prof)
       const estaAprobado = prof.aprobado === true
       setAprobado(estaAprobado)
-
       if (estaAprobado) {
         const { data: prods } = await supabase.from('productos').select('*').eq('activo', true).order('categoria')
         setProductos(prods || [])
@@ -70,29 +61,53 @@ export default function DashboardPage() {
     setCarrito(prev => prev.filter(i => i.id !== id))
   }
 
-  const total = carrito.reduce((sum, i) => sum + i.precio * i.cantidad, 0)
+  const subtotal = carrito.reduce((sum, i) => sum + i.precio * i.cantidad, 0)
+  const total = subtotal + (carrito.length > 0 ? FUEL_SURCHARGE : 0)
   const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0)
   const productosFiltrados = categoria === 'Todas' ? productos : productos.filter(p => p.categoria === categoria)
+  const requiereComprobante = metodoPago && metodoPago !== 'Efectivo'
 
   async function enviarPedido() {
     if (carrito.length === 0) return
-    const { data: pedido } = await supabase.from('pedidos').insert({ cliente_id: user.id, total, estado: 'pendiente' }).select().single()
+    if (!metodoPago) return alert('Selecciona un método de pago')
+    if (requiereComprobante && !comprobante) return alert('Debes adjuntar el comprobante de pago')
+    setEnviando(true)
+
+    let comprobante_url = null
+    if (comprobante && user) {
+      const ext = comprobante.name.split('.').pop()
+      const path = `comprobantes/${user.id}-${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('documentos').upload(path, comprobante, { upsert: true })
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
+        comprobante_url = urlData.publicUrl
+      }
+    }
+
+    const { data: pedido } = await supabase.from('pedidos').insert({
+      cliente_id: user.id,
+      total,
+      fuel_surcharge: FUEL_SURCHARGE,
+      metodo_pago: metodoPago,
+      comprobante_url,
+      estado: 'pendiente'
+    }).select().single()
+
     if (pedido) {
       await supabase.from('pedido_items').insert(carrito.map(i => ({ pedido_id: pedido.id, producto_id: i.id, cantidad: i.cantidad, precio_unitario: i.precio })))
       const { data: peds } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').eq('cliente_id', user.id).order('created_at', { ascending: false })
       setPedidos(peds || [])
       setCarrito([])
+      setMetodoPago('')
+      setComprobante(null)
       setShowCarrito(false)
       setPedidoEnviado(true)
       setTimeout(() => setPedidoEnviado(false), 4000)
     }
+    setEnviando(false)
   }
 
-  if (loading) return (
-    <div className="min-h-screen bg-brand-gray-light flex items-center justify-center">
-      <div className="text-brand-gray-mid">Cargando...</div>
-    </div>
-  )
+  if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
 
   if (aprobado === false) return (
     <div className="min-h-screen bg-brand-gray-light flex items-center justify-center px-4">
@@ -188,10 +203,11 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {pedidos.map(ped => (
                   <div key={ped.id} className="card">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                       <div>
                         <p className="font-heading font-bold text-brand-navy">Pedido #{ped.id.slice(0,8).toUpperCase()}</p>
                         <p className="text-sm text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        {ped.metodo_pago && <p className="text-xs text-brand-gray-mid mt-0.5">Pago: {ped.metodo_pago}</p>}
                       </div>
                       <div className="text-right">
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${ped.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700' : ped.estado === 'entregado' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -207,6 +223,12 @@ export default function DashboardPage() {
                           <span className="font-medium">${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
                         </div>
                       ))}
+                      {ped.fuel_surcharge > 0 && (
+                        <div className="flex justify-between text-sm text-brand-gray-mid border-t pt-1 mt-1">
+                          <span>Fuel Surcharge</span>
+                          <span>${ped.fuel_surcharge?.toFixed(2)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -230,23 +252,58 @@ export default function DashboardPage() {
                   <ShoppingCart size={44} className="mx-auto mb-3 opacity-25" />
                   <p>Tu carrito está vacío</p>
                 </div>
-              ) : carrito.map(item => (
-                <div key={item.id} className="flex items-center gap-3 py-3 border-b last:border-0">
-                  <div className="flex-1">
-                    <p className="font-medium text-brand-navy text-sm">{item.nombre}</p>
-                    <p className="text-brand-gray-mid text-xs">{item.unidad}</p>
+              ) : (
+                <>
+                  {carrito.map(item => (
+                    <div key={item.id} className="flex items-center gap-3 py-3 border-b last:border-0">
+                      <div className="flex-1">
+                        <p className="font-medium text-brand-navy text-sm">{item.nombre}</p>
+                        <p className="text-brand-gray-mid text-xs">{item.unidad}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => cambiarCantidad(item.id, -1)} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center"><Minus size={12} /></button>
+                        <span className="font-bold text-sm w-5 text-center">{item.cantidad}</span>
+                        <button onClick={() => cambiarCantidad(item.id, 1)} className="w-7 h-7 rounded-full bg-brand-orange text-white flex items-center justify-center"><Plus size={12} /></button>
+                      </div>
+                      <div className="text-right min-w-16">
+                        <p className="font-bold text-sm">${(item.precio * item.cantidad).toFixed(2)}</p>
+                        <button onClick={() => quitarDelCarrito(item.id)} className="text-red-400 text-xs hover:text-red-600">Quitar</button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="mt-4 space-y-2 border-t pt-4">
+                    <div className="flex justify-between text-sm text-brand-gray-mid">
+                      <span>Subtotal</span>
+                      <span>${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-brand-gray-mid">
+                      <span>Fuel Surcharge</span>
+                      <span>${FUEL_SURCHARGE.toFixed(2)}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => cambiarCantidad(item.id, -1)} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center"><Minus size={12} /></button>
-                    <span className="font-bold text-sm w-5 text-center">{item.cantidad}</span>
-                    <button onClick={() => cambiarCantidad(item.id, 1)} className="w-7 h-7 rounded-full bg-brand-orange text-white flex items-center justify-center"><Plus size={12} /></button>
+                  <div className="mt-4 space-y-3 border-t pt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-brand-gray-dark mb-2">Método de Pago *</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {METODOS_PAGO.map(m => (
+                          <button key={m} onClick={() => setMetodoPago(m)} className={`px-3 py-2 rounded-lg text-sm font-medium border transition-all ${metodoPago === m ? 'bg-brand-navy text-white border-brand-navy' : 'bg-white text-brand-gray-dark border-gray-200 hover:border-brand-navy'}`}>
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {requiereComprobante && (
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-dark mb-2">Comprobante de Pago * <span className="text-brand-gray-mid font-normal">(PDF o imagen)</span></label>
+                        <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 hover:border-brand-orange transition-colors">
+                          <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setComprobante(e.target.files?.[0] || null)} className="w-full text-sm text-brand-gray-mid file:mr-3 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />
+                          {comprobante && <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><Upload size={10} /> {comprobante.name}</p>}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right min-w-16">
-                    <p className="font-bold text-sm">${(item.precio * item.cantidad).toFixed(2)}</p>
-                    <button onClick={() => quitarDelCarrito(item.id)} className="text-red-400 text-xs hover:text-red-600">Quitar</button>
-                  </div>
-                </div>
-              ))}
+                </>
+              )}
             </div>
             {carrito.length > 0 && (
               <div className="px-6 py-5 border-t bg-gray-50">
@@ -254,7 +311,9 @@ export default function DashboardPage() {
                   <span className="font-heading font-bold text-brand-navy text-lg">Total</span>
                   <span className="font-heading font-bold text-2xl text-brand-orange">${total.toFixed(2)}</span>
                 </div>
-                <button onClick={enviarPedido} className="btn-primary w-full py-3 text-base">Enviar Pedido</button>
+                <button onClick={enviarPedido} disabled={enviando} className="btn-primary w-full py-3 text-base">
+                  {enviando ? 'Enviando...' : 'Enviar Pedido'}
+                </button>
                 <p className="text-xs text-center text-brand-gray-mid mt-3">Te contactaremos para confirmar la entrega</p>
               </div>
             )}
