@@ -165,7 +165,15 @@ export default function DashboardPage() {
               {productosFiltrados.map(p => {
                 const enCarrito = carrito.find(i => i.id === p.id)
                 return (
-                  <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow">
+                 <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow overflow-hidden">
+                    {p.imagen_url ? (
+                      <img src={p.imagen_url} alt={p.nombre} className="w-full h-36 object-cover" />
+                    ) : (
+                      <div className="w-full h-36 bg-gray-100 flex items-center justify-center">
+                        <span className="text-4xl">📦</span>
+                      </div>
+                    )}
+                    <div className="p-4 flex flex-col flex-1">
                     <div className="text-xs text-brand-orange font-semibold mb-1 uppercase tracking-wide">{p.categoria}</div>
                     <h3 className="font-heading font-bold text-brand-navy text-base mb-1">{p.nombre}</h3>
                     <p className="text-brand-gray-mid text-xs mb-1 flex-1">{p.descripcion}</p>

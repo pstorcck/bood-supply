@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon } from 'lucide-react'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
@@ -50,6 +50,7 @@ export default function AdminPage() {
   const [guardando, setGuardando] = useState(false)
   const [nuevaCategoria, setNuevaCategoria] = useState('')
   const [formProducto, setFormProducto] = useState({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
+  const [imagenProducto, setImagenProducto] = useState<File | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
   const supabase = createClient()
 
@@ -145,11 +146,35 @@ export default function AdminPage() {
   async function agregarProducto() {
     if (!formProducto.nombre || !formProducto.precio || !formProducto.unidad || !formProducto.categoria) return alert('Llena todos los campos')
     setGuardando(true)
-    await supabase.from('productos').insert({ ...formProducto, precio: parseFloat(formProducto.precio), activo: true })
+
+    let imagen_url = null
+    if (imagenProducto) {
+      const ext = imagenProducto.name.split('.').pop()
+      const path = `productos/${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('documentos').upload(path, imagenProducto, { upsert: true })
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
+        imagen_url = urlData.publicUrl
+      }
+    }
+
+    await supabase.from('productos').insert({ ...formProducto, precio: parseFloat(formProducto.precio), activo: true, imagen_url })
     setFormProducto({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
+    setImagenProducto(null)
     setShowFormProducto(false)
     await cargarProductos()
     setGuardando(false)
+  }
+
+  async function actualizarImagenProducto(id: string, file: File) {
+    const ext = file.name.split('.').pop()
+    const path = `productos/${id}.${ext}`
+    const { error: uploadError } = await supabase.storage.from('documentos').upload(path, file, { upsert: true })
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
+      await supabase.from('productos').update({ imagen_url: urlData.publicUrl }).eq('id', id)
+      await cargarProductos()
+    }
   }
 
   async function agregarCategoria() {
@@ -364,7 +389,6 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </div>
-
                   {(c.sales_tax_url || c.id_foto_url) && (
                     <div className="flex flex-wrap gap-2 mb-3">
                       {c.sales_tax_url && (
@@ -383,7 +407,6 @@ export default function AdminPage() {
                       )}
                     </div>
                   )}
-
                   {editando ? (
                     <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
                       {[
@@ -572,6 +595,13 @@ export default function AdminPage() {
                     <label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripción</label>
                     <input value={formProducto.descripcion} onChange={e => setFormProducto({...formProducto, descripcion: e.target.value})} placeholder="Descripción breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen del producto <span className="text-brand-gray-mid font-normal">(JPG, PNG)</span></label>
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors">
+                      <input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e => setImagenProducto(e.target.files?.[0] || null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer" />
+                      {imagenProducto && <p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex gap-3 mt-5">
                   <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">
@@ -593,6 +623,13 @@ export default function AdminPage() {
                     <div className="space-y-2">
                       {prods.map(p => (
                         <div key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${p.activo ? 'border-gray-100 bg-gray-50' : 'border-red-100 bg-red-50 opacity-60'}`}>
+                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                            {p.imagen_url ? (
+                              <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover" />
+                            ) : (
+                              <ImageIcon size={20} className="text-gray-400" />
+                            )}
+                          </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-brand-navy text-sm">{p.nombre}</span>
@@ -602,6 +639,10 @@ export default function AdminPage() {
                           </div>
                           <div className="font-heading font-bold text-brand-navy">${p.precio}</div>
                           <div className="flex items-center gap-1">
+                            <label className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400 cursor-pointer" title="Cambiar imagen">
+                              <ImageIcon size={15} />
+                              <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={e => { if (e.target.files?.[0]) actualizarImagenProducto(p.id, e.target.files[0]) }} />
+                            </label>
                             <button onClick={() => toggleActivo(p.id, p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors text-brand-gray-mid">
                               {p.activo ? <Eye size={15} /> : <EyeOff size={15} />}
                             </button>
