@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, Calendar } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail } from 'lucide-react'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
@@ -171,12 +171,7 @@ export default function AdminPage() {
         await fetch('/api/aprobar-cliente', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            nombre: cliente?.nombre || email,
-            asunto: mensajeAsunto,
-            cuerpo: mensajeCuerpo,
-          }),
+          body: JSON.stringify({ email, nombre: cliente?.nombre || email, asunto: mensajeAsunto, cuerpo: mensajeCuerpo }),
         })
       }
       setMensajeEnviado(true)
@@ -449,7 +444,8 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </div>
-                  {(c.sales_tax_url || c.id_foto_url) && (
+
+                  {(c.sales_tax_url || c.id_foto_url || c.crt61_url) && (
                     <div className="flex flex-wrap gap-2 mb-3">
                       {c.sales_tax_url && (
                         <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48">
@@ -465,8 +461,16 @@ export default function AdminPage() {
                           <a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600">Ver</a>
                         </div>
                       )}
+                      {c.crt61_url && (
+                        <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48">
+                          <FileText size={15} className="text-green-500 flex-shrink-0" />
+                          <span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span>
+                          <a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">Ver</a>
+                        </div>
+                      )}
                     </div>
                   )}
+
                   {editando ? (
                     <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
                       {[
@@ -534,7 +538,6 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
-
             {seleccionados.length > 0 && (
               <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
                 <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
@@ -546,14 +549,12 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-
             {pedidosFiltrados.length === 0 && (
               <div className="card text-center py-12 text-brand-gray-mid">
                 <ShoppingBag size={40} className="mx-auto mb-3 opacity-25" />
                 <p>No hay pedidos en este período</p>
               </div>
             )}
-
             {GRUPOS.map(grupo => {
               const pedidosGrupo = pedidosFiltrados.filter(p => grupo.key.includes(p.estado))
               if (pedidosGrupo.length === 0) return null
