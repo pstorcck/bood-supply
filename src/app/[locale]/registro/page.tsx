@@ -3,10 +3,13 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
+const CRT61_URL = 'https://kfftpcsihfqdhdiezeix.supabase.co/storage/v1/object/public/documentos/forms/CRT-61.pdf'
+
 export default function RegistroPage() {
   const [form, setForm] = useState({ email: '', password: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '', fecha_nacimiento: '' })
   const [archivoTax, setArchivoTax] = useState<File | null>(null)
   const [archivoId, setArchivoId] = useState<File | null>(null)
+  const [archivoCRT, setArchivoCRT] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [exitoso, setExitoso] = useState(false)
@@ -20,6 +23,7 @@ export default function RegistroPage() {
     }
     if (!archivoTax) return setError('Debes subir tu Sales Tax Permit')
     if (!archivoId) return setError('Debes subir una foto de tu ID')
+    if (!archivoCRT) return setError('Debes subir el formulario CRT-61 firmado')
     setLoading(true)
     setError('')
 
@@ -28,6 +32,7 @@ export default function RegistroPage() {
 
     let sales_tax_url = null
     let id_foto_url = null
+    let crt61_url = null
 
     if (data.user) {
       if (archivoTax) {
@@ -48,6 +53,16 @@ export default function RegistroPage() {
           id_foto_url = urlData.publicUrl
         }
       }
+      if (archivoCRT) {
+        const ext = archivoCRT.name.split('.').pop()
+        const path = `crt61/${data.user.id}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivoCRT, { upsert: true })
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
+          crt61_url = urlData.publicUrl
+        }
+      }
+
       await supabase.from('profiles').upsert({
         id: data.user.id,
         email: form.email,
@@ -59,6 +74,7 @@ export default function RegistroPage() {
         fecha_nacimiento: form.fecha_nacimiento,
         sales_tax_url,
         id_foto_url,
+        crt61_url,
         aprobado: false,
       })
 
@@ -126,6 +142,26 @@ export default function RegistroPage() {
             <label className="block text-sm font-medium text-brand-gray-dark mb-1">Dirección del Negocio *</label>
             <input value={form.direccion} onChange={e => setForm({...form, direccion: e.target.value})} placeholder="Dirección completa" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
           </div>
+
+          {/* CRT-61 */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="flex items-start gap-3 mb-3">
+              <span className="text-2xl">📄</span>
+              <div>
+                <p className="font-medium text-brand-navy text-sm">Formulario CRT-61 — Certificado de Reventa</p>
+                <p className="text-xs text-brand-gray-mid mt-0.5">Descarga el formulario, llénalo, fírmalo y súbelo aquí.</p>
+              </div>
+            </div>
+            <a href={CRT61_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-brand-navy text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors mb-3">
+              ⬇️ Descargar CRT-61
+            </a>
+            <div className="border-2 border-dashed border-blue-200 rounded-xl px-4 py-3 hover:border-brand-orange transition-colors">
+              <p className="text-xs text-brand-gray-mid mb-2">Sube el CRT-61 llenado y firmado *</p>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoCRT(e.target.files?.[0] || null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer" />
+              {archivoCRT && <p className="text-xs text-green-600 mt-2">✓ {archivoCRT.name}</p>}
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-brand-gray-dark mb-1">Sales Tax Permit * <span className="text-brand-gray-mid font-normal">(PDF o imagen)</span></label>
             <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors">
