@@ -15,7 +15,7 @@ export default function RegistroPage() {
   const [exitoso, setExitoso] = useState(false)
   const supabase = createClient()
 
-  useEffect(() => { supabase.auth.signOut() }, [])
+  // removed auto signout
 
   async function handleRegistro() {
     if (!form.email || !form.password || !form.nombre || !form.negocio || !form.telefono || !form.direccion || !form.ein || !form.fecha_nacimiento) {
