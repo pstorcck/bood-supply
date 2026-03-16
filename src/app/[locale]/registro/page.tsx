@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 export default function RegistroPage() {
-  const [form, setForm] = useState({ email: '', password: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '' })
+  const [form, setForm] = useState({ email: '', password: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '', fecha_nacimiento: '' })
   const [archivoTax, setArchivoTax] = useState<File | null>(null)
   const [archivoId, setArchivoId] = useState<File | null>(null)
   const [error, setError] = useState('')
@@ -15,7 +15,7 @@ export default function RegistroPage() {
   useEffect(() => { supabase.auth.signOut() }, [])
 
   async function handleRegistro() {
-    if (!form.email || !form.password || !form.nombre || !form.negocio || !form.telefono || !form.direccion || !form.ein) {
+    if (!form.email || !form.password || !form.nombre || !form.negocio || !form.telefono || !form.direccion || !form.ein || !form.fecha_nacimiento) {
       return setError('Todos los campos son obligatorios')
     }
     if (!archivoTax) return setError('Debes subir tu Sales Tax Permit')
@@ -56,11 +56,24 @@ export default function RegistroPage() {
         telefono: form.telefono,
         direccion: form.direccion,
         ein: form.ein,
+        fecha_nacimiento: form.fecha_nacimiento,
         sales_tax_url,
         id_foto_url,
         aprobado: false,
       })
+
+      try {
+        await fetch('/api/notificar-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo: 'cliente_nuevo',
+            datos: { nombre: form.nombre, negocio: form.negocio, email: form.email, telefono: form.telefono, direccion: form.direccion, ein: form.ein }
+          })
+        })
+      } catch (e) { console.error('Notif error:', e) }
     }
+
     setExitoso(true)
     setLoading(false)
   }
@@ -85,11 +98,11 @@ export default function RegistroPage() {
         </div>
         {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>}
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre Completo *</label>
+            <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Tu nombre completo" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
+          </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre Completo *</label>
-              <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Tu nombre completo" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
-            </div>
             <div>
               <label className="block text-sm font-medium text-brand-gray-dark mb-1">Negocio *</label>
               <input value={form.negocio} onChange={e => setForm({...form, negocio: e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
@@ -99,9 +112,15 @@ export default function RegistroPage() {
               <input value={form.ein} onChange={e => setForm({...form, ein: e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Teléfono *</label>
-            <input value={form.telefono} onChange={e => setForm({...form, telefono: e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-brand-gray-dark mb-1">Teléfono *</label>
+              <input value={form.telefono} onChange={e => setForm({...form, telefono: e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento *</label>
+              <input value={form.fecha_nacimiento} onChange={e => setForm({...form, fecha_nacimiento: e.target.value})} type="date" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-brand-gray-dark mb-1">Dirección del Negocio *</label>
@@ -115,7 +134,7 @@ export default function RegistroPage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Foto de ID * <span className="text-brand-gray-mid font-normal">(licencia, pasaporte o identificación)</span></label>
+            <label className="block text-sm font-medium text-brand-gray-dark mb-1">Foto de ID * <span className="text-brand-gray-mid font-normal">(licencia o pasaporte)</span></label>
             <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors">
               <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e => setArchivoId(e.target.files?.[0] || null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer" />
               {archivoId && <p className="text-xs text-green-600 mt-2">✓ {archivoId.name}</p>}
