@@ -12,24 +12,49 @@ export default function ResetPasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Supabase envía el token como hash en la URL: #access_token=...
-    const hash = window.location.hash
-    if (hash && hash.includes('access_token')) {
-      const params = new URLSearchParams(hash.substring(1))
-      const access_token = params.get('access_token')
-      const refresh_token = params.get('refresh_token')
-      if (access_token && refresh_token) {
-        supabase.auth.setSession({ access_token, refresh_token }).then(() => {
-          setSesionLista(true)
-        })
+    async function procesarToken() {
+      const hash = window.location.hash
+      const query = window.location.search
+
+      // Intentar desde hash
+      if (hash && hash.length > 1) {
+        const params = new URLSearchParams(hash.substring(1))
+        const access_token = params.get('access_token')
+        const refresh_token = params.get('refresh_token') || params.get('TokenHash') || ''
+        if (access_token) {
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token })
+          if (!error) { setSesionLista(true); return }
+        }
+        // Intentar con token hash
+        const token_hash = params.get('TokenHash') || params.get('token_hash')
+        if (token_hash) {
+          const { error } = await supabase.auth.verifyOtp({ token_hash, type: 'recovery' })
+          if (!error) { setSesionLista(true); return }
+        }
       }
-    } else {
-      // También puede venir como query param con PKCE
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session) setSesionLista(true)
-        else setError('Link inválido o expirado. Solicita uno nuevo.')
-      })
+
+      // Intentar desde query params
+      if (query) {
+        const params = new URLSearchParams(query)
+        const token_hash = params.get('token_hash')
+        const code = params.get('code')
+        if (token_hash) {
+          const { error } = await supabase.auth.verifyOtp({ token_hash, type: 'recovery' })
+          if (!error) { setSesionLista(true); return }
+        }
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          if (!error) { setSesionLista(true); return }
+        }
+      }
+
+      // Verificar si ya hay sesión activa
+      const { data } = await supabase.auth.getSession()
+      if (data.session) { setSesionLista(true); return }
+
+      setError('Link inválido o expirado. Solicita uno nuevo desde el login.')
     }
+    procesarToken()
   }, [])
 
   async function handleReset() {
@@ -40,6 +65,7 @@ export default function ResetPasswordPage() {
     setError('')
     const { error } = await supabase.auth.updateUser({ password })
     if (error) { setError(error.message); setLoading(false); return }
+    await supabase.auth.signOut()
     setListo(true)
     setTimeout(() => { window.location.href = '/es/login' }, 3000)
   }
