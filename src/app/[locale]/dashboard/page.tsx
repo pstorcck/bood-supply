@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [metodoPago, setMetodoPago] = useState('')
   const [comprobante, setComprobante] = useState<File | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [productoModal, setProductoModal] = useState<any>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -85,12 +86,8 @@ export default function DashboardPage() {
     }
 
     const { data: pedido } = await supabase.from('pedidos').insert({
-      cliente_id: user.id,
-      total,
-      fuel_surcharge: FUEL_SURCHARGE,
-      metodo_pago: metodoPago,
-      comprobante_url,
-      estado: 'pendiente'
+      cliente_id: user.id, total, fuel_surcharge: FUEL_SURCHARGE,
+      metodo_pago: metodoPago, comprobante_url, estado: 'pendiente'
     }).select().single()
 
     if (pedido) {
@@ -128,6 +125,35 @@ export default function DashboardPage() {
           ¡Pedido enviado! Te contactaremos pronto. ✓
         </div>
       )}
+
+      {/* MODAL PRODUCTO */}
+      {productoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setProductoModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            {productoModal.imagen_url ? (
+              <img src={productoModal.imagen_url} alt={productoModal.nombre} className="w-full h-64 object-contain bg-gray-50" />
+            ) : (
+              <div className="w-full h-48 bg-gray-100 flex items-center justify-center text-6xl">📦</div>
+            )}
+            <div className="p-6">
+              <div className="text-xs text-brand-orange font-semibold uppercase tracking-wide mb-1">{productoModal.categoria}</div>
+              <h2 className="font-heading font-bold text-brand-navy text-2xl mb-2">{productoModal.nombre}</h2>
+              <p className="text-brand-gray-mid mb-1">{productoModal.descripcion}</p>
+              <p className="text-sm text-gray-400 mb-4">{productoModal.unidad}</p>
+              <div className="flex items-center justify-between">
+                <span className="font-heading font-bold text-3xl text-brand-navy">${productoModal.precio}</span>
+                <button onClick={() => { agregarAlCarrito(productoModal); setProductoModal(null) }} className="btn-primary flex items-center gap-2">
+                  <Plus size={16} /> Agregar al carrito
+                </button>
+              </div>
+            </div>
+            <button onClick={() => setProductoModal(null)} className="absolute top-4 right-4 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md hover:bg-gray-100">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <nav className="bg-white border-b border-gray-100 shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-40">
         <span className="font-heading font-bold text-xl text-brand-navy">BOOD <span className="text-brand-orange">SUPPLY</span></span>
         <div className="flex items-center gap-4">
@@ -166,16 +192,18 @@ export default function DashboardPage() {
                 const enCarrito = carrito.find(i => i.id === p.id)
                 return (
                   <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow overflow-hidden">
-                    {p.imagen_url ? (
-                      <img src={p.imagen_url} alt={p.nombre} className="w-full h-36 object-cover" />
-                    ) : (
-                      <div className="w-full h-36 bg-gray-100 flex items-center justify-center">
-                        <span className="text-4xl">📦</span>
-                      </div>
-                    )}
+                    <div className="cursor-pointer" onClick={() => setProductoModal(p)}>
+                      {p.imagen_url ? (
+                        <img src={p.imagen_url} alt={p.nombre} className="w-full h-36 object-contain bg-gray-50 hover:opacity-90 transition-opacity" />
+                      ) : (
+                        <div className="w-full h-36 bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+                          <span className="text-4xl">📦</span>
+                        </div>
+                      )}
+                    </div>
                     <div className="p-4 flex flex-col flex-1">
                       <div className="text-xs text-brand-orange font-semibold mb-1 uppercase tracking-wide">{p.categoria}</div>
-                      <h3 className="font-heading font-bold text-brand-navy text-base mb-1">{p.nombre}</h3>
+                      <h3 className="font-heading font-bold text-brand-navy text-base mb-1 cursor-pointer hover:text-brand-orange transition-colors" onClick={() => setProductoModal(p)}>{p.nombre}</h3>
                       <p className="text-brand-gray-mid text-xs mb-1 flex-1">{p.descripcion}</p>
                       <p className="text-xs text-gray-400 mb-3">{p.unidad}</p>
                       <div className="flex items-center justify-between mt-auto">
@@ -282,12 +310,10 @@ export default function DashboardPage() {
                   ))}
                   <div className="mt-4 space-y-2 border-t pt-4">
                     <div className="flex justify-between text-sm text-brand-gray-mid">
-                      <span>Subtotal</span>
-                      <span>${subtotal.toFixed(2)}</span>
+                      <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm text-brand-gray-mid">
-                      <span>Fuel Surcharge</span>
-                      <span>${FUEL_SURCHARGE.toFixed(2)}</span>
+                      <span>Fuel Surcharge</span><span>${FUEL_SURCHARGE.toFixed(2)}</span>
                     </div>
                   </div>
                   <div className="mt-4 space-y-3 border-t pt-4">
