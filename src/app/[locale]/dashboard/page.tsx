@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { ShoppingBag, LogOut, ShoppingCart, X, Minus, Plus, Upload } from 'lucide-react'
+import { ShoppingBag, LogOut, ShoppingCart, X, Minus, Plus, Upload, Search } from 'lucide-react'
 
 const CATEGORIAS = ['Todas', 'Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos', 'Grocery', 'Químicos y Limpieza']
 const METODOS_PAGO = ['Efectivo', 'ACH', 'Tarjeta de crédito', 'Cheque']
@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [categoria, setCategoria] = useState('Todas')
+  const [busqueda, setBusqueda] = useState('')
   const [carrito, setCarrito] = useState<any[]>([])
   const [showCarrito, setShowCarrito] = useState(false)
   const [tab, setTab] = useState<'catalogo' | 'pedidos'>('catalogo')
@@ -65,7 +66,13 @@ export default function DashboardPage() {
   const subtotal = carrito.reduce((sum, i) => sum + i.precio * i.cantidad, 0)
   const total = subtotal + (carrito.length > 0 ? FUEL_SURCHARGE : 0)
   const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0)
-  const productosFiltrados = categoria === 'Todas' ? productos : productos.filter(p => p.categoria === categoria)
+
+  const productosFiltrados = productos.filter(p => {
+    const matchCat = categoria === 'Todas' || p.categoria === categoria
+    const matchBusqueda = busqueda === '' || p.nombre.toLowerCase().includes(busqueda.toLowerCase()) || p.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
+    return matchCat && matchBusqueda
+  })
+
   const requiereComprobante = metodoPago && metodoPago !== 'Efectivo'
 
   async function enviarPedido() {
@@ -92,6 +99,28 @@ export default function DashboardPage() {
 
     if (pedido) {
       await supabase.from('pedido_items').insert(carrito.map(i => ({ pedido_id: pedido.id, producto_id: i.id, cantidad: i.cantidad, precio_unitario: i.precio })))
+
+      // Notificar admin
+      try {
+        await fetch('/api/notificar-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo: 'pedido_nuevo',
+            datos: {
+              pedido_id: pedido.id.slice(0,8).toUpperCase(),
+              cliente_nombre: profile?.nombre,
+              cliente_email: user.email,
+              negocio: profile?.negocio,
+              telefono: profile?.telefono,
+              metodo_pago: metodoPago,
+              total: total.toFixed(2),
+              items: carrito.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, subtotal: (i.precio * i.cantidad).toFixed(2) }))
+            }
+          })
+        })
+      } catch (e) { console.error('Notif error:', e) }
+
       const { data: peds } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').eq('cliente_id', user.id).order('created_at', { ascending: false })
       setPedidos(peds || [])
       setCarrito([])
@@ -126,10 +155,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* MODAL PRODUCTO */}
       {productoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setProductoModal(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden relative" onClick={e => e.stopPropagation()}>
             {productoModal.imagen_url ? (
               <img src={productoModal.imagen_url} alt={productoModal.nombre} className="w-full h-64 object-contain bg-gray-50" />
             ) : (
@@ -182,11 +210,23 @@ export default function DashboardPage() {
 
         {tab === 'catalogo' && (
           <>
+            <div className="flex flex-col sm:flex-row gap-3 mb-6">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray-mid" />
+                <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar productos..." className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-brand-orange" />
+              </div>
+            </div>
             <div className="flex gap-2 flex-wrap mb-6">
               {CATEGORIAS.map(cat => (
                 <button key={cat} onClick={() => setCategoria(cat)} className={`text-sm px-4 py-1.5 rounded-full font-medium transition-all ${categoria === cat ? 'bg-brand-orange text-white' : 'bg-white text-brand-gray-dark border border-gray-200 hover:border-brand-orange'}`}>{cat}</button>
               ))}
             </div>
+            {productosFiltrados.length === 0 && (
+              <div className="text-center py-12 text-brand-gray-mid">
+                <Search size={40} className="mx-auto mb-3 opacity-25" />
+                <p>No se encontraron productos</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {productosFiltrados.map(p => {
                 const enCarrito = carrito.find(i => i.id === p.id)
@@ -267,6 +307,13 @@ export default function DashboardPage() {
                         </div>
                       )}
                     </div>
+                    {ped.comprobante_url && (
+                      <div className="mt-3 pt-3 border-t">
+                        <a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium">
+                          📄 Ver comprobante de pago
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
