@@ -165,13 +165,17 @@ export default function AdminPage() {
   }
 
   async function actualizarImagenProducto(id: string, file: File) {
-    const ext = file.name.split('.').pop()
-    const path = `productos/${id}.${ext}`
-    const { error: uploadError } = await supabase.storage.from('documentos').upload(path, file, { upsert: true })
-    if (!uploadError) {
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `productos/${id}-${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('documentos').upload(path, file, { upsert: true })
+      if (uploadError) { alert('Error subiendo imagen: ' + uploadError.message); return }
       const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
-      await supabase.from('productos').update({ imagen_url: urlData.publicUrl }).eq('id', id)
+      const { error: updateError } = await supabase.from('productos').update({ imagen_url: urlData.publicUrl }).eq('id', id)
+      if (updateError) { alert('Error actualizando producto: ' + updateError.message); return }
       await cargarProductos()
+    } catch (e: any) {
+      alert('Error: ' + e.message)
     }
   }
 
