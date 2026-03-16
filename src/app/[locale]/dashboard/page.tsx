@@ -165,7 +165,7 @@ export default function DashboardPage() {
               {productosFiltrados.map(p => {
                 const enCarrito = carrito.find(i => i.id === p.id)
                 return (
-                 <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow overflow-hidden">
+                  <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow overflow-hidden">
                     {p.imagen_url ? (
                       <img src={p.imagen_url} alt={p.nombre} className="w-full h-36 object-cover" />
                     ) : (
@@ -174,23 +174,24 @@ export default function DashboardPage() {
                       </div>
                     )}
                     <div className="p-4 flex flex-col flex-1">
-                    <div className="text-xs text-brand-orange font-semibold mb-1 uppercase tracking-wide">{p.categoria}</div>
-                    <h3 className="font-heading font-bold text-brand-navy text-base mb-1">{p.nombre}</h3>
-                    <p className="text-brand-gray-mid text-xs mb-1 flex-1">{p.descripcion}</p>
-                    <p className="text-xs text-gray-400 mb-3">{p.unidad}</p>
-                    <div className="flex items-center justify-between mt-auto">
-                      <span className="font-heading font-bold text-xl text-brand-navy">${p.precio}</span>
-                      {enCarrito ? (
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => cambiarCantidad(p.id, -1)} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-red-50"><Minus size={12} /></button>
-                          <span className="font-bold text-sm w-5 text-center">{enCarrito.cantidad}</span>
-                          <button onClick={() => cambiarCantidad(p.id, 1)} className="w-7 h-7 rounded-full bg-brand-orange text-white flex items-center justify-center"><Plus size={12} /></button>
-                        </div>
-                      ) : (
-                        <button onClick={() => agregarAlCarrito(p)} className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1">
-                          <Plus size={14} /> Agregar
-                        </button>
-                      )}
+                      <div className="text-xs text-brand-orange font-semibold mb-1 uppercase tracking-wide">{p.categoria}</div>
+                      <h3 className="font-heading font-bold text-brand-navy text-base mb-1">{p.nombre}</h3>
+                      <p className="text-brand-gray-mid text-xs mb-1 flex-1">{p.descripcion}</p>
+                      <p className="text-xs text-gray-400 mb-3">{p.unidad}</p>
+                      <div className="flex items-center justify-between mt-auto">
+                        <span className="font-heading font-bold text-xl text-brand-navy">${p.precio}</span>
+                        {enCarrito ? (
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => cambiarCantidad(p.id, -1)} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-red-50"><Minus size={12} /></button>
+                            <span className="font-bold text-sm w-5 text-center">{enCarrito.cantidad}</span>
+                            <button onClick={() => cambiarCantidad(p.id, 1)} className="w-7 h-7 rounded-full bg-brand-orange text-white flex items-center justify-center"><Plus size={12} /></button>
+                          </div>
+                        ) : (
+                          <button onClick={() => agregarAlCarrito(p)} className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1">
+                            <Plus size={14} /> Agregar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )
