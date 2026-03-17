@@ -20,6 +20,7 @@ const TEXTS = {
     tax: 'Tax Químicos y Limpieza (10.25%)',
     fuel: 'Fuel Surcharge',
     total: 'Total',
+    all: 'Todas',
     payment_method: 'Método de Pago *',
     proof: 'Comprobante de Pago *',
     proof_hint: '(PDF o imagen)',
@@ -39,7 +40,8 @@ const TEXTS = {
     proof_link: '📄 Ver comprobante de pago',
     tax_note: '+10.25% tax',
     methods: ['Efectivo', 'Zelle', 'Tarjeta de crédito', 'Cheque'],
-    categorias: ['Todas', 'Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos', 'Grocery', 'Químicos y Limpieza'],
+    categorias_es: ['Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos', 'Grocery', 'Químicos y Limpieza'],
+    categorias_en: ['Disposable Cups', 'Disposable Plates', 'Cutlery', 'Bags & Containers', 'Napkins', 'Bathroom Paper', 'Paper', 'Toothpicks', 'Grocery', 'Chemicals & Cleaning'],
     zelle_info: 'Envía tu pago por Zelle al número registrado:',
     zelle_name: 'Nombre: Bood Supply',
     zelle_number: 'Número: (312) 409-0106',
@@ -59,6 +61,7 @@ const TEXTS = {
     tax: 'Chemicals & Cleaning Tax (10.25%)',
     fuel: 'Fuel Surcharge',
     total: 'Total',
+    all: 'All',
     payment_method: 'Payment Method *',
     proof: 'Payment Proof *',
     proof_hint: '(PDF or image)',
@@ -78,7 +81,8 @@ const TEXTS = {
     proof_link: '📄 View payment proof',
     tax_note: '+10.25% tax',
     methods: ['Cash', 'Zelle', 'Credit card', 'Check'],
-    categorias: ['All', 'Disposable Cups', 'Disposable Plates', 'Cutlery', 'Bags & Containers', 'Napkins', 'Bathroom Paper', 'Paper', 'Toothpicks', 'Grocery', 'Chemicals & Cleaning'],
+    categorias_es: ['Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos', 'Grocery', 'Químicos y Limpieza'],
+    categorias_en: ['Disposable Cups', 'Disposable Plates', 'Cutlery', 'Bags & Containers', 'Napkins', 'Bathroom Paper', 'Paper', 'Toothpicks', 'Grocery', 'Chemicals & Cleaning'],
     zelle_info: 'Send your payment via Zelle to the registered number:',
     zelle_name: 'Name: Bood Supply',
     zelle_number: 'Number: (312) 409-0106',
@@ -94,6 +98,7 @@ export default function DashboardPage() {
   const [aprobado, setAprobado] = useState<boolean | null>(null)
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
+  const [categoriasDB, setCategoriasDB] = useState<string[]>([])
   const [categoria, setCategoria] = useState(0)
   const [busqueda, setBusqueda] = useState('')
   const [carrito, setCarrito] = useState<any[]>([])
@@ -121,6 +126,8 @@ export default function DashboardPage() {
       if (estaAprobado) {
         const { data: prods } = await supabase.from('productos').select('*').eq('activo', true).order('categoria')
         setProductos(prods || [])
+        const cats = [...new Set((prods || []).map((p: any) => p.categoria))].filter(Boolean) as string[]
+        setCategoriasDB(cats)
         const { data: peds } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').eq('cliente_id', user.id).order('created_at', { ascending: false })
         setPedidos(peds || [])
       }
@@ -139,12 +146,12 @@ export default function DashboardPage() {
     return p.descripcion
   }
 
-  function getCategoriaProducto(p: any) {
+  function getCategoriaLabel(catES: string) {
     if (lang === 'en') {
-      const idx = TEXTS.es.categorias.indexOf(p.categoria)
-      if (idx > 0) return TEXTS.en.categorias[idx]
+      const idx = TEXTS.es.categorias_es.indexOf(catES)
+      if (idx >= 0) return TEXTS.en.categorias_en[idx]
     }
-    return p.categoria
+    return catES
   }
 
   function agregarAlCarrito(producto: any) {
@@ -170,12 +177,12 @@ export default function DashboardPage() {
   const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0)
 
   const productosFiltrados = productos.filter(p => {
-    const catES = categoria === 0 ? true : p.categoria === TEXTS.es.categorias[categoria]
+    const catMatch = categoria === 0 ? true : p.categoria === categoriasDB[categoria - 1]
     const matchBusqueda = busqueda === '' ||
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       (p.nombre_en && p.nombre_en.toLowerCase().includes(busqueda.toLowerCase())) ||
       p.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
-    return catES && matchBusqueda
+    return catMatch && matchBusqueda
   })
 
   const requiereComprobante = metodoPago && metodoPago !== 'Efectivo' && metodoPago !== 'Cash' && metodoPago !== 'Zelle' && metodoPago !== 'Cheque' && metodoPago !== 'Check'
@@ -267,7 +274,7 @@ export default function DashboardPage() {
               <div className="w-full h-48 bg-gray-100 flex items-center justify-center text-6xl">📦</div>
             )}
             <div className="p-6">
-              <div className="text-xs text-brand-orange font-semibold uppercase tracking-wide mb-1">{getCategoriaProducto(productoModal)}</div>
+              <div className="text-xs text-brand-orange font-semibold uppercase tracking-wide mb-1">{getCategoriaLabel(productoModal.categoria)}</div>
               <h2 className="font-heading font-bold text-brand-navy text-2xl mb-2">{getNombreProducto(productoModal)}</h2>
               <p className="text-brand-gray-mid mb-1">{getDescProducto(productoModal)}</p>
               <p className="text-sm text-gray-400 mb-4">{productoModal.unidad}</p>
@@ -327,8 +334,13 @@ export default function DashboardPage() {
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder={t.search} className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-brand-orange" />
             </div>
             <div className="flex gap-2 flex-wrap mb-6">
-              {t.categorias.map((cat, idx) => (
-                <button key={cat} onClick={() => setCategoria(idx)} className={`text-sm px-4 py-1.5 rounded-full font-medium transition-all ${categoria === idx ? 'bg-brand-orange text-white' : 'bg-white text-brand-gray-dark border border-gray-200 hover:border-brand-orange'}`}>{cat}</button>
+              <button onClick={() => setCategoria(0)} className={`text-sm px-4 py-1.5 rounded-full font-medium transition-all ${categoria === 0 ? 'bg-brand-orange text-white' : 'bg-white text-brand-gray-dark border border-gray-200 hover:border-brand-orange'}`}>
+                {t.all}
+              </button>
+              {categoriasDB.map((cat, idx) => (
+                <button key={cat} onClick={() => setCategoria(idx + 1)} className={`text-sm px-4 py-1.5 rounded-full font-medium transition-all ${categoria === idx + 1 ? 'bg-brand-orange text-white' : 'bg-white text-brand-gray-dark border border-gray-200 hover:border-brand-orange'}`}>
+                  {getCategoriaLabel(cat)}
+                </button>
               ))}
             </div>
             {productosFiltrados.length === 0 && (
@@ -352,7 +364,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <div className="p-4 flex flex-col flex-1">
-                      <div className="text-xs text-brand-orange font-semibold mb-1 uppercase tracking-wide">{getCategoriaProducto(p)}</div>
+                      <div className="text-xs text-brand-orange font-semibold mb-1 uppercase tracking-wide">{getCategoriaLabel(p.categoria)}</div>
                       <h3 className="font-heading font-bold text-brand-navy text-base mb-1 cursor-pointer hover:text-brand-orange transition-colors" onClick={() => setProductoModal(p)}>{getNombreProducto(p)}</h3>
                       <p className="text-brand-gray-mid text-xs mb-1 flex-1">{getDescProducto(p)}</p>
                       <p className="text-xs text-gray-400 mb-1">{p.unidad}</p>
@@ -490,7 +502,7 @@ export default function DashboardPage() {
                         ))}
                       </div>
                     </div>
-                    {(metodoPago === 'Zelle') && (
+                    {metodoPago === 'Zelle' && (
                       <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
                         <p className="text-sm font-medium text-purple-800 mb-2">💜 {t.zelle_info}</p>
                         <p className="text-sm text-purple-700 font-bold">{t.zelle_name}</p>
