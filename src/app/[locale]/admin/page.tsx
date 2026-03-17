@@ -183,6 +183,18 @@ export default function AdminPage() {
     setEnviandoMensaje(false)
   }
 
+  async function traducirTexto(texto: string): Promise<string> {
+    try {
+      const res = await fetch('/api/traducir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto, idioma: 'EN' })
+      })
+      const data = await res.json()
+      return data.traduccion || texto
+    } catch { return texto }
+  }
+
   async function agregarProducto() {
     if (!formProducto.nombre || !formProducto.precio || !formProducto.unidad || !formProducto.categoria) return alert('Llena todos los campos')
     setGuardando(true)
@@ -196,7 +208,9 @@ export default function AdminPage() {
         imagen_url = urlData.publicUrl
       }
     }
-    await supabase.from('productos').insert({ ...formProducto, precio: parseFloat(formProducto.precio), activo: true, imagen_url })
+    const nombre_en = await traducirTexto(formProducto.nombre)
+    const descripcion_en = formProducto.descripcion ? await traducirTexto(formProducto.descripcion) : ''
+    await supabase.from('productos').insert({ ...formProducto, precio: parseFloat(formProducto.precio), activo: true, imagen_url, nombre_en, descripcion_en })
     setFormProducto({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
     setImagenProducto(null)
     setShowFormProducto(false)
@@ -444,7 +458,6 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </div>
-
                   {(c.sales_tax_url || c.id_foto_url || c.crt61_url) && (
                     <div className="flex flex-wrap gap-2 mb-3">
                       {c.sales_tax_url && (
@@ -470,7 +483,6 @@ export default function AdminPage() {
                       )}
                     </div>
                   )}
-
                   {editando ? (
                     <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
                       {[
@@ -704,7 +716,7 @@ export default function AdminPage() {
                 <h2 className="font-heading font-bold text-brand-navy text-lg mb-5">Nuevo Producto</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre *</label>
+                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre * <span className="text-brand-gray-mid font-normal text-xs">(se traducirá automáticamente al inglés)</span></label>
                     <input value={formProducto.nombre} onChange={e => setFormProducto({...formProducto, nombre: e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
                   </div>
                   <div>
@@ -736,7 +748,7 @@ export default function AdminPage() {
                 </div>
                 <div className="flex gap-3 mt-5">
                   <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">
-                    {guardando ? 'Guardando...' : <><Plus size={16} /> Guardar</>}
+                    {guardando ? 'Guardando y traduciendo...' : <><Plus size={16} /> Guardar</>}
                   </button>
                   <button onClick={() => setShowFormProducto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                 </div>
@@ -764,6 +776,7 @@ export default function AdminPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-brand-navy text-sm">{p.nombre}</span>
+                              {p.nombre_en && <span className="text-xs text-gray-400">/ {p.nombre_en}</span>}
                               {!p.activo && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactivo</span>}
                             </div>
                             <div className="text-xs text-brand-gray-mid mt-0.5">{p.descripcion} · {p.unidad}</div>
