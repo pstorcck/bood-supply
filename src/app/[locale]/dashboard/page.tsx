@@ -178,7 +178,7 @@ export default function DashboardPage() {
     return catES && matchBusqueda
   })
 
-  const requiereComprobante = metodoPago && metodoPago !== 'Efectivo' && metodoPago !== 'Cash' && metodoPago !== 'Zelle'
+  const requiereComprobante = metodoPago && metodoPago !== 'Efectivo' && metodoPago !== 'Cash' && metodoPago !== 'Zelle' && metodoPago !== 'Cheque' && metodoPago !== 'Check'
 
   async function enviarPedido() {
     if (carrito.length === 0) return
@@ -322,11 +322,9 @@ export default function DashboardPage() {
 
         {tab === 'catalogo' && (
           <>
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              <div className="relative flex-1">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray-mid" />
-                <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder={t.search} className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-brand-orange" />
-              </div>
+            <div className="relative mb-6">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray-mid" />
+              <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder={t.search} className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-brand-orange" />
             </div>
             <div className="flex gap-2 flex-wrap mb-6">
               {t.categorias.map((cat, idx) => (
@@ -492,26 +490,21 @@ export default function DashboardPage() {
                         ))}
                       </div>
                     </div>
-
-                    {/* Zelle info */}
                     {(metodoPago === 'Zelle') && (
                       <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
                         <p className="text-sm font-medium text-purple-800 mb-2">💜 {t.zelle_info}</p>
-                        <p className="text-sm text-purple-700 font-bold">{t.z <p className="text-sm text-purple-700 font-bold">{t.zelle_name}</p>
+                        <p className="text-sm text-purple-700 font-bold">{t.zelle_name}</p>
                         <p className="text-sm text-purple-700 font-bold mb-3">{t.zelle_number}</p>
                         <a href="https://enroll.zellepay.com/qr-codes?data=ewogICJuYW1lIjogIkJPT0QgU1VQUExZIiwKICAidG9rZW4iOiAiMzEyNDA5MDEwNiIsCiAgImFjdGlvbiI6ICJwYXltZW50Igp9" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-purple-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
                           💸 {t.zelle_link}
                         </a>
                       </div>
                     )}
-
-                    {/* Cheque info */}
                     {(metodoPago === 'Cheque' || metodoPago === 'Check') && (
                       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                         <p className="text-sm text-amber-800">🧾 {t.cheque_note}</p>
                       </div>
                     )}
-
                     {requiereComprobante && (
                       <div>
                         <label className="block text-sm font-medium text-brand-gray-dark mb-2">{t.proof} <span className="text-brand-gray-mid font-normal">{t.proof_hint}</span></label>
@@ -542,4 +535,4 @@ export default function DashboardPage() {
       )}
     </div>
   )
-} 
+}
