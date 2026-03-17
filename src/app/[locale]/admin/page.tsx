@@ -49,8 +49,12 @@ export default function AdminPage() {
   const [showFormCategoria, setShowFormCategoria] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [nuevaCategoria, setNuevaCategoria] = useState('')
+  const [editandoCategoria, setEditandoCategoria] = useState<string | null>(null)
+  const [categoriaEditNombre, setCategoriaEditNombre] = useState('')
   const [formProducto, setFormProducto] = useState({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
   const [imagenProducto, setImagenProducto] = useState<File | null>(null)
+  const [editandoProducto, setEditandoProducto] = useState<string | null>(null)
+  const [formEditProducto, setFormEditProducto] = useState<any>({})
   const [aprobando, setAprobando] = useState<string | null>(null)
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
@@ -218,6 +222,27 @@ export default function AdminPage() {
     setGuardando(false)
   }
 
+  function iniciarEdicionProducto(p: any) {
+    setEditandoProducto(p.id)
+    setFormEditProducto({ nombre: p.nombre || '', descripcion: p.descripcion || '', categoria: p.categoria || '', precio: String(p.precio || ''), unidad: p.unidad || '', nombre_en: p.nombre_en || '', descripcion_en: p.descripcion_en || '' })
+  }
+
+  async function guardarProducto(id: string) {
+    setGuardando(true)
+    await supabase.from('productos').update({
+      nombre: formEditProducto.nombre,
+      descripcion: formEditProducto.descripcion,
+      categoria: formEditProducto.categoria,
+      precio: parseFloat(formEditProducto.precio),
+      unidad: formEditProducto.unidad,
+      nombre_en: formEditProducto.nombre_en,
+      descripcion_en: formEditProducto.descripcion_en,
+    }).eq('id', id)
+    setEditandoProducto(null)
+    await cargarProductos()
+    setGuardando(false)
+  }
+
   async function actualizarImagenProducto(id: string, file: File) {
     try {
       const ext = file.name.split('.').pop()
@@ -247,6 +272,16 @@ export default function AdminPage() {
     setCategorias(prev => [...prev, nuevaCategoria.trim()])
     setNuevaCategoria('')
     setShowFormCategoria(false)
+  }
+
+  async function guardarCategoria(catAntigua: string) {
+    if (!categoriaEditNombre.trim()) return alert('Escribe un nombre')
+    if (categoriaEditNombre === catAntigua) { setEditandoCategoria(null); return }
+    setGuardando(true)
+    await supabase.from('productos').update({ categoria: categoriaEditNombre.trim() }).eq('categoria', catAntigua)
+    await cargarProductos()
+    setEditandoCategoria(null)
+    setGuardando(false)
   }
 
   async function eliminarCategoria(cat: string) {
@@ -350,6 +385,9 @@ export default function AdminPage() {
           <span className="font-heading font-bold text-lg">Admin — BOOD SUPPLY</span>
         </div>
         <div className="flex items-center gap-4">
+          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm flex items-center gap-1">
+            📘 Facebook
+          </a>
           <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
           <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors">
             <LogOut size={16} /> Salir
@@ -716,7 +754,7 @@ export default function AdminPage() {
                 <h2 className="font-heading font-bold text-brand-navy text-lg mb-5">Nuevo Producto</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre * <span className="text-brand-gray-mid font-normal text-xs">(se traducirá automáticamente al inglés)</span></label>
+                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre * <span className="text-brand-gray-mid font-normal text-xs">(se traducirá automáticamente)</span></label>
                     <input value={formProducto.nombre} onChange={e => setFormProducto({...formProducto, nombre: e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
                   </div>
                   <div>
@@ -765,34 +803,83 @@ export default function AdminPage() {
                     </h2>
                     <div className="space-y-2">
                       {prods.map(p => (
-                        <div key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${p.activo ? 'border-gray-100 bg-gray-50' : 'border-red-100 bg-red-50 opacity-60'}`}>
-                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
-                            {p.imagen_url ? (
-                              <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-contain" />
-                            ) : (
-                              <ImageIcon size={20} className="text-gray-400" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-brand-navy text-sm">{p.nombre}</span>
-                              {p.nombre_en && <span className="text-xs text-gray-400">/ {p.nombre_en}</span>}
-                              {!p.activo && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactivo</span>}
+                        <div key={p.id}>
+                          <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${p.activo ? 'border-gray-100 bg-gray-50' : 'border-red-100 bg-red-50 opacity-60'}`}>
+                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                              {p.imagen_url ? (
+                                <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-contain" />
+                              ) : (
+                                <ImageIcon size={20} className="text-gray-400" />
+                              )}
                             </div>
-                            <div className="text-xs text-brand-gray-mid mt-0.5">{p.descripcion} · {p.unidad}</div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-brand-navy text-sm">{p.nombre}</span>
+                                {p.nombre_en && <span className="text-xs text-gray-400">/ {p.nombre_en}</span>}
+                                {!p.activo && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactivo</span>}
+                              </div>
+                              <div className="text-xs text-brand-gray-mid mt-0.5">{p.descripcion} · {p.unidad}</div>
+                            </div>
+                            <div className="font-heading font-bold text-brand-navy">${p.precio}</div>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500" title="Editar producto">
+                                <Pencil size={15} />
+                              </button>
+                              <button onClick={() => seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400" title="Cambiar imagen">
+                                <ImageIcon size={15} />
+                              </button>
+                              <button onClick={() => toggleActivo(p.id, p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors text-brand-gray-mid">
+                                {p.activo ? <Eye size={15} /> : <EyeOff size={15} />}
+                              </button>
+                              <button onClick={() => eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400 hover:text-red-600">
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
                           </div>
-                          <div className="font-heading font-bold text-brand-navy">${p.precio}</div>
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400" title="Cambiar imagen">
-                              <ImageIcon size={15} />
-                            </button>
-                            <button onClick={() => toggleActivo(p.id, p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors text-brand-gray-mid">
-                              {p.activo ? <Eye size={15} /> : <EyeOff size={15} />}
-                            </button>
-                            <button onClick={() => eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400 hover:text-red-600">
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
+                          {editandoProducto === p.id && (
+                            <div className="mt-2 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre (ES)</label>
+                                  <input value={formEditProducto.nombre} onChange={e => setFormEditProducto({...formEditProducto, nombre: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Name (EN)</label>
+                                  <input value={formEditProducto.nombre_en} onChange={e => setFormEditProducto({...formEditProducto, nombre_en: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Descripción (ES)</label>
+                                  <input value={formEditProducto.descripcion} onChange={e => setFormEditProducto({...formEditProducto, descripcion: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Description (EN)</label>
+                                  <input value={formEditProducto.descripcion_en} onChange={e => setFormEditProducto({...formEditProducto, descripcion_en: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Precio (USD)</label>
+                                  <input value={formEditProducto.precio} onChange={e => setFormEditProducto({...formEditProducto, precio: e.target.value})} type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Unidad</label>
+                                  <input value={formEditProducto.unidad} onChange={e => setFormEditProducto({...formEditProducto, unidad: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoría</label>
+                                  <select value={formEditProducto.categoria} onChange={e => setFormEditProducto({...formEditProducto, categoria: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
+                                    {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="flex gap-3 mt-4">
+                                <button onClick={() => guardarProducto(p.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+                                  <Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}
+                                </button>
+                                <button onClick={() => setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid hover:text-brand-navy">
+                                  <X size={14} /> Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -830,15 +917,39 @@ export default function AdminPage() {
             ) : (
               <div className="space-y-2">
                 {categorias.map(cat => (
-                  <div key={cat} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <Tag size={16} className="text-brand-orange" />
-                      <span className="font-medium text-brand-navy">{cat}</span>
-                      <span className="text-xs text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{productos.filter(p => p.categoria === cat).length} productos</span>
+                  <div key={cat}>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                      <div className="flex items-center gap-3 flex-1">
+                        <Tag size={16} className="text-brand-orange" />
+                        {editandoCategoria === cat ? (
+                          <input value={categoriaEditNombre} onChange={e => setCategoriaEditNombre(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e => e.key === 'Enter' && guardarCategoria(cat)} autoFocus />
+                        ) : (
+                          <span className="font-medium text-brand-navy">{cat}</span>
+                        )}
+                        <span className="text-xs text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{productos.filter(p => p.categoria === cat).length} productos</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {editandoCategoria === cat ? (
+                          <>
+                            <button onClick={() => guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
+                              <Save size={13} /> {guardando ? '...' : 'Guardar'}
+                            </button>
+                            <button onClick={() => setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid">
+                              <X size={15} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => { setEditandoCategoria(cat); setCategoriaEditNombre(cat) }} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500">
+                              <Pencil size={15} />
+                            </button>
+                            <button onClick={() => eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400 hover:text-red-600">
+                              <Trash2 size={15} />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <button onClick={() => eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400 hover:text-red-600">
-                      <Trash2 size={15} />
-                    </button>
                   </div>
                 ))}
               </div>

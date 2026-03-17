@@ -12,7 +12,6 @@ const TEXTS = {
     catalog: 'Catálogo',
     my_orders: 'Mis Pedidos',
     search: 'Buscar productos...',
-    all: 'Todas',
     no_products: 'No se encontraron productos',
     add: 'Agregar',
     your_order: 'Tu Pedido',
@@ -39,15 +38,19 @@ const TEXTS = {
     payment: 'Pago',
     proof_link: '📄 Ver comprobante de pago',
     tax_note: '+10.25% tax',
-    methods: ['Efectivo', 'ACH', 'Tarjeta de crédito', 'Cheque'],
+    methods: ['Efectivo', 'Zelle', 'Tarjeta de crédito', 'Cheque'],
     categorias: ['Todas', 'Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Papel para Baño', 'Papel', 'Palillos', 'Grocery', 'Químicos y Limpieza'],
+    zelle_info: 'Envía tu pago por Zelle al número registrado:',
+    zelle_name: 'Nombre: Bood Supply',
+    zelle_number: 'Número: (312) 409-0106',
+    zelle_link: 'Pagar con Zelle',
+    cheque_note: 'El cheque deberá ser entregado directamente al repartidor al momento de la entrega. Haz el cheque a nombre de: Bood Supply.',
   },
   en: {
     welcome: 'Welcome',
     catalog: 'Catalog',
     my_orders: 'My Orders',
     search: 'Search products...',
-    all: 'All',
     no_products: 'No products found',
     add: 'Add',
     your_order: 'Your Order',
@@ -74,8 +77,13 @@ const TEXTS = {
     payment: 'Payment',
     proof_link: '📄 View payment proof',
     tax_note: '+10.25% tax',
-    methods: ['Cash', 'ACH', 'Credit card', 'Check'],
+    methods: ['Cash', 'Zelle', 'Credit card', 'Check'],
     categorias: ['All', 'Disposable Cups', 'Disposable Plates', 'Cutlery', 'Bags & Containers', 'Napkins', 'Bathroom Paper', 'Paper', 'Toothpicks', 'Grocery', 'Chemicals & Cleaning'],
+    zelle_info: 'Send your payment via Zelle to the registered number:',
+    zelle_name: 'Name: Bood Supply',
+    zelle_number: 'Number: (312) 409-0106',
+    zelle_link: 'Pay with Zelle',
+    cheque_note: 'The check must be handed directly to the delivery driver at the time of delivery. Please make the check payable to: Bood Supply.',
   }
 }
 
@@ -170,7 +178,7 @@ export default function DashboardPage() {
     return catES && matchBusqueda
   })
 
-  const requiereComprobante = metodoPago && metodoPago !== 'Efectivo' && metodoPago !== 'Cash'
+  const requiereComprobante = metodoPago && metodoPago !== 'Efectivo' && metodoPago !== 'Cash' && metodoPago !== 'Zelle'
 
   async function enviarPedido() {
     if (carrito.length === 0) return
@@ -283,6 +291,9 @@ export default function DashboardPage() {
       <nav className="bg-white border-b border-gray-100 shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-40">
         <span className="font-heading font-bold text-xl text-brand-navy">BOOD <span className="text-brand-orange">SUPPLY</span></span>
         <div className="flex items-center gap-3">
+          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 transition-colors hidden sm:flex items-center gap-1">
+            📘 Facebook
+          </a>
           <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="flex items-center gap-1.5 text-sm font-medium border border-gray-200 px-3 py-1.5 rounded-lg hover:border-brand-orange transition-colors text-brand-gray-dark">
             {lang === 'es' ? '🇺🇸 EN' : '🇲🇽 ES'}
           </button>
@@ -481,6 +492,26 @@ export default function DashboardPage() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Zelle info */}
+                    {(metodoPago === 'Zelle') && (
+                      <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                        <p className="text-sm font-medium text-purple-800 mb-2">💜 {t.zelle_info}</p>
+                        <p className="text-sm text-purple-700 font-bold">{t.z <p className="text-sm text-purple-700 font-bold">{t.zelle_name}</p>
+                        <p className="text-sm text-purple-700 font-bold mb-3">{t.zelle_number}</p>
+                        <a href="https://enroll.zellepay.com/qr-codes?data=ewogICJuYW1lIjogIkJPT0QgU1VQUExZIiwKICAidG9rZW4iOiAiMzEyNDA5MDEwNiIsCiAgImFjdGlvbiI6ICJwYXltZW50Igp9" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-purple-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                          💸 {t.zelle_link}
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Cheque info */}
+                    {(metodoPago === 'Cheque' || metodoPago === 'Check') && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <p className="text-sm text-amber-800">🧾 {t.cheque_note}</p>
+                      </div>
+                    )}
+
                     {requiereComprobante && (
                       <div>
                         <label className="block text-sm font-medium text-brand-gray-dark mb-2">{t.proof} <span className="text-brand-gray-mid font-normal">{t.proof_hint}</span></label>
@@ -511,4 +542,4 @@ export default function DashboardPage() {
       )}
     </div>
   )
-}
+} 
