@@ -47,6 +47,16 @@ const TEXTS = {
     zelle_number: 'Número: (312) 409-0106',
     zelle_link: 'Pagar con Zelle',
     cheque_note: 'El cheque deberá ser entregado directamente al repartidor al momento de la entrega. Haz el cheque a nombre de: Bood Supply.',
+    change_password_title: 'Cambio de contraseña requerido',
+    change_password_msg: 'Por seguridad debes crear una nueva contraseña antes de continuar.',
+    new_password: 'Nueva contraseña',
+    confirm_password: 'Confirmar contraseña',
+    password_placeholder: 'Mínimo 6 caracteres',
+    confirm_placeholder: 'Repite la contraseña',
+    save_password: 'Guardar Contraseña',
+    saving: 'Guardando...',
+    password_mismatch: 'Las contraseñas no coinciden',
+    password_short: 'Mínimo 6 caracteres',
   },
   en: {
     welcome: 'Welcome',
@@ -88,6 +98,16 @@ const TEXTS = {
     zelle_number: 'Number: (312) 409-0106',
     zelle_link: 'Pay with Zelle',
     cheque_note: 'The check must be handed directly to the delivery driver at the time of delivery. Please make the check payable to: Bood Supply.',
+    change_password_title: 'Password change required',
+    change_password_msg: 'For security reasons you must create a new password before continuing.',
+    new_password: 'New password',
+    confirm_password: 'Confirm password',
+    password_placeholder: 'Minimum 6 characters',
+    confirm_placeholder: 'Repeat the password',
+    save_password: 'Save Password',
+    saving: 'Saving...',
+    password_mismatch: 'Passwords do not match',
+    password_short: 'Minimum 6 characters',
   }
 }
 
@@ -96,6 +116,11 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [aprobado, setAprobado] = useState<boolean | null>(null)
+  const [mustChangePassword, setMustChangePassword] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [savingPassword, setSavingPassword] = useState(false)
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [categoriasDB, setCategoriasDB] = useState<string[]>([])
@@ -121,6 +146,11 @@ export default function DashboardPage() {
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       if (!prof) { setAprobado(false); setLoading(false); return }
       setProfile(prof)
+      if (prof.must_change_password) {
+        setMustChangePassword(true)
+        setLoading(false)
+        return
+      }
       const estaAprobado = prof.aprobado === true
       setAprobado(estaAprobado)
       if (estaAprobado) {
@@ -135,6 +165,30 @@ export default function DashboardPage() {
     }
     init()
   }, [])
+
+  async function handleChangePassword() {
+    if (newPassword.length < 6) return setPasswordError(t.password_short)
+    if (newPassword !== confirmPassword) return setPasswordError(t.password_mismatch)
+    setSavingPassword(true)
+    setPasswordError('')
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) { setPasswordError(error.message); setSavingPassword(false); return }
+    await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id)
+    setMustChangePassword(false)
+    const prof = { ...profile, must_change_password: false }
+    setProfile(prof)
+    const estaAprobado = prof.aprobado === true
+    setAprobado(estaAprobado)
+    if (estaAprobado) {
+      const { data: prods } = await supabase.from('productos').select('*').eq('activo', true).order('categoria')
+      setProductos(prods || [])
+      const cats = [...new Set((prods || []).map((p: any) => p.categoria))].filter(Boolean) as string[]
+      setCategoriasDB(cats)
+      const { data: peds } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').eq('cliente_id', user.id).order('created_at', { ascending: false })
+      setPedidos(peds || [])
+    }
+    setSavingPassword(false)
+  }
 
   function getNombreProducto(p: any) {
     if (lang === 'en' && p.nombre_en) return p.nombre_en
@@ -192,7 +246,6 @@ export default function DashboardPage() {
     if (!metodoPago) return alert(lang === 'es' ? 'Selecciona un método de pago' : 'Select a payment method')
     if (requiereComprobante && !comprobante) return alert(lang === 'es' ? 'Debes adjuntar el comprobante de pago' : 'You must attach the payment proof')
     setEnviando(true)
-
     let comprobante_url = null
     if (comprobante && user) {
       const ext = comprobante.name.split('.').pop()
@@ -203,12 +256,10 @@ export default function DashboardPage() {
         comprobante_url = urlData.publicUrl
       }
     }
-
     const { data: pedido } = await supabase.from('pedidos').insert({
       cliente_id: user.id, total, fuel_surcharge: FUEL_SURCHARGE,
       metodo_pago: metodoPago, comprobante_url, estado: 'pendiente'
     }).select().single()
-
     if (pedido) {
       await supabase.from('pedido_items').insert(carrito.map(i => ({ pedido_id: pedido.id, producto_id: i.id, cantidad: i.cantidad, precio_unitario: i.precio })))
       try {
@@ -230,7 +281,6 @@ export default function DashboardPage() {
           })
         })
       } catch (e) { console.error('Notif error:', e) }
-
       const { data: peds } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').eq('cliente_id', user.id).order('created_at', { ascending: false })
       setPedidos(peds || [])
       setCarrito([])
@@ -244,6 +294,39 @@ export default function DashboardPage() {
   }
 
   if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
+
+  if (mustChangePassword) return (
+    <div className="min-h-screen bg-brand-gray-light flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🔑</div>
+          <h1 className="font-heading text-3xl font-bold text-brand-navy">BOOD <span className="text-brand-orange">SUPPLY</span></h1>
+          <h2 className="font-heading text-xl font-bold text-brand-navy mt-3">{t.change_password_title}</h2>
+          <p className="text-brand-gray-mid mt-2 text-sm">{t.change_password_msg}</p>
+        </div>
+        {passwordError && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{passwordError}</div>}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-brand-gray-dark mb-1">{t.new_password}</label>
+            <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder={t.password_placeholder} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-brand-gray-dark mb-1">{t.confirm_password}</label>
+            <input value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} type="password" placeholder={t.confirm_placeholder} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e => e.key === 'Enter' && handleChangePassword()} />
+          </div>
+          <button onClick={handleChangePassword} disabled={savingPassword} className="btn-primary w-full py-3 text-base">
+            {savingPassword ? t.saving : t.save_password}
+          </button>
+        </div>
+        <div className="flex justify-between items-center mt-4">
+          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="text-xs text-brand-gray-mid hover:text-brand-orange">
+            {lang === 'es' ? '🇺🇸 EN' : '🇲🇽 ES'}
+          </button>
+          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="text-xs text-brand-gray-mid hover:text-brand-orange">{t.logout}</button>
+        </div>
+      </div>
+    </div>
+  )
 
   if (aprobado === false) return (
     <div className="min-h-screen bg-brand-gray-light flex items-center justify-center px-4">

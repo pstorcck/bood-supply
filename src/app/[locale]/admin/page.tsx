@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus } from 'lucide-react'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
@@ -63,6 +63,11 @@ export default function AdminPage() {
   const [destinatarios, setDestinatarios] = useState<string[]>([])
   const [enviandoMensaje, setEnviandoMensaje] = useState(false)
   const [mensajeEnviado, setMensajeEnviado] = useState(false)
+  const [showFormUsuario, setShowFormUsuario] = useState(false)
+  const [formUsuario, setFormUsuario] = useState({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '' })
+  const [creandoUsuario, setCreandoUsuario] = useState(false)
+  const [usuarioCreado, setUsuarioCreado] = useState(false)
+  const [errorUsuario, setErrorUsuario] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
@@ -112,6 +117,27 @@ export default function AdminPage() {
 
   const totalVentasFiltradas = pedidosFiltrados.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
   const totalVentas = pedidos.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
+
+  async function crearUsuario() {
+    if (!formUsuario.email || !formUsuario.nombre) return setErrorUsuario('Email y nombre son requeridos')
+    setCreandoUsuario(true)
+    setErrorUsuario('')
+    try {
+      const res = await fetch('/api/crear-usuario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formUsuario)
+      })
+      const data = await res.json()
+      if (data.error) { setErrorUsuario(data.error); setCreandoUsuario(false); return }
+      setUsuarioCreado(true)
+      setFormUsuario({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '' })
+      setShowFormUsuario(false)
+      setTimeout(() => setUsuarioCreado(false), 4000)
+      await cargarClientes()
+    } catch (e: any) { setErrorUsuario(e.message) }
+    setCreandoUsuario(false)
+  }
 
   async function aprobarCliente(c: any, aprobar: boolean) {
     setAprobando(c.id)
@@ -379,6 +405,12 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-brand-gray-light">
+      {usuarioCreado && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">
+          ✓ Usuario creado y correo enviado
+        </div>
+      )}
+
       <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <Package size={22} className="text-brand-orange" />
@@ -428,15 +460,63 @@ export default function AdminPage() {
         {/* CLIENTES */}
         {tab === 'clientes' && (
           <div className="space-y-3">
-            <div className="flex justify-between items-center mb-5">
+            <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
               <h2 className="font-heading font-bold text-brand-navy text-xl">
                 Clientes — {clientes.length}
                 {pendientesAprobacion > 0 && <span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s)</span>}
               </h2>
-              <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
-                <Download size={15} /> Exportar CSV
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setShowFormUsuario(!showFormUsuario)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">
+                  <UserPlus size={15} /> Crear Usuario
+                </button>
+                <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
+                  <Download size={15} /> Exportar CSV
+                </button>
+              </div>
             </div>
+
+            {showFormUsuario && (
+              <div className="card border-2 border-brand-orange/30 mb-4">
+                <h3 className="font-heading font-bold text-brand-navy text-lg mb-4 flex items-center gap-2">
+                  <UserPlus size={18} className="text-brand-orange" /> Crear Nuevo Usuario
+                </h3>
+                {errorUsuario && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorUsuario}</div>}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre Completo *</label>
+                    <input value={formUsuario.nombre} onChange={e => setFormUsuario({...formUsuario, nombre: e.target.value})} placeholder="Nombre completo" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Email *</label>
+                    <input value={formUsuario.email} onChange={e => setFormUsuario({...formUsuario, email: e.target.value})} placeholder="correo@email.com" type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Negocio</label>
+                    <input value={formUsuario.negocio} onChange={e => setFormUsuario({...formUsuario, negocio: e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Teléfono</label>
+                    <input value={formUsuario.telefono} onChange={e => setFormUsuario({...formUsuario, telefono: e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label>
+                    <input value={formUsuario.ein} onChange={e => setFormUsuario({...formUsuario, ein: e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label>
+                    <input value={formUsuario.direccion} onChange={e => setFormUsuario({...formUsuario, direccion: e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                  </div>
+                </div>
+                <p className="text-xs text-brand-gray-mid mt-3">✓ El usuario recibirá un correo con sus credenciales y deberá cambiar su contraseña al primer inicio de sesión.</p>
+                <div className="flex gap-3 mt-4">
+                  <button onClick={crearUsuario} disabled={creandoUsuario} className="btn-primary flex items-center gap-2">
+                    <UserPlus size={15} /> {creandoUsuario ? 'Creando...' : 'Crear y Enviar Correo'}
+                  </button>
+                  <button onClick={() => { setShowFormUsuario(false); setErrorUsuario('') }} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
+                </div>
+              </div>
+            )}
+
             {clientes.map(c => {
               const pedidosCliente = getPedidosCliente(c.id)
               const ultimoPedido = pedidosCliente[0]
@@ -455,6 +535,7 @@ export default function AdminPage() {
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.aprobado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                             {c.aprobado ? '✓ Aprobado' : '⏳ Pendiente'}
                           </span>
+                          {c.must_change_password && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">🔑 Debe cambiar contraseña</span>}
                         </div>
                         <p className="text-xs text-brand-gray-mid">{c.email}</p>
                       </div>
@@ -806,11 +887,7 @@ export default function AdminPage() {
                         <div key={p.id}>
                           <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${p.activo ? 'border-gray-100 bg-gray-50' : 'border-red-100 bg-red-50 opacity-60'}`}>
                             <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
-                              {p.imagen_url ? (
-                                <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-contain" />
-                              ) : (
-                                <ImageIcon size={20} className="text-gray-400" />
-                              )}
+                              {p.imagen_url ? <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-contain" /> : <ImageIcon size={20} className="text-gray-400" />}
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
@@ -822,61 +899,30 @@ export default function AdminPage() {
                             </div>
                             <div className="font-heading font-bold text-brand-navy">${p.precio}</div>
                             <div className="flex items-center gap-1">
-                              <button onClick={() => iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500" title="Editar producto">
-                                <Pencil size={15} />
-                              </button>
-                              <button onClick={() => seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400" title="Cambiar imagen">
-                                <ImageIcon size={15} />
-                              </button>
-                              <button onClick={() => toggleActivo(p.id, p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors text-brand-gray-mid">
-                                {p.activo ? <Eye size={15} /> : <EyeOff size={15} />}
-                              </button>
-                              <button onClick={() => eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400 hover:text-red-600">
-                                <Trash2 size={15} />
-                              </button>
+                              <button onClick={() => iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15} /></button>
+                              <button onClick={() => seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400"><ImageIcon size={15} /></button>
+                              <button onClick={() => toggleActivo(p.id, p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors text-brand-gray-mid">{p.activo ? <Eye size={15} /> : <EyeOff size={15} />}</button>
+                              <button onClick={() => eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15} /></button>
                             </div>
                           </div>
                           {editandoProducto === p.id && (
                             <div className="mt-2 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
                               <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre (ES)</label>
-                                  <input value={formEditProducto.nombre} onChange={e => setFormEditProducto({...formEditProducto, nombre: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Name (EN)</label>
-                                  <input value={formEditProducto.nombre_en} onChange={e => setFormEditProducto({...formEditProducto, nombre_en: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Descripción (ES)</label>
-                                  <input value={formEditProducto.descripcion} onChange={e => setFormEditProducto({...formEditProducto, descripcion: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Description (EN)</label>
-                                  <input value={formEditProducto.descripcion_en} onChange={e => setFormEditProducto({...formEditProducto, descripcion_en: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Precio (USD)</label>
-                                  <input value={formEditProducto.precio} onChange={e => setFormEditProducto({...formEditProducto, precio: e.target.value})} type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Unidad</label>
-                                  <input value={formEditProducto.unidad} onChange={e => setFormEditProducto({...formEditProducto, unidad: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoría</label>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre (ES)</label><input value={formEditProducto.nombre} onChange={e => setFormEditProducto({...formEditProducto, nombre: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Name (EN)</label><input value={formEditProducto.nombre_en} onChange={e => setFormEditProducto({...formEditProducto, nombre_en: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Descripción (ES)</label><input value={formEditProducto.descripcion} onChange={e => setFormEditProducto({...formEditProducto, descripcion: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Description (EN)</label><input value={formEditProducto.descripcion_en} onChange={e => setFormEditProducto({...formEditProducto, descripcion_en: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Precio (USD)</label><input value={formEditProducto.precio} onChange={e => setFormEditProducto({...formEditProducto, precio: e.target.value})} type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Unidad</label><input value={formEditProducto.unidad} onChange={e => setFormEditProducto({...formEditProducto, unidad: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoría</label>
                                   <select value={formEditProducto.categoria} onChange={e => setFormEditProducto({...formEditProducto, categoria: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
                                     {categorias.map(c => <option key={c} value={c}>{c}</option>)}
                                   </select>
                                 </div>
                               </div>
                               <div className="flex gap-3 mt-4">
-                                <button onClick={() => guardarProducto(p.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
-                                  <Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}
-                                </button>
-                                <button onClick={() => setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid hover:text-brand-navy">
-                                  <X size={14} /> Cancelar
-                                </button>
+                                <button onClick={() => guardarProducto(p.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"><Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}</button>
+                                <button onClick={() => setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid hover:text-brand-navy"><X size={14} /> Cancelar</button>
                               </div>
                             </div>
                           )}
@@ -931,21 +977,13 @@ export default function AdminPage() {
                       <div className="flex items-center gap-1">
                         {editandoCategoria === cat ? (
                           <>
-                            <button onClick={() => guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
-                              <Save size={13} /> {guardando ? '...' : 'Guardar'}
-                            </button>
-                            <button onClick={() => setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid">
-                              <X size={15} />
-                            </button>
+                            <button onClick={() => guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={13} /> {guardando ? '...' : 'Guardar'}</button>
+                            <button onClick={() => setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid"><X size={15} /></button>
                           </>
                         ) : (
                           <>
-                            <button onClick={() => { setEditandoCategoria(cat); setCategoriaEditNombre(cat) }} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500">
-                              <Pencil size={15} />
-                            </button>
-                            <button onClick={() => eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400 hover:text-red-600">
-                              <Trash2 size={15} />
-                            </button>
+                            <button onClick={() => { setEditandoCategoria(cat); setCategoriaEditNombre(cat) }} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15} /></button>
+                            <button onClick={() => eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15} /></button>
                           </>
                         )}
                       </div>
