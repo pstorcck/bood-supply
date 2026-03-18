@@ -1,7 +1,7 @@
 "use client"
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map } from 'lucide-react'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
@@ -37,7 +37,7 @@ function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes'>('clientes')
+  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas'>('clientes')
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
@@ -71,6 +71,13 @@ export default function AdminPage() {
   const [creandoUsuario, setCreandoUsuario] = useState(false)
   const [usuarioCreado, setUsuarioCreado] = useState(false)
   const [errorUsuario, setErrorUsuario] = useState('')
+  // Rutas
+  const [pedidosRuta, setPedidosRuta] = useState<string[]>([])
+  const [optimizando, setOptimizando] = useState(false)
+  const [rutaOptimizada, setRutaOptimizada] = useState<any[]>([])
+  const [errorRuta, setErrorRuta] = useState('')
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -83,6 +90,170 @@ export default function AdminPage() {
     }
     init()
   }, [])
+
+  useEffect(() => {
+    if (tab === 'rutas' && mapRef.current && !mapInstanceRef.current) {
+      const script = document.createElement('script')
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`
+      script.async = true
+      script.onload = () => {
+        const map = new (window as any).google.maps.Map(mapRef.current, {
+          center: { lat: 41.9281, lng: -87.7006 },
+          zoom: 11,
+        })
+        mapInstanceRef.current = map
+      }
+      document.head.appendChild(script)
+    }
+  }, [tab])
+
+  function mostrarRutaEnMapa(paradas: any[]) {
+    if (!mapInstanceRef.current) return
+    const google = (window as any).google
+    const map = mapInstanceRef.current
+
+    // Limpiar marcadores anteriores
+    if ((window as any)._marcadores) {
+      (window as any)._marcadores.forEach((m: any) => m.setMap(null))
+    }
+    (window as any)._marcadores = []
+
+    const origen = '2900 N Richmond St, Chicago, IL 60618'
+    const geocoder = new google.maps.Geocoder()
+
+    // Marcador de origen
+    geocoder.geocode({ address: origen }, (results: any, status: any) => {
+      if (status === 'OK') {
+        const marker = new google.maps.Marker({
+          map,
+          position: results[0].geometry.location,
+          label: { text: '🏭', fontSize: '20px' },
+          title: 'Bood Supply — Origen',
+        })
+        ;(window as any)._marcadores.push(marker)
+      }
+    })
+
+    // Marcadores de paradas
+    paradas.forEach((parada, idx) => {
+      geocoder.geocode({ address: parada.direccion + ', Chicago, IL' }, (results: any, status: any) => {
+        if (status === 'OK') {
+          const marker = new google.maps.Marker({
+            map,
+            position: results[0].geometry.location,
+            label: { text: String(idx + 1), color: 'white', fontWeight: 'bold' },
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 18,
+              fillColor: '#F47B20',
+              fillOpacity: 1,
+              strokeColor: '#0F2B5B',
+              strokeWeight: 2,
+            },
+            title: `${idx + 1}. ${parada.negocio || parada.nombre}`,
+          })
+          const infoWindow = new google.maps.InfoWindow({
+            content: `<div style="font-family:Arial;padding:8px;"><strong>${idx + 1}. ${parada.negocio || parada.nombre}</strong><br/>${parada.nombre}<br/>${parada.direccion}<br/><strong>${parada.pedidoId}</strong></div>`
+          })
+          marker.addListener('click', () => infoWindow.open(map, marker))
+          ;(window as any)._marcadores.push(marker)
+        }
+      })
+    })
+
+    // Dibujar ruta
+    const directionsService = new google.maps.DirectionsService()
+    const directionsRenderer = new google.maps.DirectionsRenderer({
+      map,
+      suppressMarkers: true,
+      polylineOptions: { strokeColor: '#0F2B5B', strokeWeight: 4 }
+    })
+
+    if (paradas.length > 0) {
+      directionsService.route({
+        origin: origen,
+        destination: origen,
+        waypoints: paradas.map(p => ({ location: p.direccion + ', Chicago, IL', stopover: true })),
+        travelMode: google.maps.TravelMode.DRIVING,
+      }, (result: any, status: any) => {
+        if (status === 'OK') directionsRenderer.setDirections(result)
+      })
+    }
+  }
+
+  async function optimizarRuta() {
+    if (pedidosRuta.length < 1) return setErrorRuta('Selecciona al menos 1 pedido')
+    setOptimizando(true)
+    setErrorRuta('')
+    setRutaOptimizada([])
+
+    const pedidosSeleccionados = pedidos.filter(p => pedidosRuta.includes(p.id))
+    const paradas = pedidosSeleccionados.map(ped => {
+      const cliente = getCliente(ped.cliente_id)
+      return {
+        pedidoId: '#' + ped.id.slice(0,8).toUpperCase(),
+        nombre: cliente?.nombre || '—',
+        negocio: cliente?.negocio || '—',
+        telefono: cliente?.telefono || '—',
+        direccion: cliente?.direccion || '',
+        total: ped.total,
+        metodo_pago: ped.metodo_pago,
+        items: ped.pedido_items,
+      }
+    }).filter(p => p.direccion)
+
+    if (paradas.length === 0) return setErrorRuta('Los pedidos seleccionados no tienen dirección registrada')
+
+    try {
+      const res = await fetch('/api/optimizar-ruta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direcciones: paradas.map(p => p.direccion + ', Chicago, IL') })
+      })
+      const data = await res.json()
+      if (data.error) { setErrorRuta(data.error); setOptimizando(false); return }
+
+      const rutaOrdenada = data.orden.map((i: number) => paradas[i])
+      setRutaOptimizada(rutaOrdenada)
+      mostrarRutaEnMapa(rutaOrdenada)
+    } catch (e: any) {
+      setErrorRuta(e.message)
+    }
+    setOptimizando(false)
+  }
+
+  function imprimirRuta() {
+    const html = `<html><head><title>Ruta de Entrega — BOOD SUPPLY</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}
+      .header{background:#0F2B5B;color:white;padding:16px;border-radius:8px;margin-bottom:20px;text-align:center}
+      .parada{border:1px solid #ccc;border-radius:8px;padding:12px;margin-bottom:12px;page-break-inside:avoid}
+      .num{background:#F47B20;color:white;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;margin-right:8px}
+      .items{margin-top:8px;padding-top:8px;border-top:1px solid #eee;font-size:11px}
+    </style></head><body>
+    <div class="header"><h2 style="margin:0">BOOD SUPPLY — Ruta de Entrega</h2>
+    <p style="margin:4px 0 0">${new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}</p>
+    <p style="margin:4px 0 0">Origen: 2900 N Richmond St, Chicago, IL 60618</p></div>
+    ${rutaOptimizada.map((p, i) => `
+      <div class="parada">
+        <div style="display:flex;align-items:center;margin-bottom:6px">
+          <span class="num">${i+1}</span>
+          <strong>${p.negocio || p.nombre}</strong>
+        </div>
+        <p style="margin:2px 0">👤 ${p.nombre}</p>
+        <p style="margin:2px 0">📍 ${p.direccion}</p>
+        <p style="margin:2px 0">📞 ${p.telefono}</p>
+        <p style="margin:2px 0">💳 Pago: ${p.metodo_pago} · Total: $${p.total?.toFixed(2)}</p>
+        <p style="margin:2px 0">📦 Pedido: ${p.pedidoId}</p>
+        <div class="items">
+          ${p.items?.map((item: any) => `<div>${item.productos?.nombre} x${item.cantidad}</div>`).join('') || ''}
+        </div>
+      </div>
+    `).join('')}
+    </body></html>`
+    const win = window.open('', '_blank')
+    if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
+  }
 
   async function cargarProductos() {
     const { data } = await supabase.from('productos').select('*').order('categoria').order('nombre')
@@ -379,6 +550,10 @@ export default function AdminPage() {
     setSeleccionados(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
   }
 
+  function togglePedidoRuta(id: string) {
+    setPedidosRuta(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
+  }
+
   function toggleDestinatario(email: string) {
     setDestinatarios(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email])
   }
@@ -447,6 +622,7 @@ export default function AdminPage() {
   }
 
   const pendientesAprobacion = clientes.filter(c => !c.aprobado).length
+  const pedidosParaRuta = pedidos.filter(p => ['pendiente', 'confirmado', 'en_preparacion'].includes(p.estado))
 
   if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
 
@@ -493,6 +669,7 @@ export default function AdminPage() {
           {[
             { key: 'clientes', label: 'Clientes', icon: Users, badge: pendientesAprobacion },
             { key: 'pedidos', label: 'Pedidos', icon: ShoppingBag, badge: 0 },
+            { key: 'rutas', label: 'Rutas', icon: Map, badge: 0 },
             { key: 'mensajes', label: 'Mensajes', icon: Mail, badge: 0 },
             { key: 'productos', label: 'Productos', icon: Package, badge: 0 },
             { key: 'categorias', label: 'Categorías', icon: Tag, badge: 0 },
@@ -840,6 +1017,120 @@ export default function AdminPage() {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {/* RUTAS */}
+        {tab === 'rutas' && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="font-heading font-bold text-brand-navy text-xl">Optimización de Rutas</h2>
+                <p className="text-brand-gray-mid text-sm mt-1">Selecciona los pedidos del día y calcula la ruta más eficiente</p>
+              </div>
+              <div className="flex gap-3">
+                {rutaOptimizada.length > 0 && (
+                  <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
+                    🖨️ Imprimir Ruta
+                  </button>
+                )}
+                <button onClick={optimizarRuta} disabled={optimizando || pedidosRuta.length === 0} className="btn-primary flex items-center gap-2">
+                  <Map size={16} /> {optimizando ? 'Calculando...' : 'Optimizar Ruta'}
+                </button>
+              </div>
+            </div>
+
+            {errorRuta && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorRuta}</div>}
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Lista de pedidos para seleccionar */}
+              <div>
+                <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">
+                  Pedidos Activos
+                  <span className="text-xs font-normal text-brand-gray-mid bg-gray-100 px-2 py-0.5 rounded-full">{pedidosParaRuta.length}</span>
+                  {pedidosRuta.length > 0 && <span className="text-xs font-normal text-brand-orange bg-orange-50 px-2 py-0.5 rounded-full">{pedidosRuta.length} seleccionados</span>}
+                </h3>
+                <div className="flex gap-2 mb-3">
+                  <button onClick={() => setPedidosRuta(pedidosParaRuta.map(p => p.id))} className="text-xs text-brand-orange hover:underline">Seleccionar todos</button>
+                  <span className="text-brand-gray-mid text-xs">·</span>
+                  <button onClick={() => setPedidosRuta([])} className="text-xs text-brand-gray-mid hover:underline">Limpiar</button>
+                </div>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {pedidosParaRuta.length === 0 ? (
+                    <div className="card text-center py-8 text-brand-gray-mid">
+                      <p>No hay pedidos activos para entregar</p>
+                    </div>
+                  ) : (
+                    pedidosParaRuta.map(ped => {
+                      const cliente = getCliente(ped.cliente_id)
+                      const enRuta = pedidosRuta.includes(ped.id)
+                      return (
+                        <div key={ped.id} onClick={() => togglePedidoRuta(ped.id)} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${enRuta ? 'border-brand-orange bg-orange-50' : 'border-gray-100 bg-white hover:border-gray-300'}`}>
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${enRuta ? 'bg-brand-orange border-brand-orange' : 'border-gray-300'}`}>
+                            {enRuta && <span className="text-white text-xs font-bold">✓</span>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-brand-navy text-sm truncate">{cliente?.negocio || cliente?.nombre || '—'}</p>
+                            <p className="text-xs text-brand-gray-mid truncate">📍 {cliente?.direccion || 'Sin dirección'}</p>
+                            <p className="text-xs text-brand-gray-mid">#{ped.id.slice(0,8).toUpperCase()} · ${ped.total?.toFixed(2)}</p>
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${estadoColor[ped.estado]}`}>
+                            {ped.estado.replace('_',' ')}
+                          </span>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Resultado y mapa */}
+              <div>
+                {rutaOptimizada.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">
+                      🚚 Ruta Óptima
+                      <span className="text-xs font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{rutaOptimizada.length} paradas</span>
+                    </h3>
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg">
+                        <div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div>
+                        <div>
+                          <p className="font-medium text-brand-navy text-sm">Origen — Bood Supply</p>
+                          <p className="text-xs text-brand-gray-mid">2900 N Richmond St, Chicago</p>
+                        </div>
+                      </div>
+                      {rutaOptimizada.map((parada, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-100">
+                          <div className="w-7 h-7 bg-brand-orange rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{idx + 1}</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-brand-navy text-sm truncate">{parada.negocio || parada.nombre}</p>
+                            <p className="text-xs text-brand-gray-mid truncate">📍 {parada.direccion}</p>
+                            <p className="text-xs text-brand-gray-mid">📞 {parada.telefono} · 💳 {parada.metodo_pago} · ${parada.total?.toFixed(2)}</p>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg">
+                        <div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div>
+                        <div>
+                          <p className="font-medium text-brand-navy text-sm">Regreso — Bood Supply</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={mapRef} className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{ height: rutaOptimizada.length > 0 ? '300px' : '400px' }}>
+                  {!rutaOptimizada.length && (
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand-gray-mid">
+                      <div className="text-center">
+                        <Map size={40} className="mx-auto mb-2 opacity-25" />
+                        <p className="text-sm">Selecciona pedidos y optimiza la ruta</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
