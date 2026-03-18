@@ -64,7 +64,10 @@ export default function AdminPage() {
   const [enviandoMensaje, setEnviandoMensaje] = useState(false)
   const [mensajeEnviado, setMensajeEnviado] = useState(false)
   const [showFormUsuario, setShowFormUsuario] = useState(false)
-  const [formUsuario, setFormUsuario] = useState({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '' })
+  const [formUsuario, setFormUsuario] = useState({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '', fecha_nacimiento: '' })
+  const [archivoTaxUsuario, setArchivoTaxUsuario] = useState<File | null>(null)
+  const [archivoIdUsuario, setArchivoIdUsuario] = useState<File | null>(null)
+  const [archivoCRTUsuario, setArchivoCRTUsuario] = useState<File | null>(null)
   const [creandoUsuario, setCreandoUsuario] = useState(false)
   const [usuarioCreado, setUsuarioCreado] = useState(false)
   const [errorUsuario, setErrorUsuario] = useState('')
@@ -130,8 +133,52 @@ export default function AdminPage() {
       })
       const data = await res.json()
       if (data.error) { setErrorUsuario(data.error); setCreandoUsuario(false); return }
+      const userId = data.userId
+
+      let sales_tax_url = null
+      let id_foto_url = null
+      let crt61_url = null
+
+      if (archivoTaxUsuario) {
+        const ext = archivoTaxUsuario.name.split('.').pop()
+        const path = `sales-tax/${userId}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivoTaxUsuario, { upsert: true })
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
+          sales_tax_url = urlData.publicUrl
+        }
+      }
+      if (archivoIdUsuario) {
+        const ext = archivoIdUsuario.name.split('.').pop()
+        const path = `ids/${userId}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivoIdUsuario, { upsert: true })
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
+          id_foto_url = urlData.publicUrl
+        }
+      }
+      if (archivoCRTUsuario) {
+        const ext = archivoCRTUsuario.name.split('.').pop()
+        const path = `crt61/${userId}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivoCRTUsuario, { upsert: true })
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
+          crt61_url = urlData.publicUrl
+        }
+      }
+
+      await supabase.from('profiles').update({
+        fecha_nacimiento: formUsuario.fecha_nacimiento || null,
+        sales_tax_url,
+        id_foto_url,
+        crt61_url,
+      }).eq('id', userId)
+
       setUsuarioCreado(true)
-      setFormUsuario({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '' })
+      setFormUsuario({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '', fecha_nacimiento: '' })
+      setArchivoTaxUsuario(null)
+      setArchivoIdUsuario(null)
+      setArchivoCRTUsuario(null)
       setShowFormUsuario(false)
       setTimeout(() => setUsuarioCreado(false), 4000)
       await cargarClientes()
@@ -503,8 +550,33 @@ export default function AdminPage() {
                     <input value={formUsuario.ein} onChange={e => setFormUsuario({...formUsuario, ein: e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
                   </div>
                   <div>
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento</label>
+                    <input value={formUsuario.fecha_nacimiento} onChange={e => setFormUsuario({...formUsuario, fecha_nacimiento: e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                  </div>
+                  <div className="col-span-2">
                     <label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label>
                     <input value={formUsuario.direccion} onChange={e => setFormUsuario({...formUsuario, direccion: e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit <span className="text-brand-gray-mid font-normal">(PDF o imagen)</span></label>
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors">
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoTaxUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />
+                      {archivoTaxUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID <span className="text-brand-gray-mid font-normal">(licencia o pasaporte)</span></label>
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors">
+                      <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e => setArchivoIdUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />
+                      {archivoIdUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado <span className="text-brand-gray-mid font-normal">(PDF o imagen)</span></label>
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors">
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoCRTUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />
+                      {archivoCRTUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}
+                    </div>
                   </div>
                 </div>
                 <p className="text-xs text-brand-gray-mid mt-3">✓ El usuario recibirá un correo con sus credenciales y deberá cambiar su contraseña al primer inicio de sesión.</p>
