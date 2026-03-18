@@ -17,8 +17,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email y nombre son requeridos' }, { status: 400 })
     }
 
-    // Crear usuario en Supabase Auth con contraseña temporal
-    const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
+    // Contraseña temporal simple y válida
+    const tempPassword = 'BoodSupply2025!'
+
+    // Crear usuario en Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
@@ -31,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     const userId = authData.user.id
 
-    // Crear perfil en la tabla profiles
+    // Crear perfil
     await supabaseAdmin.from('profiles').upsert({
       id: userId,
       email,
@@ -45,11 +47,11 @@ export async function POST(req: NextRequest) {
       must_change_password: true,
     })
 
-    // Enviar email al cliente con credenciales y link para cambiar contraseña
+    // Enviar email
     await resend.emails.send({
       from: 'BOOD SUPPLY <noreply@boodsupply.com>',
       to: email,
-      subject: '¡Bienvenido a Bood Supply! — Activa tu cuenta',
+      subject: '¡Bienvenido a Bood Supply! — Tus credenciales de acceso',
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
           <div style="background:#0F2B5B;padding:24px;border-radius:12px 12px 0 0;text-align:center;">
@@ -58,17 +60,17 @@ export async function POST(req: NextRequest) {
           <div style="background:#f9f9f9;padding:32px;border-radius:0 0 12px 12px;border:1px solid #eee;">
             <h2 style="color:#0F2B5B;">¡Hola ${nombre}!</h2>
             <p style="color:#555;">Tu cuenta en Bood Supply ha sido creada y está lista para usar.</p>
-            <div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:16px;margin:20px 0;">
-              <p style="margin:0 0 8px;color:#555;"><strong>Email:</strong> ${email}</p>
-              <p style="margin:0;color:#555;"><strong>Contraseña temporal:</strong> ${tempPassword}</p>
+            <div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:20px;margin:20px 0;">
+              <p style="margin:0 0 10px;color:#555;font-size:15px;"><strong>📧 Email:</strong> ${email}</p>
+              <p style="margin:0;color:#555;font-size:15px;"><strong>🔑 Contraseña temporal:</strong> BoodSupply2025!</p>
             </div>
-            <p style="color:#e53e3e;font-size:14px;">⚠️ Por seguridad, deberás cambiar tu contraseña al iniciar sesión por primera vez.</p>
+            <p style="color:#e53e3e;font-size:14px;background:#fff5f5;padding:12px;border-radius:8px;border-left:4px solid #e53e3e;">⚠️ Al iniciar sesión por primera vez se te pedirá que crees una nueva contraseña personal.</p>
             <div style="text-align:center;margin:28px 0;">
               <a href="https://www.boodsupply.com/es/login" style="background:#F47B20;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;">
-                Iniciar Sesión
+                Iniciar Sesión →
               </a>
             </div>
-            <p style="color:#888;font-size:12px;text-align:center;">2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106</p>
+            <p style="color:#888;font-size:12px;text-align:center;margin-top:24px;">2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106</p>
           </div>
         </div>
       `,
