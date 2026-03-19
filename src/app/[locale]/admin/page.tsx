@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map } from 'lucide-react'
+import MapaRutas from '@/components/MapaRutas'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
 const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
@@ -75,9 +76,6 @@ export default function AdminPage() {
   const [optimizando, setOptimizando] = useState(false)
   const [rutaOptimizada, setRutaOptimizada] = useState<any[]>([])
   const [errorRuta, setErrorRuta] = useState('')
-  const [mapaCargado, setMapaCargado] = useState(false)
-  const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<any>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -90,103 +88,6 @@ export default function AdminPage() {
     }
     init()
   }, [])
-
-  useEffect(() => {
-    if (tab !== 'rutas') {
-      mapInstanceRef.current = null
-      return
-    }
-    const timer = setTimeout(() => {
-      if ((window as any).__gmapsLoaded) {
-        iniciarMapa()
-        return
-      }
-      if (document.querySelector('script[data-gmaps]')) {
-        const interval = setInterval(() => {
-          if ((window as any).__gmapsLoaded) {
-            clearInterval(interval)
-            iniciarMapa()
-          }
-        }, 200)
-        return
-      }
-      const script = document.createElement('script')
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&loading=async`
-      script.setAttribute('data-gmaps', 'true')
-      script.onload = () => {
-        ;(window as any).__gmapsLoaded = true
-        setTimeout(() => iniciarMapa(), 300)
-      }
-      document.head.appendChild(script)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [tab])
-
-  function iniciarMapa() {
-    try {
-      if (!mapRef.current || mapInstanceRef.current) return
-      if (!(window as any).google?.maps) return
-      const map = new (window as any).google.maps.Map(mapRef.current, {
-        center: { lat: 41.9281, lng: -87.7006 },
-        zoom: 11,
-      })
-      mapInstanceRef.current = map
-      setMapaCargado(true)
-    } catch (e) {
-      console.error('Map init error:', e)
-      mapInstanceRef.current = null
-    }
-  }
-
-  function mostrarRutaEnMapa(paradas: any[]) {
-    if (!mapInstanceRef.current) return
-    const google = (window as any).google
-    const map = mapInstanceRef.current
-    if ((window as any)._marcadores) {
-      ;(window as any)._marcadores.forEach((m: any) => m.setMap(null))
-    }
-    ;(window as any)._marcadores = []
-    const origen = '2900 N Richmond St, Chicago, IL 60618'
-    const geocoder = new google.maps.Geocoder()
-    geocoder.geocode({ address: origen }, (results: any, status: any) => {
-      if (status === 'OK') {
-        const marker = new google.maps.Marker({ map, position: results[0].geometry.location, title: 'Bood Supply — Origen', label: { text: '⭐', fontSize: '18px' } })
-        ;(window as any)._marcadores.push(marker)
-      }
-    })
-    paradas.forEach((parada, idx) => {
-      geocoder.geocode({ address: parada.direccion + ', Chicago, IL' }, (results: any, status: any) => {
-        if (status === 'OK') {
-          const marker = new google.maps.Marker({
-            map,
-            position: results[0].geometry.location,
-            label: { text: String(idx + 1), color: 'white', fontWeight: 'bold' },
-            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 18, fillColor: '#F47B20', fillOpacity: 1, strokeColor: '#0F2B5B', strokeWeight: 2 },
-            title: `${idx + 1}. ${parada.negocio || parada.nombre}`,
-          })
-          const infoWindow = new google.maps.InfoWindow({
-            content: `<div style="font-family:Arial;padding:8px;min-width:180px"><strong>${idx + 1}. ${parada.negocio || parada.nombre}</strong><br/>${parada.nombre}<br/>📍 ${parada.direccion}<br/>💳 ${parada.metodo_pago} · $${parada.total?.toFixed(2)}</div>`
-          })
-          marker.addListener('click', () => infoWindow.open(map, marker))
-          ;(window as any)._marcadores.push(marker)
-        }
-      })
-    })
-    const directionsService = new google.maps.DirectionsService()
-    const directionsRenderer = new google.maps.DirectionsRenderer({
-      map, suppressMarkers: true,
-      polylineOptions: { strokeColor: '#0F2B5B', strokeWeight: 4, strokeOpacity: 0.8 }
-    })
-    if (paradas.length > 0) {
-      directionsService.route({
-        origin: origen, destination: origen,
-        waypoints: paradas.map((p: any) => ({ location: p.direccion + ', Chicago, IL', stopover: true })),
-        travelMode: google.maps.TravelMode.DRIVING,
-      }, (result: any, status: any) => {
-        if (status === 'OK') directionsRenderer.setDirections(result)
-      })
-    }
-  }
 
   async function optimizarRuta() {
     if (pedidosRuta.length < 1) return setErrorRuta('Selecciona al menos 1 pedido')
@@ -206,7 +107,6 @@ export default function AdminPage() {
       if (data.error) { setErrorRuta(data.error); setOptimizando(false); return }
       const rutaOrdenada = data.orden.map((i: number) => paradas[i])
       setRutaOptimizada(rutaOrdenada)
-      setTimeout(() => mostrarRutaEnMapa(rutaOrdenada), 500)
     } catch (e: any) { setErrorRuta(e.message) }
     setOptimizando(false)
   }
@@ -755,9 +655,13 @@ export default function AdminPage() {
                     </div>
                   </div>
                 )}
-                <div ref={mapRef} className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{height:'400px'}}>
-                  {!mapaCargado&&!rutaOptimizada.length&&(
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand-gray-mid"><div className="text-center"><Map size={40} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Selecciona pedidos y optimiza la ruta</p></div></div>
+                <div className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{height:'400px'}}>
+                  {rutaOptimizada.length>0 ? (
+                    <MapaRutas key={rutaOptimizada.map(p=>p.pedidoId).join(',')} paradas={rutaOptimizada} />
+                  ) : (
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand-gray-mid">
+                      <div className="text-center"><Map size={40} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Selecciona pedidos y optimiza la ruta</p></div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -810,7 +714,7 @@ export default function AdminPage() {
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Precio * (USD)</label><input value={formProducto.precio} onChange={e=>setFormProducto({...formProducto,precio:e.target.value})} placeholder="Ej: 9.99" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Unidad *</label><input value={formProducto.unidad} onChange={e=>setFormProducto({...formProducto,unidad:e.target.value})} placeholder="Ej: paquete 100u" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripción</label><input value={formProducto.descripcion} onChange={e=>setFormProducto({...formProducto,descripcion:e.target.value})} placeholder="Descripción breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen <span className="text-brand-gray-mid font-normal">(JPG, PNG)</span></label><div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e=>setImagenProducto(e.target.files?.[0]||null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer"/>{imagenProducto&&<p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}</div></div>
+                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e=>setImagenProducto(e.target.files?.[0]||null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer"/>{imagenProducto&&<p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}</div></div>
                 </div>
                 <div className="flex gap-3 mt-5">
                   <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">{guardando?'Guardando y traduciendo...':<><Plus size={16}/> Guardar</>}</button>
