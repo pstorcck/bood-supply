@@ -92,58 +92,68 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    if (tab !== 'rutas') return
-    if ((window as any).__gmapsLoaded) {
-      setTimeout(() => iniciarMapa(), 300)
+    if (tab !== 'rutas') {
+      mapInstanceRef.current = null
       return
     }
-    if (document.querySelector('script[data-gmaps]')) return
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&loading=async`
-    script.setAttribute('data-gmaps', 'true')
-    script.onload = () => {
-      ;(window as any).__gmapsLoaded = true
-      setTimeout(() => iniciarMapa(), 300)
-    }
-    document.head.appendChild(script)
+    const timer = setTimeout(() => {
+      if ((window as any).__gmapsLoaded) {
+        iniciarMapa()
+        return
+      }
+      if (document.querySelector('script[data-gmaps]')) {
+        const interval = setInterval(() => {
+          if ((window as any).__gmapsLoaded) {
+            clearInterval(interval)
+            iniciarMapa()
+          }
+        }, 200)
+        return
+      }
+      const script = document.createElement('script')
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&loading=async`
+      script.setAttribute('data-gmaps', 'true')
+      script.onload = () => {
+        ;(window as any).__gmapsLoaded = true
+        setTimeout(() => iniciarMapa(), 300)
+      }
+      document.head.appendChild(script)
+    }, 300)
+    return () => clearTimeout(timer)
   }, [tab])
 
   function iniciarMapa() {
-    if (!mapRef.current || mapInstanceRef.current) return
-    if (!(window as any).google?.maps) return
-    const map = new (window as any).google.maps.Map(mapRef.current, {
-      center: { lat: 41.9281, lng: -87.7006 },
-      zoom: 11,
-    })
-    mapInstanceRef.current = map
-    setMapaCargado(true)
+    try {
+      if (!mapRef.current || mapInstanceRef.current) return
+      if (!(window as any).google?.maps) return
+      const map = new (window as any).google.maps.Map(mapRef.current, {
+        center: { lat: 41.9281, lng: -87.7006 },
+        zoom: 11,
+      })
+      mapInstanceRef.current = map
+      setMapaCargado(true)
+    } catch (e) {
+      console.error('Map init error:', e)
+      mapInstanceRef.current = null
+    }
   }
 
   function mostrarRutaEnMapa(paradas: any[]) {
     if (!mapInstanceRef.current) return
     const google = (window as any).google
     const map = mapInstanceRef.current
-
     if ((window as any)._marcadores) {
       ;(window as any)._marcadores.forEach((m: any) => m.setMap(null))
     }
     ;(window as any)._marcadores = []
-
     const origen = '2900 N Richmond St, Chicago, IL 60618'
     const geocoder = new google.maps.Geocoder()
-
     geocoder.geocode({ address: origen }, (results: any, status: any) => {
       if (status === 'OK') {
-        const marker = new google.maps.Marker({
-          map,
-          position: results[0].geometry.location,
-          title: 'Bood Supply — Origen',
-          label: { text: '⭐', fontSize: '18px' },
-        })
+        const marker = new google.maps.Marker({ map, position: results[0].geometry.location, title: 'Bood Supply — Origen', label: { text: '⭐', fontSize: '18px' } })
         ;(window as any)._marcadores.push(marker)
       }
     })
-
     paradas.forEach((parada, idx) => {
       geocoder.geocode({ address: parada.direccion + ', Chicago, IL' }, (results: any, status: any) => {
         if (status === 'OK') {
@@ -151,14 +161,7 @@ export default function AdminPage() {
             map,
             position: results[0].geometry.location,
             label: { text: String(idx + 1), color: 'white', fontWeight: 'bold' },
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 18,
-              fillColor: '#F47B20',
-              fillOpacity: 1,
-              strokeColor: '#0F2B5B',
-              strokeWeight: 2,
-            },
+            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 18, fillColor: '#F47B20', fillOpacity: 1, strokeColor: '#0F2B5B', strokeWeight: 2 },
             title: `${idx + 1}. ${parada.negocio || parada.nombre}`,
           })
           const infoWindow = new google.maps.InfoWindow({
@@ -169,18 +172,14 @@ export default function AdminPage() {
         }
       })
     })
-
     const directionsService = new google.maps.DirectionsService()
     const directionsRenderer = new google.maps.DirectionsRenderer({
-      map,
-      suppressMarkers: true,
+      map, suppressMarkers: true,
       polylineOptions: { strokeColor: '#0F2B5B', strokeWeight: 4, strokeOpacity: 0.8 }
     })
-
     if (paradas.length > 0) {
       directionsService.route({
-        origin: origen,
-        destination: origen,
+        origin: origen, destination: origen,
         waypoints: paradas.map((p: any) => ({ location: p.direccion + ', Chicago, IL', stopover: true })),
         travelMode: google.maps.TravelMode.DRIVING,
       }, (result: any, status: any) => {
@@ -191,42 +190,24 @@ export default function AdminPage() {
 
   async function optimizarRuta() {
     if (pedidosRuta.length < 1) return setErrorRuta('Selecciona al menos 1 pedido')
-    setOptimizando(true)
-    setErrorRuta('')
-    setRutaOptimizada([])
-
+    setOptimizando(true); setErrorRuta(''); setRutaOptimizada([])
     const pedidosSeleccionados = pedidos.filter(p => pedidosRuta.includes(p.id))
     const paradas = pedidosSeleccionados.map(ped => {
       const cliente = getCliente(ped.cliente_id)
-      return {
-        pedidoId: '#' + ped.id.slice(0,8).toUpperCase(),
-        nombre: cliente?.nombre || '—',
-        negocio: cliente?.negocio || '—',
-        telefono: cliente?.telefono || '—',
-        direccion: cliente?.direccion || '',
-        total: ped.total,
-        metodo_pago: ped.metodo_pago,
-        items: ped.pedido_items,
-      }
+      return { pedidoId: '#' + ped.id.slice(0,8).toUpperCase(), nombre: cliente?.nombre || '—', negocio: cliente?.negocio || '—', telefono: cliente?.telefono || '—', direccion: cliente?.direccion || '', total: ped.total, metodo_pago: ped.metodo_pago, items: ped.pedido_items }
     }).filter(p => p.direccion)
-
-    if (paradas.length === 0) return setErrorRuta('Los pedidos seleccionados no tienen dirección registrada')
-
+    if (paradas.length === 0) { setErrorRuta('Los pedidos no tienen dirección registrada'); setOptimizando(false); return }
     try {
       const res = await fetch('/api/optimizar-ruta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ direcciones: paradas.map((p: any) => p.direccion + ', Chicago, IL') })
       })
       const data = await res.json()
       if (data.error) { setErrorRuta(data.error); setOptimizando(false); return }
-
       const rutaOrdenada = data.orden.map((i: number) => paradas[i])
       setRutaOptimizada(rutaOrdenada)
       setTimeout(() => mostrarRutaEnMapa(rutaOrdenada), 500)
-    } catch (e: any) {
-      setErrorRuta(e.message)
-    }
+    } catch (e: any) { setErrorRuta(e.message) }
     setOptimizando(false)
   }
 
@@ -234,36 +215,14 @@ export default function AdminPage() {
     if (rutaOptimizada.length === 0) return
     const origen = '2900+N+Richmond+St,+Chicago,+IL+60618'
     const paradas = rutaOptimizada.map(p => encodeURIComponent(p.direccion + ', Chicago, IL')).join('/')
-    const url = `https://www.google.com/maps/dir/${origen}/${paradas}/${origen}`
-    window.open(url, '_blank')
+    window.open(`https://www.google.com/maps/dir/${origen}/${paradas}/${origen}`, '_blank')
   }
 
   function imprimirRuta() {
     const html = `<html><head><title>Ruta de Entrega — BOOD SUPPLY</title>
-    <style>
-      body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}
-      .header{background:#0F2B5B;color:white;padding:16px;border-radius:8px;margin-bottom:20px;text-align:center}
-      .parada{border:1px solid #ccc;border-radius:8px;padding:12px;margin-bottom:12px;page-break-inside:avoid}
-      .num{background:#F47B20;color:white;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;margin-right:8px}
-      .items{margin-top:8px;padding-top:8px;border-top:1px solid #eee;font-size:11px}
-    </style></head><body>
-    <div class="header"><h2 style="margin:0">BOOD SUPPLY — Ruta de Entrega</h2>
-    <p style="margin:4px 0 0">${new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}</p>
-    <p style="margin:4px 0 0">Origen: 2900 N Richmond St, Chicago, IL 60618</p></div>
-    ${rutaOptimizada.map((p, i) => `
-      <div class="parada">
-        <div style="display:flex;align-items:center;margin-bottom:6px">
-          <span class="num">${i+1}</span>
-          <strong>${p.negocio || p.nombre}</strong>
-        </div>
-        <p style="margin:2px 0">👤 ${p.nombre}</p>
-        <p style="margin:2px 0">📍 ${p.direccion}</p>
-        <p style="margin:2px 0">📞 ${p.telefono}</p>
-        <p style="margin:2px 0">💳 Pago: ${p.metodo_pago} · Total: $${p.total?.toFixed(2)}</p>
-        <p style="margin:2px 0">📦 Pedido: ${p.pedidoId}</p>
-        <div class="items">${p.items?.map((item: any) => `<div>${item.productos?.nombre} x${item.cantidad}</div>`).join('') || ''}</div>
-      </div>
-    `).join('')}
+    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.header{background:#0F2B5B;color:white;padding:16px;border-radius:8px;margin-bottom:20px;text-align:center}.parada{border:1px solid #ccc;border-radius:8px;padding:12px;margin-bottom:12px;page-break-inside:avoid}.num{background:#F47B20;color:white;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;margin-right:8px}.items{margin-top:8px;padding-top:8px;border-top:1px solid #eee;font-size:11px}</style></head><body>
+    <div class="header"><h2 style="margin:0">BOOD SUPPLY — Ruta de Entrega</h2><p style="margin:4px 0 0">${new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p><p style="margin:4px 0 0">Origen: 2900 N Richmond St, Chicago, IL 60618</p></div>
+    ${rutaOptimizada.map((p,i)=>`<div class="parada"><div style="display:flex;align-items:center;margin-bottom:6px"><span class="num">${i+1}</span><strong>${p.negocio||p.nombre}</strong></div><p style="margin:2px 0">👤 ${p.nombre}</p><p style="margin:2px 0">📍 ${p.direccion}</p><p style="margin:2px 0">📞 ${p.telefono}</p><p style="margin:2px 0">💳 Pago: ${p.metodo_pago} · Total: $${p.total?.toFixed(2)}</p><p style="margin:2px 0">📦 Pedido: ${p.pedidoId}</p><div class="items">${p.items?.map((item:any)=>`<div>${item.productos?.nombre} x${item.cantidad}</div>`).join('')||''}</div></div>`).join('')}
     </body></html>`
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
@@ -287,13 +246,8 @@ export default function AdminPage() {
     setClientes(data || [])
   }
 
-  function getCliente(cliente_id: string) {
-    return clientes.find(c => c.id === cliente_id)
-  }
-
-  function getPedidosCliente(cliente_id: string) {
-    return pedidos.filter(p => p.cliente_id === cliente_id)
-  }
+  function getCliente(cliente_id: string) { return clientes.find(c => c.id === cliente_id) }
+  function getPedidosCliente(cliente_id: string) { return pedidos.filter(p => p.cliente_id === cliente_id) }
 
   const pedidosFiltrados = pedidos.filter(p => {
     if (!fechaDesde && !fechaHasta) return true
@@ -308,32 +262,27 @@ export default function AdminPage() {
 
   async function crearUsuario() {
     if (!formUsuario.email || !formUsuario.nombre) return setErrorUsuario('Email y nombre son requeridos')
-    setCreandoUsuario(true)
-    setErrorUsuario('')
+    setCreandoUsuario(true); setErrorUsuario('')
     try {
-      const res = await fetch('/api/crear-usuario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formUsuario)
-      })
+      const res = await fetch('/api/crear-usuario', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formUsuario) })
       const data = await res.json()
       if (data.error) { setErrorUsuario(data.error); setCreandoUsuario(false); return }
       const userId = data.userId
       let sales_tax_url = null, id_foto_url = null, crt61_url = null
       if (archivoTaxUsuario) {
         const ext = archivoTaxUsuario.name.split('.').pop()
-        const { error: uploadError } = await supabase.storage.from('documentos').upload(`sales-tax/${userId}.${ext}`, archivoTaxUsuario, { upsert: true })
-        if (!uploadError) { const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(`sales-tax/${userId}.${ext}`); sales_tax_url = urlData.publicUrl }
+        const { error: ue } = await supabase.storage.from('documentos').upload(`sales-tax/${userId}.${ext}`, archivoTaxUsuario, { upsert: true })
+        if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`sales-tax/${userId}.${ext}`); sales_tax_url = ud.publicUrl }
       }
       if (archivoIdUsuario) {
         const ext = archivoIdUsuario.name.split('.').pop()
-        const { error: uploadError } = await supabase.storage.from('documentos').upload(`ids/${userId}.${ext}`, archivoIdUsuario, { upsert: true })
-        if (!uploadError) { const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(`ids/${userId}.${ext}`); id_foto_url = urlData.publicUrl }
+        const { error: ue } = await supabase.storage.from('documentos').upload(`ids/${userId}.${ext}`, archivoIdUsuario, { upsert: true })
+        if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`ids/${userId}.${ext}`); id_foto_url = ud.publicUrl }
       }
       if (archivoCRTUsuario) {
         const ext = archivoCRTUsuario.name.split('.').pop()
-        const { error: uploadError } = await supabase.storage.from('documentos').upload(`crt61/${userId}.${ext}`, archivoCRTUsuario, { upsert: true })
-        if (!uploadError) { const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(`crt61/${userId}.${ext}`); crt61_url = urlData.publicUrl }
+        const { error: ue } = await supabase.storage.from('documentos').upload(`crt61/${userId}.${ext}`, archivoCRTUsuario, { upsert: true })
+        if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`crt61/${userId}.${ext}`); crt61_url = ud.publicUrl }
       }
       await supabase.from('profiles').update({ fecha_nacimiento: formUsuario.fecha_nacimiento || null, sales_tax_url, id_foto_url, crt61_url }).eq('id', userId)
       setUsuarioCreado(true)
@@ -353,13 +302,11 @@ export default function AdminPage() {
       try { await fetch('/api/aprobar-cliente', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: c.email, nombre: c.nombre }) }) }
       catch (e) { console.error('Email error:', e) }
     }
-    await cargarClientes()
-    setAprobando(null)
+    await cargarClientes(); setAprobando(null)
   }
 
   async function cambiarEstado(id: string, estado: string) {
-    await supabase.from('pedidos').update({ estado }).eq('id', id)
-    await cargarPedidos()
+    await supabase.from('pedidos').update({ estado }).eq('id', id); await cargarPedidos()
   }
 
   async function eliminarPedido(id: string) {
@@ -386,9 +333,7 @@ export default function AdminPage() {
   async function guardarCliente(id: string) {
     setGuardando(true)
     await supabase.from('profiles').update(formCliente).eq('id', id)
-    await cargarClientes()
-    setEditandoCliente(null)
-    setGuardando(false)
+    await cargarClientes(); setEditandoCliente(null); setGuardando(false)
   }
 
   async function enviarMensaje() {
@@ -421,8 +366,8 @@ export default function AdminPage() {
     if (imagenProducto) {
       const ext = imagenProducto.name.split('.').pop()
       const path = `productos/${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('documentos').upload(path, imagenProducto, { upsert: true })
-      if (!uploadError) { const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path); imagen_url = urlData.publicUrl }
+      const { error: ue } = await supabase.storage.from('documentos').upload(path, imagenProducto, { upsert: true })
+      if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(path); imagen_url = ud.publicUrl }
     }
     const nombre_en = await traducirTexto(formProducto.nombre)
     const descripcion_en = formProducto.descripcion ? await traducirTexto(formProducto.descripcion) : ''
@@ -446,10 +391,10 @@ export default function AdminPage() {
     try {
       const ext = file.name.split('.').pop()
       const path = `productos/${id}-${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('documentos').upload(path, file, { upsert: true })
-      if (uploadError) { alert('Error subiendo imagen: ' + uploadError.message); return }
-      const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
-      await supabase.from('productos').update({ imagen_url: urlData.publicUrl }).eq('id', id)
+      const { error: ue } = await supabase.storage.from('documentos').upload(path, file, { upsert: true })
+      if (ue) { alert('Error subiendo imagen: ' + ue.message); return }
+      const { data: ud } = supabase.storage.from('documentos').getPublicUrl(path)
+      await supabase.from('productos').update({ imagen_url: ud.publicUrl }).eq('id', id)
       await cargarProductos()
     } catch (e: any) { alert('Error: ' + e.message) }
   }
@@ -520,14 +465,9 @@ export default function AdminPage() {
 
   function imprimirOrdenes() {
     const pedidosSeleccionados = pedidos.filter(p => seleccionados.includes(p.id))
-    const html = `<html><head><title>Órdenes — BOOD SUPPLY</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.orden{border:1px solid #ccc;padding:16px;margin-bottom:28px;page-break-inside:avoid;border-radius:8px}.header{background:#0F2B5B;color:white;padding:10px 16px;border-radius:6px;margin-bottom:14px;display:flex;justify-content:space-between}.header h2{margin:0;font-size:15px}.header p{margin:0;font-size:11px;opacity:.8}.seccion{margin-bottom:12px}.seccion h3{font-size:10px;text-transform:uppercase;color:#888;margin:0 0 6px;border-bottom:1px solid #eee;padding-bottom:3px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.campo{font-size:11px;padding:2px 0}.campo b{color:#0F2B5B}.item-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f5f5f5;font-size:11px}.total{font-size:15px;font-weight:bold;color:#F47B20;text-align:right;margin-top:10px;padding-top:8px;border-top:2px solid #F47B20}.logo-header{text-align:center;margin-bottom:24px;border-bottom:2px solid #0F2B5B;padding-bottom:12px}.logo-header h1{color:#0F2B5B;margin:0;font-size:20px}</style></head><body>
-    <div class="logo-header"><h1>BOOD SUPPLY</h1><p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p><p>Órdenes de Entrega — ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p></div>
-    ${pedidosSeleccionados.map(ped => {
-      const cliente = getCliente(ped.cliente_id)
-      const subtotal = (ped.total || 0) - (ped.fuel_surcharge || 0)
-      return `<div class="orden"><div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div><div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX', {year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')} · Pago: ${ped.metodo_pago||'N/A'}</p></div></div><div class="seccion"><h3>Datos del Cliente</h3><div class="grid2"><div class="campo"><b>Nombre:</b> ${cliente?.nombre||'N/A'}</div><div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div><div class="campo"><b>Teléfono:</b> ${cliente?.telefono||'N/A'}</div><div class="campo"><b>EIN:</b> ${cliente?.ein||'N/A'}</div><div class="campo" style="grid-column:span 2"><b>Dirección:</b> ${cliente?.direccion||'N/A'}</div></div></div><div class="seccion"><h3>Detalle del Pedido</h3>${ped.pedido_items?.map((item: any) => `<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}<div class="item-row" style="color:#888"><span>Fuel Surcharge</span><span>$${(ped.fuel_surcharge||0).toFixed(2)}</span></div></div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`
-    }).join('')}</body></html>`
+    const html = `<html><head><title>Órdenes — BOOD SUPPLY</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.orden{border:1px solid #ccc;padding:16px;margin-bottom:28px;page-break-inside:avoid;border-radius:8px}.header{background:#0F2B5B;color:white;padding:10px 16px;border-radius:6px;margin-bottom:14px;display:flex;justify-content:space-between}.header h2{margin:0;font-size:15px}.header p{margin:0;font-size:11px;opacity:.8}.seccion{margin-bottom:12px}.seccion h3{font-size:10px;text-transform:uppercase;color:#888;margin:0 0 6px;border-bottom:1px solid #eee;padding-bottom:3px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.campo{font-size:11px;padding:2px 0}.campo b{color:#0F2B5B}.item-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f5f5f5;font-size:11px}.total{font-size:15px;font-weight:bold;color:#F47B20;text-align:right;margin-top:10px;padding-top:8px;border-top:2px solid #F47B20}.logo-header{text-align:center;margin-bottom:24px;border-bottom:2px solid #0F2B5B;padding-bottom:12px}.logo-header h1{color:#0F2B5B;margin:0;font-size:20px}</style></head><body>
+    <div class="logo-header"><h1>BOOD SUPPLY</h1><p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p><p>Órdenes de Entrega — ${new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p></div>
+    ${pedidosSeleccionados.map(ped=>{const cliente=getCliente(ped.cliente_id);const subtotal=(ped.total||0)-(ped.fuel_surcharge||0);return`<div class="orden"><div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div><div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')} · Pago: ${ped.metodo_pago||'N/A'}</p></div></div><div class="seccion"><h3>Datos del Cliente</h3><div class="grid2"><div class="campo"><b>Nombre:</b> ${cliente?.nombre||'N/A'}</div><div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div><div class="campo"><b>Teléfono:</b> ${cliente?.telefono||'N/A'}</div><div class="campo"><b>EIN:</b> ${cliente?.ein||'N/A'}</div><div class="campo" style="grid-column:span 2"><b>Dirección:</b> ${cliente?.direccion||'N/A'}</div></div></div><div class="seccion"><h3>Detalle del Pedido</h3>${ped.pedido_items?.map((item:any)=>`<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}<div class="item-row" style="color:#888"><span>Fuel Surcharge</span><span>$${(ped.fuel_surcharge||0).toFixed(2)}</span></div></div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`}).join('')}</body></html>`
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
   }
@@ -539,49 +479,29 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-brand-gray-light">
-      {usuarioCreado && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">✓ Usuario creado y correo enviado</div>
-      )}
+      {usuarioCreado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">✓ Usuario creado y correo enviado</div>}
 
       <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <Package size={22} className="text-brand-orange" />
-          <span className="font-heading font-bold text-lg">Admin — BOOD SUPPLY</span>
-        </div>
+        <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Admin — BOOD SUPPLY</span></div>
         <div className="flex items-center gap-4">
           <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm flex items-center gap-1">📘 Facebook</a>
           <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
-          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors"><LogOut size={16} /> Salir</button>
+          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors"><LogOut size={16}/> Salir</button>
         </div>
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: 'Pedidos totales', value: pedidos.length, color: 'text-brand-navy' },
-            { label: 'Recibidos', value: pedidos.filter(p => p.estado === 'pendiente').length, color: 'text-yellow-600' },
-            { label: 'Clientes', value: clientes.length, color: 'text-brand-orange' },
-            { label: 'Total ventas', value: `$${totalVentas.toFixed(2)}`, color: 'text-green-600' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="card text-center py-4">
-              <div className={`font-heading text-2xl font-bold ${color}`}>{value}</div>
-              <div className="text-brand-gray-mid text-sm mt-1">{label}</div>
-            </div>
+          {[{label:'Pedidos totales',value:pedidos.length,color:'text-brand-navy'},{label:'Recibidos',value:pedidos.filter(p=>p.estado==='pendiente').length,color:'text-yellow-600'},{label:'Clientes',value:clientes.length,color:'text-brand-orange'},{label:'Total ventas',value:`$${totalVentas.toFixed(2)}`,color:'text-green-600'}].map(({label,value,color})=>(
+            <div key={label} className="card text-center py-4"><div className={`font-heading text-2xl font-bold ${color}`}>{value}</div><div className="text-brand-gray-mid text-sm mt-1">{label}</div></div>
           ))}
         </div>
 
         <div className="flex gap-2 flex-wrap mb-8">
-          {[
-            { key: 'clientes', label: 'Clientes', icon: Users, badge: pendientesAprobacion },
-            { key: 'pedidos', label: 'Pedidos', icon: ShoppingBag, badge: 0 },
-            { key: 'rutas', label: 'Rutas', icon: Map, badge: 0 },
-            { key: 'mensajes', label: 'Mensajes', icon: Mail, badge: 0 },
-            { key: 'productos', label: 'Productos', icon: Package, badge: 0 },
-            { key: 'categorias', label: 'Categorías', icon: Tag, badge: 0 },
-          ].map(({ key, label, icon: Icon, badge }) => (
-            <button key={key} onClick={() => setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab === key ? 'bg-brand-navy text-white' : 'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
-              <Icon size={16} /> {label}
-              {badge > 0 && <span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${tab === key ? 'bg-white text-brand-navy' : 'bg-red-500 text-white'}`}>{badge}</span>}
+          {[{key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion},{key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},{key:'rutas',label:'Rutas',icon:Map,badge:0},{key:'mensajes',label:'Mensajes',icon:Mail,badge:0},{key:'productos',label:'Productos',icon:Package,badge:0},{key:'categorias',label:'Categorías',icon:Tag,badge:0}].map(({key,label,icon:Icon,badge})=>(
+            <button key={key} onClick={()=>setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab===key?'bg-brand-navy text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
+              <Icon size={16}/> {label}
+              {badge>0&&<span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${tab===key?'bg-white text-brand-navy':'bg-red-500 text-white'}`}>{badge}</span>}
             </button>
           ))}
         </div>
@@ -590,40 +510,33 @@ export default function AdminPage() {
         {tab === 'clientes' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
-              <h2 className="font-heading font-bold text-brand-navy text-xl">
-                Clientes — {clientes.length}
-                {pendientesAprobacion > 0 && <span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s)</span>}
-              </h2>
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes — {clientes.length}{pendientesAprobacion>0&&<span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s)</span>}</h2>
               <div className="flex gap-2">
-                <button onClick={() => setShowFormUsuario(!showFormUsuario)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">
-                  <UserPlus size={15} /> Crear Usuario
-                </button>
-                <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
-                  <Download size={15} /> Exportar CSV
-                </button>
+                <button onClick={()=>setShowFormUsuario(!showFormUsuario)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"><UserPlus size={15}/> Crear Usuario</button>
+                <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors"><Download size={15}/> Exportar CSV</button>
               </div>
             </div>
 
             {showFormUsuario && (
               <div className="card border-2 border-brand-orange/30 mb-4">
-                <h3 className="font-heading font-bold text-brand-navy text-lg mb-4 flex items-center gap-2"><UserPlus size={18} className="text-brand-orange" /> Crear Nuevo Usuario</h3>
+                <h3 className="font-heading font-bold text-brand-navy text-lg mb-4 flex items-center gap-2"><UserPlus size={18} className="text-brand-orange"/> Crear Nuevo Usuario</h3>
                 {errorUsuario && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorUsuario}</div>}
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre Completo *</label><input value={formUsuario.nombre} onChange={e => setFormUsuario({...formUsuario, nombre: e.target.value})} placeholder="Nombre completo" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Email *</label><input value={formUsuario.email} onChange={e => setFormUsuario({...formUsuario, email: e.target.value})} placeholder="correo@email.com" type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Negocio</label><input value={formUsuario.negocio} onChange={e => setFormUsuario({...formUsuario, negocio: e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Teléfono</label><input value={formUsuario.telefono} onChange={e => setFormUsuario({...formUsuario, telefono: e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label><input value={formUsuario.ein} onChange={e => setFormUsuario({...formUsuario, ein: e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento</label><input value={formUsuario.fecha_nacimiento} onChange={e => setFormUsuario({...formUsuario, fecha_nacimiento: e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label><input value={formUsuario.direccion} onChange={e => setFormUsuario({...formUsuario, direccion: e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoTaxUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />{archivoTaxUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}</div></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e => setArchivoIdUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />{archivoIdUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}</div></div>
-                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoCRTUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />{archivoCRTUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre Completo *</label><input value={formUsuario.nombre} onChange={e=>setFormUsuario({...formUsuario,nombre:e.target.value})} placeholder="Nombre completo" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Email *</label><input value={formUsuario.email} onChange={e=>setFormUsuario({...formUsuario,email:e.target.value})} placeholder="correo@email.com" type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Negocio</label><input value={formUsuario.negocio} onChange={e=>setFormUsuario({...formUsuario,negocio:e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Teléfono</label><input value={formUsuario.telefono} onChange={e=>setFormUsuario({...formUsuario,telefono:e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label><input value={formUsuario.ein} onChange={e=>setFormUsuario({...formUsuario,ein:e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento</label><input value={formUsuario.fecha_nacimiento} onChange={e=>setFormUsuario({...formUsuario,fecha_nacimiento:e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label><input value={formUsuario.direccion} onChange={e=>setFormUsuario({...formUsuario,direccion:e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoTaxUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoTaxUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}</div></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e=>setArchivoIdUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoIdUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}</div></div>
+                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoCRTUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoCRTUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
                 </div>
                 <p className="text-xs text-brand-gray-mid mt-3">✓ El usuario recibirá un correo con sus credenciales y deberá cambiar su contraseña al primer inicio de sesión.</p>
                 <div className="flex gap-3 mt-4">
-                  <button onClick={crearUsuario} disabled={creandoUsuario} className="btn-primary flex items-center gap-2"><UserPlus size={15} /> {creandoUsuario ? 'Creando...' : 'Crear y Enviar Correo'}</button>
-                  <button onClick={() => { setShowFormUsuario(false); setErrorUsuario('') }} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
+                  <button onClick={crearUsuario} disabled={creandoUsuario} className="btn-primary flex items-center gap-2"><UserPlus size={15}/> {creandoUsuario?'Creando...':'Crear y Enviar Correo'}</button>
+                  <button onClick={()=>{setShowFormUsuario(false);setErrorUsuario('')}} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                 </div>
               </div>
             )}
@@ -631,20 +544,18 @@ export default function AdminPage() {
             {clientes.map(c => {
               const pedidosCliente = getPedidosCliente(c.id)
               const ultimoPedido = pedidosCliente[0]
-              const totalGastado = pedidosCliente.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
+              const totalGastado = pedidosCliente.filter(p=>p.estado!=='cancelado').reduce((sum,p)=>sum+(p.total||0),0)
               const editando = editandoCliente === c.id
               return (
-                <div key={c.id} className={`card border-l-4 ${c.aprobado ? 'border-l-green-400' : 'border-l-yellow-400'}`}>
+                <div key={c.id} className={`card border-l-4 ${c.aprobado?'border-l-green-400':'border-l-yellow-400'}`}>
                   <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0 ${c.aprobado ? 'bg-green-500 text-white' : 'bg-yellow-400 text-white'}`}>
-                        {(c.nombre || c.email || '?')[0].toUpperCase()}
-                      </div>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0 ${c.aprobado?'bg-green-500 text-white':'bg-yellow-400 text-white'}`}>{(c.nombre||c.email||'?')[0].toUpperCase()}</div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-heading font-bold text-brand-navy">{c.nombre || '—'}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.aprobado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{c.aprobado ? '✓ Aprobado' : '⏳ Pendiente'}</span>
-                          {c.must_change_password && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">🔑 Debe cambiar contraseña</span>}
+                          <p className="font-heading font-bold text-brand-navy">{c.nombre||'—'}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.aprobado?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{c.aprobado?'✓ Aprobado':'⏳ Pendiente'}</span>
+                          {c.must_change_password&&<span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">🔑 Debe cambiar contraseña</span>}
                         </div>
                         <p className="text-xs text-brand-gray-mid">{c.email}</p>
                       </div>
@@ -652,37 +563,26 @@ export default function AdminPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-center"><p className="font-heading font-bold text-brand-orange">{pedidosCliente.length}</p><p className="text-xs text-brand-gray-mid">pedidos</p></div>
                       <div className="text-center"><p className="font-heading font-bold text-green-600">${totalGastado.toFixed(2)}</p><p className="text-xs text-brand-gray-mid">total</p></div>
-                      {!c.aprobado ? (
-                        <button onClick={() => aprobarCliente(c, true)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><CheckCircle size={14} /> {aprobando === c.id ? 'Aprobando...' : 'Aprobar'}</button>
-                      ) : (
-                        <button onClick={() => aprobarCliente(c, false)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600"><XCircle size={14} /> Revocar</button>
-                      )}
-                      {!editando ? (
-                        <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange"><Pencil size={14} /> Editar</button>
-                      ) : (
-                        <div className="flex gap-2">
-                          <button onClick={() => guardarCliente(c.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}</button>
-                          <button onClick={() => setEditandoCliente(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-mid"><X size={14} /> Cancelar</button>
-                        </div>
-                      )}
-                      <button onClick={() => eliminarCliente(c.id, c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50"><Trash2 size={14} /></button>
+                      {!c.aprobado?<button onClick={()=>aprobarCliente(c,true)} disabled={aprobando===c.id} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><CheckCircle size={14}/> {aprobando===c.id?'Aprobando...':'Aprobar'}</button>:<button onClick={()=>aprobarCliente(c,false)} disabled={aprobando===c.id} className="flex items-center gap-1 text-sm bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600"><XCircle size={14}/> Revocar</button>}
+                      {!editando?<button onClick={()=>iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange"><Pencil size={14}/> Editar</button>:<div className="flex gap-2"><button onClick={()=>guardarCliente(c.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={14}/> {guardando?'Guardando...':'Guardar'}</button><button onClick={()=>setEditandoCliente(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-mid"><X size={14}/> Cancelar</button></div>}
+                      <button onClick={()=>eliminarCliente(c.id,c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50"><Trash2 size={14}/></button>
                     </div>
                   </div>
-                  {(c.sales_tax_url || c.id_foto_url || c.crt61_url) && (
+                  {(c.sales_tax_url||c.id_foto_url||c.crt61_url)&&(
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {c.sales_tax_url && <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48"><FileText size={15} className="text-blue-500 flex-shrink-0" /><span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span><a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600">Ver</a></div>}
-                      {c.id_foto_url && <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48"><FileText size={15} className="text-purple-500 flex-shrink-0" /><span className="text-xs text-purple-700 flex-1">ID / Identificación</span><a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600">Ver</a></div>}
-                      {c.crt61_url && <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48"><FileText size={15} className="text-green-500 flex-shrink-0" /><span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span><a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">Ver</a></div>}
+                      {c.sales_tax_url&&<div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48"><FileText size={15} className="text-blue-500 flex-shrink-0"/><span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span><a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600">Ver</a></div>}
+                      {c.id_foto_url&&<div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48"><FileText size={15} className="text-purple-500 flex-shrink-0"/><span className="text-xs text-purple-700 flex-1">ID / Identificación</span><a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600">Ver</a></div>}
+                      {c.crt61_url&&<div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48"><FileText size={15} className="text-green-500 flex-shrink-0"/><span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span><a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">Ver</a></div>}
                     </div>
                   )}
-                  {editando ? (
+                  {editando?(
                     <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
-                      {[{key:'nombre',label:'Nombre',ph:'Nombre completo'},{key:'negocio',label:'Negocio',ph:'Nombre del negocio'},{key:'telefono',label:'Teléfono',ph:'(312) 000-0000'},{key:'ein',label:'EIN',ph:'XX-XXXXXXX'}].map(({key,label,ph}) => (
+                      {[{key:'nombre',label:'Nombre',ph:'Nombre completo'},{key:'negocio',label:'Negocio',ph:'Nombre del negocio'},{key:'telefono',label:'Teléfono',ph:'(312) 000-0000'},{key:'ein',label:'EIN',ph:'XX-XXXXXXX'}].map(({key,label,ph})=>(
                         <div key={key}><label className="block text-xs font-medium text-brand-gray-dark mb-1">{label}</label><input value={formCliente[key]||''} onChange={e=>setFormCliente({...formCliente,[key]:e.target.value})} placeholder={ph} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                       ))}
                       <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label><input value={formCliente.direccion||''} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                     </div>
-                  ) : (
+                  ):(
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs mt-3 border-t pt-3">
                       {[{label:'Negocio',value:c.negocio},{label:'Teléfono',value:c.telefono},{label:'EIN',value:c.ein},{label:'Fecha Nacimiento',value:c.fecha_nacimiento?new Date(c.fecha_nacimiento).toLocaleDateString('es-MX',{timeZone:'UTC'}):null},{label:'Dirección',value:c.direccion,full:true},{label:'Último pedido',value:ultimoPedido?new Date(ultimoPedido.created_at).toLocaleDateString('es-MX'):null},{label:'Registro',value:new Date(c.created_at).toLocaleDateString('es-MX')}].map(({label,value,full}:any)=>(
                         <div key={label} className={`bg-gray-50 rounded-lg p-2 border border-gray-100 ${full?'col-span-2':''}`}><p className="text-brand-gray-mid">{label}</p><p className="font-medium text-brand-navy">{value||'—'}</p></div>
@@ -709,7 +609,7 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
-            {seleccionados.length > 0 && (
+            {seleccionados.length>0&&(
               <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
                 <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
                 <div className="flex gap-3">
@@ -718,23 +618,23 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-            {pedidosFiltrados.length === 0 && <div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos en este período</p></div>}
-            {GRUPOS.map(grupo => {
-              const pedidosGrupo = pedidosFiltrados.filter(p => grupo.key.includes(p.estado))
-              if (pedidosGrupo.length === 0) return null
-              const totalGrupo = pedidosGrupo.reduce((sum,p)=>sum+(p.total||0),0)
-              return (
+            {pedidosFiltrados.length===0&&<div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos en este período</p></div>}
+            {GRUPOS.map(grupo=>{
+              const pedidosGrupo=pedidosFiltrados.filter(p=>grupo.key.includes(p.estado))
+              if(pedidosGrupo.length===0) return null
+              const totalGrupo=pedidosGrupo.reduce((sum,p)=>sum+(p.total||0),0)
+              return(
                 <div key={grupo.label} className={`mb-8 border-2 ${grupo.color} rounded-2xl p-5`}>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="font-heading font-bold text-brand-navy text-lg flex items-center gap-2">{grupo.label}<span className="text-sm font-normal text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{pedidosGrupo.length}</span></h2>
                     <span className="font-heading font-bold text-brand-orange">Subtotal: ${totalGrupo.toFixed(2)}</span>
                   </div>
                   <div className="space-y-3">
-                    {pedidosGrupo.map(ped => {
-                      const cliente = getCliente(ped.cliente_id)
-                      const seleccionado = seleccionados.includes(ped.id)
-                      const subtotal = (ped.total||0)-(ped.fuel_surcharge||0)
-                      return (
+                    {pedidosGrupo.map(ped=>{
+                      const cliente=getCliente(ped.cliente_id)
+                      const seleccionado=seleccionados.includes(ped.id)
+                      const subtotal=(ped.total||0)-(ped.fuel_surcharge||0)
+                      return(
                         <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado?'border-brand-orange':'border-transparent'}`}>
                           <div className="flex items-start gap-3">
                             <button onClick={()=>toggleSeleccion(ped.id)} className="mt-1 flex-shrink-0">{seleccionado?<CheckSquare size={18} className="text-brand-orange"/>:<Square size={18} className="text-gray-300"/>}</button>
@@ -756,7 +656,7 @@ export default function AdminPage() {
                                 <div><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion||'—'}</span></div>
                                 <div className="col-span-2 flex items-center justify-between mt-1 pt-1 border-t border-blue-100">
                                   <div><span className="text-brand-gray-mid">Método de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago||'—'}</span></div>
-                                  {ped.comprobante_url && <a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600"><FileText size={11}/> Ver comprobante</a>}
+                                  {ped.comprobante_url&&<a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600"><FileText size={11}/> Ver comprobante</a>}
                                 </div>
                               </div>
                               <div className="border-t pt-2 space-y-1">
@@ -788,30 +688,24 @@ export default function AdminPage() {
                 <p className="text-brand-gray-mid text-sm mt-1">Selecciona los pedidos del día y calcula la ruta más eficiente</p>
               </div>
               <div className="flex gap-3 flex-wrap">
-                {rutaOptimizada.length > 0 && (
+                {rutaOptimizada.length>0&&(
                   <>
-                    <button onClick={abrirEnGoogleMaps} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">
-                      🗺️ Abrir en Google Maps
-                    </button>
-                    <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
-                      🖨️ Imprimir Ruta
-                    </button>
+                    <button onClick={abrirEnGoogleMaps} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">🗺️ Abrir en Google Maps</button>
+                    <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">🖨️ Imprimir Ruta</button>
                   </>
                 )}
-                <button onClick={optimizarRuta} disabled={optimizando || pedidosRuta.length === 0} className="btn-primary flex items-center gap-2">
-                  <Map size={16}/> {optimizando ? 'Calculando...' : 'Optimizar Ruta'}
-                </button>
+                <button onClick={optimizarRuta} disabled={optimizando||pedidosRuta.length===0} className="btn-primary flex items-center gap-2"><Map size={16}/> {optimizando?'Calculando...':'Optimizar Ruta'}</button>
               </div>
             </div>
 
-            {errorRuta && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorRuta}</div>}
+            {errorRuta&&<div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorRuta}</div>}
 
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">
                   Pedidos Activos
                   <span className="text-xs font-normal text-brand-gray-mid bg-gray-100 px-2 py-0.5 rounded-full">{pedidosParaRuta.length}</span>
-                  {pedidosRuta.length > 0 && <span className="text-xs font-normal text-brand-orange bg-orange-50 px-2 py-0.5 rounded-full">{pedidosRuta.length} seleccionados</span>}
+                  {pedidosRuta.length>0&&<span className="text-xs font-normal text-brand-orange bg-orange-50 px-2 py-0.5 rounded-full">{pedidosRuta.length} seleccionados</span>}
                 </h3>
                 <div className="flex gap-2 mb-3">
                   <button onClick={()=>setPedidosRuta(pedidosParaRuta.map(p=>p.id))} className="text-xs text-brand-orange hover:underline">Seleccionar todos</button>
@@ -819,13 +713,13 @@ export default function AdminPage() {
                   <button onClick={()=>setPedidosRuta([])} className="text-xs text-brand-gray-mid hover:underline">Limpiar</button>
                 </div>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {pedidosParaRuta.length === 0 ? (
+                  {pedidosParaRuta.length===0?(
                     <div className="card text-center py-8 text-brand-gray-mid"><p>No hay pedidos activos para entregar</p></div>
-                  ) : (
-                    pedidosParaRuta.map(ped => {
-                      const cliente = getCliente(ped.cliente_id)
-                      const enRuta = pedidosRuta.includes(ped.id)
-                      return (
+                  ):(
+                    pedidosParaRuta.map(ped=>{
+                      const cliente=getCliente(ped.cliente_id)
+                      const enRuta=pedidosRuta.includes(ped.id)
+                      return(
                         <div key={ped.id} onClick={()=>togglePedidoRuta(ped.id)} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${enRuta?'border-brand-orange bg-orange-50':'border-gray-100 bg-white hover:border-gray-300'}`}>
                           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${enRuta?'bg-brand-orange border-brand-orange':'border-gray-300'}`}>{enRuta&&<span className="text-white text-xs font-bold">✓</span>}</div>
                           <div className="flex-1 min-w-0">
@@ -842,18 +736,12 @@ export default function AdminPage() {
               </div>
 
               <div>
-                {rutaOptimizada.length > 0 && (
+                {rutaOptimizada.length>0&&(
                   <div className="mb-4">
-                    <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">
-                      🚚 Ruta Óptima
-                      <span className="text-xs font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{rutaOptimizada.length} paradas</span>
-                    </h3>
+                    <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">🚚 Ruta Óptima<span className="text-xs font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{rutaOptimizada.length} paradas</span></h3>
                     <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg">
-                        <div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div>
-                        <div><p className="font-medium text-brand-navy text-sm">Origen — Bood Supply</p><p className="text-xs text-brand-gray-mid">2900 N Richmond St, Chicago</p></div>
-                      </div>
-                      {rutaOptimizada.map((parada, idx) => (
+                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg"><div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div><div><p className="font-medium text-brand-navy text-sm">Origen — Bood Supply</p><p className="text-xs text-brand-gray-mid">2900 N Richmond St, Chicago</p></div></div>
+                      {rutaOptimizada.map((parada,idx)=>(
                         <div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-100">
                           <div className="w-7 h-7 bg-brand-orange rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{idx+1}</div>
                           <div className="flex-1 min-w-0">
@@ -863,18 +751,13 @@ export default function AdminPage() {
                           </div>
                         </div>
                       ))}
-                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg">
-                        <div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div>
-                        <div><p className="font-medium text-brand-navy text-sm">Regreso — Bood Supply</p></div>
-                      </div>
+                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg"><div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div><div><p className="font-medium text-brand-navy text-sm">Regreso — Bood Supply</p></div></div>
                     </div>
                   </div>
                 )}
-                <div ref={mapRef} className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{ height: '400px' }}>
-                  {!rutaOptimizada.length && !mapaCargado && (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand-gray-mid">
-                      <div className="text-center"><Map size={40} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Selecciona pedidos y optimiza la ruta</p></div>
-                    </div>
+                <div ref={mapRef} className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{height:'400px'}}>
+                  {!mapaCargado&&!rutaOptimizada.length&&(
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand-gray-mid"><div className="text-center"><Map size={40} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Selecciona pedidos y optimiza la ruta</p></div></div>
                   )}
                 </div>
               </div>
@@ -886,7 +769,7 @@ export default function AdminPage() {
         {tab === 'mensajes' && (
           <div className="card">
             <h2 className="font-heading font-bold text-brand-navy text-xl mb-6">Enviar Mensaje a Clientes</h2>
-            {mensajeEnviado && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">✓ Mensaje enviado correctamente</div>}
+            {mensajeEnviado&&<div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">✓ Mensaje enviado correctamente</div>}
             <div className="space-y-4">
               <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Asunto *</label><input value={mensajeAsunto} onChange={e=>setMensajeAsunto(e.target.value)} placeholder="Asunto del mensaje" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
               <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Mensaje *</label><textarea value={mensajeCuerpo} onChange={e=>setMensajeCuerpo(e.target.value)} placeholder="Escribe tu mensaje aquí..." rows={6} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange resize-none"/></div>
@@ -918,7 +801,7 @@ export default function AdminPage() {
               <p className="text-brand-gray-mid text-sm">{productos.length} productos · {productos.filter(p=>p.activo).length} activos</p>
               <button onClick={()=>setShowFormProducto(!showFormProducto)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Agregar Producto</button>
             </div>
-            {showFormProducto && (
+            {showFormProducto&&(
               <div className="card mb-6 border-2 border-brand-orange/30">
                 <h2 className="font-heading font-bold text-brand-navy text-lg mb-5">Nuevo Producto</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -936,10 +819,10 @@ export default function AdminPage() {
               </div>
             )}
             <div className="space-y-6">
-              {categorias.map(cat => {
-                const prods = productos.filter(p=>p.categoria===cat)
-                if (prods.length===0) return null
-                return (
+              {categorias.map(cat=>{
+                const prods=productos.filter(p=>p.categoria===cat)
+                if(prods.length===0) return null
+                return(
                   <div key={cat} className="card">
                     <h2 className="font-heading font-bold text-brand-navy mb-4 flex items-center gap-2">{cat} <span className="text-xs font-normal text-brand-gray-mid bg-gray-100 px-2 py-0.5 rounded-full">{prods.length}</span></h2>
                     <div className="space-y-2">
@@ -990,7 +873,7 @@ export default function AdminPage() {
               <h2 className="font-heading font-bold text-brand-navy text-xl">Categorías</h2>
               <button onClick={()=>setShowFormCategoria(!showFormCategoria)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Nueva Categoría</button>
             </div>
-            {showFormCategoria && (
+            {showFormCategoria&&(
               <div className="border-2 border-brand-orange/30 rounded-xl p-4 mb-6">
                 <label className="block text-sm font-medium text-brand-gray-dark mb-2">Nombre *</label>
                 <div className="flex gap-3">
@@ -1000,33 +883,23 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-            {categorias.length===0 ? (
+            {categorias.length===0?(
               <div className="text-center py-12 text-brand-gray-mid"><Tag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay categorías aún</p></div>
-            ) : (
+            ):(
               <div className="space-y-2">
                 {categorias.map(cat=>(
                   <div key={cat}>
                     <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
                       <div className="flex items-center gap-3 flex-1">
                         <Tag size={16} className="text-brand-orange"/>
-                        {editandoCategoria===cat ? (
-                          <input value={categoriaEditNombre} onChange={e=>setCategoriaEditNombre(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e=>e.key==='Enter'&&guardarCategoria(cat)} autoFocus/>
-                        ) : (
-                          <span className="font-medium text-brand-navy">{cat}</span>
-                        )}
+                        {editandoCategoria===cat?<input value={categoriaEditNombre} onChange={e=>setCategoriaEditNombre(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e=>e.key==='Enter'&&guardarCategoria(cat)} autoFocus/>:<span className="font-medium text-brand-navy">{cat}</span>}
                         <span className="text-xs text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{productos.filter(p=>p.categoria===cat).length} productos</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        {editandoCategoria===cat ? (
-                          <>
-                            <button onClick={()=>guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={13}/> {guardando?'...':'Guardar'}</button>
-                            <button onClick={()=>setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid"><X size={15}/></button>
-                          </>
-                        ) : (
-                          <>
-                            <button onClick={()=>{setEditandoCategoria(cat);setCategoriaEditNombre(cat)}} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button>
-                            <button onClick={()=>eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button>
-                          </>
+                        {editandoCategoria===cat?(
+                          <><button onClick={()=>guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={13}/> {guardando?'...':'Guardar'}</button><button onClick={()=>setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid"><X size={15}/></button></>
+                        ):(
+                          <><button onClick={()=>{setEditandoCategoria(cat);setCategoriaEditNombre(cat)}} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button><button onClick={()=>eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button></>
                         )}
                       </div>
                     </div>
