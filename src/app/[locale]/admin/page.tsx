@@ -71,11 +71,11 @@ export default function AdminPage() {
   const [creandoUsuario, setCreandoUsuario] = useState(false)
   const [usuarioCreado, setUsuarioCreado] = useState(false)
   const [errorUsuario, setErrorUsuario] = useState('')
-  // Rutas
   const [pedidosRuta, setPedidosRuta] = useState<string[]>([])
   const [optimizando, setOptimizando] = useState(false)
   const [rutaOptimizada, setRutaOptimizada] = useState<any[]>([])
   const [errorRuta, setErrorRuta] = useState('')
+  const [mapaCargado, setMapaCargado] = useState(false)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const supabase = createClient()
@@ -92,49 +92,58 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    if (tab === 'rutas' && mapRef.current && !mapInstanceRef.current) {
-      const script = document.createElement('script')
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`
-      script.async = true
-      script.onload = () => {
-        const map = new (window as any).google.maps.Map(mapRef.current, {
-          center: { lat: 41.9281, lng: -87.7006 },
-          zoom: 11,
-        })
-        mapInstanceRef.current = map
-      }
-      document.head.appendChild(script)
+    if (tab !== 'rutas') return
+    if ((window as any).__gmapsLoaded) {
+      setTimeout(() => iniciarMapa(), 300)
+      return
     }
+    if (document.querySelector('script[data-gmaps]')) return
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&loading=async`
+    script.setAttribute('data-gmaps', 'true')
+    script.onload = () => {
+      ;(window as any).__gmapsLoaded = true
+      setTimeout(() => iniciarMapa(), 300)
+    }
+    document.head.appendChild(script)
   }, [tab])
+
+  function iniciarMapa() {
+    if (!mapRef.current || mapInstanceRef.current) return
+    if (!(window as any).google?.maps) return
+    const map = new (window as any).google.maps.Map(mapRef.current, {
+      center: { lat: 41.9281, lng: -87.7006 },
+      zoom: 11,
+    })
+    mapInstanceRef.current = map
+    setMapaCargado(true)
+  }
 
   function mostrarRutaEnMapa(paradas: any[]) {
     if (!mapInstanceRef.current) return
     const google = (window as any).google
     const map = mapInstanceRef.current
 
-    // Limpiar marcadores anteriores
     if ((window as any)._marcadores) {
-      (window as any)._marcadores.forEach((m: any) => m.setMap(null))
+      ;(window as any)._marcadores.forEach((m: any) => m.setMap(null))
     }
-    (window as any)._marcadores = []
+    ;(window as any)._marcadores = []
 
     const origen = '2900 N Richmond St, Chicago, IL 60618'
     const geocoder = new google.maps.Geocoder()
 
-    // Marcador de origen
     geocoder.geocode({ address: origen }, (results: any, status: any) => {
       if (status === 'OK') {
         const marker = new google.maps.Marker({
           map,
           position: results[0].geometry.location,
-          label: { text: '🏭', fontSize: '20px' },
           title: 'Bood Supply — Origen',
+          label: { text: '⭐', fontSize: '18px' },
         })
         ;(window as any)._marcadores.push(marker)
       }
     })
 
-    // Marcadores de paradas
     paradas.forEach((parada, idx) => {
       geocoder.geocode({ address: parada.direccion + ', Chicago, IL' }, (results: any, status: any) => {
         if (status === 'OK') {
@@ -153,7 +162,7 @@ export default function AdminPage() {
             title: `${idx + 1}. ${parada.negocio || parada.nombre}`,
           })
           const infoWindow = new google.maps.InfoWindow({
-            content: `<div style="font-family:Arial;padding:8px;"><strong>${idx + 1}. ${parada.negocio || parada.nombre}</strong><br/>${parada.nombre}<br/>${parada.direccion}<br/><strong>${parada.pedidoId}</strong></div>`
+            content: `<div style="font-family:Arial;padding:8px;min-width:180px"><strong>${idx + 1}. ${parada.negocio || parada.nombre}</strong><br/>${parada.nombre}<br/>📍 ${parada.direccion}<br/>💳 ${parada.metodo_pago} · $${parada.total?.toFixed(2)}</div>`
           })
           marker.addListener('click', () => infoWindow.open(map, marker))
           ;(window as any)._marcadores.push(marker)
@@ -161,19 +170,18 @@ export default function AdminPage() {
       })
     })
 
-    // Dibujar ruta
     const directionsService = new google.maps.DirectionsService()
     const directionsRenderer = new google.maps.DirectionsRenderer({
       map,
       suppressMarkers: true,
-      polylineOptions: { strokeColor: '#0F2B5B', strokeWeight: 4 }
+      polylineOptions: { strokeColor: '#0F2B5B', strokeWeight: 4, strokeOpacity: 0.8 }
     })
 
     if (paradas.length > 0) {
       directionsService.route({
         origin: origen,
         destination: origen,
-        waypoints: paradas.map(p => ({ location: p.direccion + ', Chicago, IL', stopover: true })),
+        waypoints: paradas.map((p: any) => ({ location: p.direccion + ', Chicago, IL', stopover: true })),
         travelMode: google.maps.TravelMode.DRIVING,
       }, (result: any, status: any) => {
         if (status === 'OK') directionsRenderer.setDirections(result)
@@ -208,18 +216,26 @@ export default function AdminPage() {
       const res = await fetch('/api/optimizar-ruta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ direcciones: paradas.map(p => p.direccion + ', Chicago, IL') })
+        body: JSON.stringify({ direcciones: paradas.map((p: any) => p.direccion + ', Chicago, IL') })
       })
       const data = await res.json()
       if (data.error) { setErrorRuta(data.error); setOptimizando(false); return }
 
       const rutaOrdenada = data.orden.map((i: number) => paradas[i])
       setRutaOptimizada(rutaOrdenada)
-      mostrarRutaEnMapa(rutaOrdenada)
+      setTimeout(() => mostrarRutaEnMapa(rutaOrdenada), 500)
     } catch (e: any) {
       setErrorRuta(e.message)
     }
     setOptimizando(false)
+  }
+
+  function abrirEnGoogleMaps() {
+    if (rutaOptimizada.length === 0) return
+    const origen = '2900+N+Richmond+St,+Chicago,+IL+60618'
+    const paradas = rutaOptimizada.map(p => encodeURIComponent(p.direccion + ', Chicago, IL')).join('/')
+    const url = `https://www.google.com/maps/dir/${origen}/${paradas}/${origen}`
+    window.open(url, '_blank')
   }
 
   function imprimirRuta() {
@@ -245,9 +261,7 @@ export default function AdminPage() {
         <p style="margin:2px 0">📞 ${p.telefono}</p>
         <p style="margin:2px 0">💳 Pago: ${p.metodo_pago} · Total: $${p.total?.toFixed(2)}</p>
         <p style="margin:2px 0">📦 Pedido: ${p.pedidoId}</p>
-        <div class="items">
-          ${p.items?.map((item: any) => `<div>${item.productos?.nombre} x${item.cantidad}</div>`).join('') || ''}
-        </div>
+        <div class="items">${p.items?.map((item: any) => `<div>${item.productos?.nombre} x${item.cantidad}</div>`).join('') || ''}</div>
       </div>
     `).join('')}
     </body></html>`
@@ -305,51 +319,26 @@ export default function AdminPage() {
       const data = await res.json()
       if (data.error) { setErrorUsuario(data.error); setCreandoUsuario(false); return }
       const userId = data.userId
-
-      let sales_tax_url = null
-      let id_foto_url = null
-      let crt61_url = null
-
+      let sales_tax_url = null, id_foto_url = null, crt61_url = null
       if (archivoTaxUsuario) {
         const ext = archivoTaxUsuario.name.split('.').pop()
-        const path = `sales-tax/${userId}.${ext}`
-        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivoTaxUsuario, { upsert: true })
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
-          sales_tax_url = urlData.publicUrl
-        }
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(`sales-tax/${userId}.${ext}`, archivoTaxUsuario, { upsert: true })
+        if (!uploadError) { const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(`sales-tax/${userId}.${ext}`); sales_tax_url = urlData.publicUrl }
       }
       if (archivoIdUsuario) {
         const ext = archivoIdUsuario.name.split('.').pop()
-        const path = `ids/${userId}.${ext}`
-        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivoIdUsuario, { upsert: true })
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
-          id_foto_url = urlData.publicUrl
-        }
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(`ids/${userId}.${ext}`, archivoIdUsuario, { upsert: true })
+        if (!uploadError) { const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(`ids/${userId}.${ext}`); id_foto_url = urlData.publicUrl }
       }
       if (archivoCRTUsuario) {
         const ext = archivoCRTUsuario.name.split('.').pop()
-        const path = `crt61/${userId}.${ext}`
-        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, archivoCRTUsuario, { upsert: true })
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
-          crt61_url = urlData.publicUrl
-        }
+        const { error: uploadError } = await supabase.storage.from('documentos').upload(`crt61/${userId}.${ext}`, archivoCRTUsuario, { upsert: true })
+        if (!uploadError) { const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(`crt61/${userId}.${ext}`); crt61_url = urlData.publicUrl }
       }
-
-      await supabase.from('profiles').update({
-        fecha_nacimiento: formUsuario.fecha_nacimiento || null,
-        sales_tax_url,
-        id_foto_url,
-        crt61_url,
-      }).eq('id', userId)
-
+      await supabase.from('profiles').update({ fecha_nacimiento: formUsuario.fecha_nacimiento || null, sales_tax_url, id_foto_url, crt61_url }).eq('id', userId)
       setUsuarioCreado(true)
       setFormUsuario({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '', fecha_nacimiento: '' })
-      setArchivoTaxUsuario(null)
-      setArchivoIdUsuario(null)
-      setArchivoCRTUsuario(null)
+      setArchivoTaxUsuario(null); setArchivoIdUsuario(null); setArchivoCRTUsuario(null)
       setShowFormUsuario(false)
       setTimeout(() => setUsuarioCreado(false), 4000)
       await cargarClientes()
@@ -361,13 +350,8 @@ export default function AdminPage() {
     setAprobando(c.id)
     await supabase.from('profiles').update({ aprobado: aprobar, aprobado_at: aprobar ? new Date().toISOString() : null }).eq('id', c.id)
     if (aprobar) {
-      try {
-        await fetch('/api/aprobar-cliente', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: c.email, nombre: c.nombre }),
-        })
-      } catch (e) { console.error('Email error:', e) }
+      try { await fetch('/api/aprobar-cliente', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: c.email, nombre: c.nombre }) }) }
+      catch (e) { console.error('Email error:', e) }
     }
     await cargarClientes()
     setAprobando(null)
@@ -386,11 +370,9 @@ export default function AdminPage() {
   }
 
   async function eliminarCliente(id: string, email: string) {
-    if (!confirm(`¿Eliminar cliente ${email}? Se eliminarán también sus pedidos.`)) return
+    if (!confirm(`¿Eliminar cliente ${email}?`)) return
     const pedidosCliente = pedidos.filter(p => p.cliente_id === id)
-    for (const ped of pedidosCliente) {
-      await supabase.from('pedido_items').delete().eq('pedido_id', ped.id)
-    }
+    for (const ped of pedidosCliente) { await supabase.from('pedido_items').delete().eq('pedido_id', ped.id) }
     await supabase.from('pedidos').delete().eq('cliente_id', id)
     await supabase.from('profiles').delete().eq('id', id)
     await Promise.all([cargarPedidos(), cargarClientes()])
@@ -416,16 +398,9 @@ export default function AdminPage() {
     try {
       for (const email of destinatarios) {
         const cliente = clientes.find(c => c.email === email)
-        await fetch('/api/aprobar-cliente', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, nombre: cliente?.nombre || email, asunto: mensajeAsunto, cuerpo: mensajeCuerpo }),
-        })
+        await fetch('/api/aprobar-cliente', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, nombre: cliente?.nombre || email, asunto: mensajeAsunto, cuerpo: mensajeCuerpo }) })
       }
-      setMensajeEnviado(true)
-      setMensajeAsunto('')
-      setMensajeCuerpo('')
-      setDestinatarios([])
+      setMensajeEnviado(true); setMensajeAsunto(''); setMensajeCuerpo(''); setDestinatarios([])
       setTimeout(() => setMensajeEnviado(false), 3000)
     } catch (e) { console.error('Error:', e) }
     setEnviandoMensaje(false)
@@ -433,11 +408,7 @@ export default function AdminPage() {
 
   async function traducirTexto(texto: string): Promise<string> {
     try {
-      const res = await fetch('/api/traducir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texto, idioma: 'EN' })
-      })
+      const res = await fetch('/api/traducir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, idioma: 'EN' }) })
       const data = await res.json()
       return data.traduccion || texto
     } catch { return texto }
@@ -451,19 +422,13 @@ export default function AdminPage() {
       const ext = imagenProducto.name.split('.').pop()
       const path = `productos/${Date.now()}.${ext}`
       const { error: uploadError } = await supabase.storage.from('documentos').upload(path, imagenProducto, { upsert: true })
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
-        imagen_url = urlData.publicUrl
-      }
+      if (!uploadError) { const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path); imagen_url = urlData.publicUrl }
     }
     const nombre_en = await traducirTexto(formProducto.nombre)
     const descripcion_en = formProducto.descripcion ? await traducirTexto(formProducto.descripcion) : ''
     await supabase.from('productos').insert({ ...formProducto, precio: parseFloat(formProducto.precio), activo: true, imagen_url, nombre_en, descripcion_en })
-    setFormProducto({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
-    setImagenProducto(null)
-    setShowFormProducto(false)
-    await cargarProductos()
-    setGuardando(false)
+    setFormProducto({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' }); setImagenProducto(null); setShowFormProducto(false)
+    await cargarProductos(); setGuardando(false)
   }
 
   function iniciarEdicionProducto(p: any) {
@@ -473,18 +438,8 @@ export default function AdminPage() {
 
   async function guardarProducto(id: string) {
     setGuardando(true)
-    await supabase.from('productos').update({
-      nombre: formEditProducto.nombre,
-      descripcion: formEditProducto.descripcion,
-      categoria: formEditProducto.categoria,
-      precio: parseFloat(formEditProducto.precio),
-      unidad: formEditProducto.unidad,
-      nombre_en: formEditProducto.nombre_en,
-      descripcion_en: formEditProducto.descripcion_en,
-    }).eq('id', id)
-    setEditandoProducto(null)
-    await cargarProductos()
-    setGuardando(false)
+    await supabase.from('productos').update({ nombre: formEditProducto.nombre, descripcion: formEditProducto.descripcion, categoria: formEditProducto.categoria, precio: parseFloat(formEditProducto.precio), unidad: formEditProducto.unidad, nombre_en: formEditProducto.nombre_en, descripcion_en: formEditProducto.descripcion_en }).eq('id', id)
+    setEditandoProducto(null); await cargarProductos(); setGuardando(false)
   }
 
   async function actualizarImagenProducto(id: string, file: File) {
@@ -494,28 +449,22 @@ export default function AdminPage() {
       const { error: uploadError } = await supabase.storage.from('documentos').upload(path, file, { upsert: true })
       if (uploadError) { alert('Error subiendo imagen: ' + uploadError.message); return }
       const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path)
-      const { error: updateError } = await supabase.from('productos').update({ imagen_url: urlData.publicUrl }).eq('id', id)
-      if (updateError) { alert('Error actualizando producto: ' + updateError.message); return }
+      await supabase.from('productos').update({ imagen_url: urlData.publicUrl }).eq('id', id)
       await cargarProductos()
     } catch (e: any) { alert('Error: ' + e.message) }
   }
 
   function seleccionarImagen(id: string) {
     const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.jpg,.jpeg,.png,.webp'
-    input.onchange = (e: any) => {
-      if (e.target.files?.[0]) actualizarImagenProducto(id, e.target.files[0])
-    }
+    input.type = 'file'; input.accept = '.jpg,.jpeg,.png,.webp'
+    input.onchange = (e: any) => { if (e.target.files?.[0]) actualizarImagenProducto(id, e.target.files[0]) }
     input.click()
   }
 
   async function agregarCategoria() {
     if (!nuevaCategoria.trim()) return alert('Escribe un nombre')
     if (categorias.includes(nuevaCategoria.trim())) return alert('Ya existe esa categoría')
-    setCategorias(prev => [...prev, nuevaCategoria.trim()])
-    setNuevaCategoria('')
-    setShowFormCategoria(false)
+    setCategorias(prev => [...prev, nuevaCategoria.trim()]); setNuevaCategoria(''); setShowFormCategoria(false)
   }
 
   async function guardarCategoria(catAntigua: string) {
@@ -523,9 +472,7 @@ export default function AdminPage() {
     if (categoriaEditNombre === catAntigua) { setEditandoCategoria(null); return }
     setGuardando(true)
     await supabase.from('productos').update({ categoria: categoriaEditNombre.trim() }).eq('categoria', catAntigua)
-    await cargarProductos()
-    setEditandoCategoria(null)
-    setGuardando(false)
+    await cargarProductos(); setEditandoCategoria(null); setGuardando(false)
   }
 
   async function eliminarCategoria(cat: string) {
@@ -535,8 +482,7 @@ export default function AdminPage() {
   }
 
   async function toggleActivo(id: string, activo: boolean) {
-    await supabase.from('productos').update({ activo: !activo }).eq('id', id)
-    await cargarProductos()
+    await supabase.from('productos').update({ activo: !activo }).eq('id', id); await cargarProductos()
   }
 
   async function eliminarProducto(id: string) {
@@ -546,17 +492,9 @@ export default function AdminPage() {
     await cargarProductos()
   }
 
-  function toggleSeleccion(id: string) {
-    setSeleccionados(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
-  }
-
-  function togglePedidoRuta(id: string) {
-    setPedidosRuta(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
-  }
-
-  function toggleDestinatario(email: string) {
-    setDestinatarios(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email])
-  }
+  function toggleSeleccion(id: string) { setSeleccionados(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]) }
+  function togglePedidoRuta(id: string) { setPedidosRuta(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]) }
+  function toggleDestinatario(email: string) { setDestinatarios(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]) }
 
   function exportarVentas() {
     const headers = ['# Pedido', 'Fecha', 'Cliente', 'Negocio', 'Email', 'Dirección', 'EIN', 'Método Pago', 'Productos', 'Subtotal', 'Fuel Surcharge', 'Total', 'Estado']
@@ -583,40 +521,13 @@ export default function AdminPage() {
   function imprimirOrdenes() {
     const pedidosSeleccionados = pedidos.filter(p => seleccionados.includes(p.id))
     const html = `<html><head><title>Órdenes — BOOD SUPPLY</title>
-    <style>
-      body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}
-      .orden{border:1px solid #ccc;padding:16px;margin-bottom:28px;page-break-inside:avoid;border-radius:8px}
-      .header{background:#0F2B5B;color:white;padding:10px 16px;border-radius:6px;margin-bottom:14px;display:flex;justify-content:space-between}
-      .header h2{margin:0;font-size:15px}.header p{margin:0;font-size:11px;opacity:.8}
-      .seccion{margin-bottom:12px}.seccion h3{font-size:10px;text-transform:uppercase;color:#888;margin:0 0 6px;border-bottom:1px solid #eee;padding-bottom:3px}
-      .grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.campo{font-size:11px;padding:2px 0}.campo b{color:#0F2B5B}
-      .item-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f5f5f5;font-size:11px}
-      .total{font-size:15px;font-weight:bold;color:#F47B20;text-align:right;margin-top:10px;padding-top:8px;border-top:2px solid #F47B20}
-      .logo-header{text-align:center;margin-bottom:24px;border-bottom:2px solid #0F2B5B;padding-bottom:12px}
-      .logo-header h1{color:#0F2B5B;margin:0;font-size:20px}
-    </style></head><body>
-    <div class="logo-header"><h1>BOOD SUPPLY</h1>
-    <p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p>
-    <p>Órdenes de Entrega — ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p></div>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.orden{border:1px solid #ccc;padding:16px;margin-bottom:28px;page-break-inside:avoid;border-radius:8px}.header{background:#0F2B5B;color:white;padding:10px 16px;border-radius:6px;margin-bottom:14px;display:flex;justify-content:space-between}.header h2{margin:0;font-size:15px}.header p{margin:0;font-size:11px;opacity:.8}.seccion{margin-bottom:12px}.seccion h3{font-size:10px;text-transform:uppercase;color:#888;margin:0 0 6px;border-bottom:1px solid #eee;padding-bottom:3px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.campo{font-size:11px;padding:2px 0}.campo b{color:#0F2B5B}.item-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f5f5f5;font-size:11px}.total{font-size:15px;font-weight:bold;color:#F47B20;text-align:right;margin-top:10px;padding-top:8px;border-top:2px solid #F47B20}.logo-header{text-align:center;margin-bottom:24px;border-bottom:2px solid #0F2B5B;padding-bottom:12px}.logo-header h1{color:#0F2B5B;margin:0;font-size:20px}</style></head><body>
+    <div class="logo-header"><h1>BOOD SUPPLY</h1><p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p><p>Órdenes de Entrega — ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p></div>
     ${pedidosSeleccionados.map(ped => {
       const cliente = getCliente(ped.cliente_id)
       const subtotal = (ped.total || 0) - (ped.fuel_surcharge || 0)
-      return `<div class="orden">
-        <div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div>
-        <div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX', {year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')} · Pago: ${ped.metodo_pago||'N/A'}</p></div></div>
-        <div class="seccion"><h3>Datos del Cliente</h3><div class="grid2">
-        <div class="campo"><b>Nombre:</b> ${cliente?.nombre||cliente?.email||'N/A'}</div>
-        <div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div>
-        <div class="campo"><b>Teléfono:</b> ${cliente?.telefono||'N/A'}</div>
-        <div class="campo"><b>EIN:</b> ${cliente?.ein||'N/A'}</div>
-        <div class="campo" style="grid-column:span 2"><b>Dirección:</b> ${cliente?.direccion||'N/A'}</div>
-        </div></div>
-        <div class="seccion"><h3>Detalle del Pedido</h3>
-        ${ped.pedido_items?.map((item: any) => `<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}
-        <div class="item-row" style="color:#888"><span>Fuel Surcharge</span><span>$${(ped.fuel_surcharge||0).toFixed(2)}</span></div>
-        </div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`
-    }).join('')}
-    </body></html>`
+      return `<div class="orden"><div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div><div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX', {year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')} · Pago: ${ped.metodo_pago||'N/A'}</p></div></div><div class="seccion"><h3>Datos del Cliente</h3><div class="grid2"><div class="campo"><b>Nombre:</b> ${cliente?.nombre||'N/A'}</div><div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div><div class="campo"><b>Teléfono:</b> ${cliente?.telefono||'N/A'}</div><div class="campo"><b>EIN:</b> ${cliente?.ein||'N/A'}</div><div class="campo" style="grid-column:span 2"><b>Dirección:</b> ${cliente?.direccion||'N/A'}</div></div></div><div class="seccion"><h3>Detalle del Pedido</h3>${ped.pedido_items?.map((item: any) => `<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}<div class="item-row" style="color:#888"><span>Fuel Surcharge</span><span>$${(ped.fuel_surcharge||0).toFixed(2)}</span></div></div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`
+    }).join('')}</body></html>`
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
   }
@@ -629,9 +540,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-brand-gray-light">
       {usuarioCreado && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">
-          ✓ Usuario creado y correo enviado
-        </div>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">✓ Usuario creado y correo enviado</div>
       )}
 
       <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
@@ -640,13 +549,9 @@ export default function AdminPage() {
           <span className="font-heading font-bold text-lg">Admin — BOOD SUPPLY</span>
         </div>
         <div className="flex items-center gap-4">
-          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm flex items-center gap-1">
-            📘 Facebook
-          </a>
+          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm flex items-center gap-1">📘 Facebook</a>
           <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
-          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors">
-            <LogOut size={16} /> Salir
-          </button>
+          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors"><LogOut size={16} /> Salir</button>
         </div>
       </nav>
 
@@ -701,66 +606,23 @@ export default function AdminPage() {
 
             {showFormUsuario && (
               <div className="card border-2 border-brand-orange/30 mb-4">
-                <h3 className="font-heading font-bold text-brand-navy text-lg mb-4 flex items-center gap-2">
-                  <UserPlus size={18} className="text-brand-orange" /> Crear Nuevo Usuario
-                </h3>
+                <h3 className="font-heading font-bold text-brand-navy text-lg mb-4 flex items-center gap-2"><UserPlus size={18} className="text-brand-orange" /> Crear Nuevo Usuario</h3>
                 {errorUsuario && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorUsuario}</div>}
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre Completo *</label>
-                    <input value={formUsuario.nombre} onChange={e => setFormUsuario({...formUsuario, nombre: e.target.value})} placeholder="Nombre completo" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Email *</label>
-                    <input value={formUsuario.email} onChange={e => setFormUsuario({...formUsuario, email: e.target.value})} placeholder="correo@email.com" type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Negocio</label>
-                    <input value={formUsuario.negocio} onChange={e => setFormUsuario({...formUsuario, negocio: e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Teléfono</label>
-                    <input value={formUsuario.telefono} onChange={e => setFormUsuario({...formUsuario, telefono: e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label>
-                    <input value={formUsuario.ein} onChange={e => setFormUsuario({...formUsuario, ein: e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento</label>
-                    <input value={formUsuario.fecha_nacimiento} onChange={e => setFormUsuario({...formUsuario, fecha_nacimiento: e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label>
-                    <input value={formUsuario.direccion} onChange={e => setFormUsuario({...formUsuario, direccion: e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit <span className="text-brand-gray-mid font-normal">(PDF o imagen)</span></label>
-                    <div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors">
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoTaxUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />
-                      {archivoTaxUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID <span className="text-brand-gray-mid font-normal">(licencia o pasaporte)</span></label>
-                    <div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors">
-                      <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e => setArchivoIdUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />
-                      {archivoIdUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}
-                    </div>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado <span className="text-brand-gray-mid font-normal">(PDF o imagen)</span></label>
-                    <div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors">
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoCRTUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />
-                      {archivoCRTUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}
-                    </div>
-                  </div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre Completo *</label><input value={formUsuario.nombre} onChange={e => setFormUsuario({...formUsuario, nombre: e.target.value})} placeholder="Nombre completo" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Email *</label><input value={formUsuario.email} onChange={e => setFormUsuario({...formUsuario, email: e.target.value})} placeholder="correo@email.com" type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Negocio</label><input value={formUsuario.negocio} onChange={e => setFormUsuario({...formUsuario, negocio: e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Teléfono</label><input value={formUsuario.telefono} onChange={e => setFormUsuario({...formUsuario, telefono: e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label><input value={formUsuario.ein} onChange={e => setFormUsuario({...formUsuario, ein: e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento</label><input value={formUsuario.fecha_nacimiento} onChange={e => setFormUsuario({...formUsuario, fecha_nacimiento: e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label><input value={formUsuario.direccion} onChange={e => setFormUsuario({...formUsuario, direccion: e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoTaxUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />{archivoTaxUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}</div></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e => setArchivoIdUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />{archivoIdUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}</div></div>
+                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setArchivoCRTUsuario(e.target.files?.[0] || null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer" />{archivoCRTUsuario && <p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
                 </div>
                 <p className="text-xs text-brand-gray-mid mt-3">✓ El usuario recibirá un correo con sus credenciales y deberá cambiar su contraseña al primer inicio de sesión.</p>
                 <div className="flex gap-3 mt-4">
-                  <button onClick={crearUsuario} disabled={creandoUsuario} className="btn-primary flex items-center gap-2">
-                    <UserPlus size={15} /> {creandoUsuario ? 'Creando...' : 'Crear y Enviar Correo'}
-                  </button>
+                  <button onClick={crearUsuario} disabled={creandoUsuario} className="btn-primary flex items-center gap-2"><UserPlus size={15} /> {creandoUsuario ? 'Creando...' : 'Crear y Enviar Correo'}</button>
                   <button onClick={() => { setShowFormUsuario(false); setErrorUsuario('') }} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                 </div>
               </div>
@@ -781,109 +643,49 @@ export default function AdminPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-heading font-bold text-brand-navy">{c.nombre || '—'}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.aprobado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {c.aprobado ? '✓ Aprobado' : '⏳ Pendiente'}
-                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.aprobado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{c.aprobado ? '✓ Aprobado' : '⏳ Pendiente'}</span>
                           {c.must_change_password && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">🔑 Debe cambiar contraseña</span>}
                         </div>
                         <p className="text-xs text-brand-gray-mid">{c.email}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <div className="text-center">
-                        <p className="font-heading font-bold text-brand-orange">{pedidosCliente.length}</p>
-                        <p className="text-xs text-brand-gray-mid">pedidos</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-heading font-bold text-green-600">${totalGastado.toFixed(2)}</p>
-                        <p className="text-xs text-brand-gray-mid">total</p>
-                      </div>
+                      <div className="text-center"><p className="font-heading font-bold text-brand-orange">{pedidosCliente.length}</p><p className="text-xs text-brand-gray-mid">pedidos</p></div>
+                      <div className="text-center"><p className="font-heading font-bold text-green-600">${totalGastado.toFixed(2)}</p><p className="text-xs text-brand-gray-mid">total</p></div>
                       {!c.aprobado ? (
-                        <button onClick={() => aprobarCliente(c, true)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
-                          <CheckCircle size={14} /> {aprobando === c.id ? 'Aprobando...' : 'Aprobar'}
-                        </button>
+                        <button onClick={() => aprobarCliente(c, true)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><CheckCircle size={14} /> {aprobando === c.id ? 'Aprobando...' : 'Aprobar'}</button>
                       ) : (
-                        <button onClick={() => aprobarCliente(c, false)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600">
-                          <XCircle size={14} /> Revocar
-                        </button>
+                        <button onClick={() => aprobarCliente(c, false)} disabled={aprobando === c.id} className="flex items-center gap-1 text-sm bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600"><XCircle size={14} /> Revocar</button>
                       )}
                       {!editando ? (
-                        <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange">
-                          <Pencil size={14} /> Editar
-                        </button>
+                        <button onClick={() => iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange"><Pencil size={14} /> Editar</button>
                       ) : (
                         <div className="flex gap-2">
-                          <button onClick={() => guardarCliente(c.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
-                            <Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}
-                          </button>
-                          <button onClick={() => setEditandoCliente(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-mid">
-                            <X size={14} /> Cancelar
-                          </button>
+                          <button onClick={() => guardarCliente(c.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}</button>
+                          <button onClick={() => setEditandoCliente(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-mid"><X size={14} /> Cancelar</button>
                         </div>
                       )}
-                      <button onClick={() => eliminarCliente(c.id, c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50">
-                        <Trash2 size={14} />
-                      </button>
+                      <button onClick={() => eliminarCliente(c.id, c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50"><Trash2 size={14} /></button>
                     </div>
                   </div>
                   {(c.sales_tax_url || c.id_foto_url || c.crt61_url) && (
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {c.sales_tax_url && (
-                        <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48">
-                          <FileText size={15} className="text-blue-500 flex-shrink-0" />
-                          <span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span>
-                          <a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600">Ver</a>
-                        </div>
-                      )}
-                      {c.id_foto_url && (
-                        <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48">
-                          <FileText size={15} className="text-purple-500 flex-shrink-0" />
-                          <span className="text-xs text-purple-700 flex-1">ID / Identificación</span>
-                          <a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600">Ver</a>
-                        </div>
-                      )}
-                      {c.crt61_url && (
-                        <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48">
-                          <FileText size={15} className="text-green-500 flex-shrink-0" />
-                          <span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span>
-                          <a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">Ver</a>
-                        </div>
-                      )}
+                      {c.sales_tax_url && <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48"><FileText size={15} className="text-blue-500 flex-shrink-0" /><span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span><a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600">Ver</a></div>}
+                      {c.id_foto_url && <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48"><FileText size={15} className="text-purple-500 flex-shrink-0" /><span className="text-xs text-purple-700 flex-1">ID / Identificación</span><a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600">Ver</a></div>}
+                      {c.crt61_url && <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48"><FileText size={15} className="text-green-500 flex-shrink-0" /><span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span><a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">Ver</a></div>}
                     </div>
                   )}
                   {editando ? (
                     <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
-                      {[
-                        { key: 'nombre', label: 'Nombre', placeholder: 'Nombre completo' },
-                        { key: 'negocio', label: 'Negocio', placeholder: 'Nombre del negocio' },
-                        { key: 'telefono', label: 'Teléfono', placeholder: '(312) 000-0000' },
-                        { key: 'ein', label: 'EIN', placeholder: 'XX-XXXXXXX' },
-                      ].map(({ key, label, placeholder }) => (
-                        <div key={key}>
-                          <label className="block text-xs font-medium text-brand-gray-dark mb-1">{label}</label>
-                          <input value={formCliente[key] || ''} onChange={e => setFormCliente({...formCliente, [key]: e.target.value})} placeholder={placeholder} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                        </div>
+                      {[{key:'nombre',label:'Nombre',ph:'Nombre completo'},{key:'negocio',label:'Negocio',ph:'Nombre del negocio'},{key:'telefono',label:'Teléfono',ph:'(312) 000-0000'},{key:'ein',label:'EIN',ph:'XX-XXXXXXX'}].map(({key,label,ph}) => (
+                        <div key={key}><label className="block text-xs font-medium text-brand-gray-dark mb-1">{label}</label><input value={formCliente[key]||''} onChange={e=>setFormCliente({...formCliente,[key]:e.target.value})} placeholder={ph} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                       ))}
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label>
-                        <input value={formCliente.direccion || ''} onChange={e => setFormCliente({...formCliente, direccion: e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                      </div>
+                      <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label><input value={formCliente.direccion||''} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs mt-3 border-t pt-3">
-                      {[
-                        { label: 'Negocio', value: c.negocio },
-                        { label: 'Teléfono', value: c.telefono },
-                        { label: 'EIN', value: c.ein },
-                        { label: 'Fecha Nacimiento', value: c.fecha_nacimiento ? new Date(c.fecha_nacimiento).toLocaleDateString('es-MX', { timeZone: 'UTC' }) : null },
-                        { label: 'Dirección', value: c.direccion, full: true },
-                        { label: 'Último pedido', value: ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : null },
-                        { label: 'Registro', value: new Date(c.created_at).toLocaleDateString('es-MX') },
-                      ].map(({ label, value, full }: any) => (
-                        <div key={label} className={`bg-gray-50 rounded-lg p-2 border border-gray-100 ${full ? 'col-span-2' : ''}`}>
-                          <p className="text-brand-gray-mid">{label}</p>
-                          <p className="font-medium text-brand-navy">{value || '—'}</p>
-                        </div>
+                      {[{label:'Negocio',value:c.negocio},{label:'Teléfono',value:c.telefono},{label:'EIN',value:c.ein},{label:'Fecha Nacimiento',value:c.fecha_nacimiento?new Date(c.fecha_nacimiento).toLocaleDateString('es-MX',{timeZone:'UTC'}):null},{label:'Dirección',value:c.direccion,full:true},{label:'Último pedido',value:ultimoPedido?new Date(ultimoPedido.created_at).toLocaleDateString('es-MX'):null},{label:'Registro',value:new Date(c.created_at).toLocaleDateString('es-MX')}].map(({label,value,full}:any)=>(
+                        <div key={label} className={`bg-gray-50 rounded-lg p-2 border border-gray-100 ${full?'col-span-2':''}`}><p className="text-brand-gray-mid">{label}</p><p className="font-medium text-brand-navy">{value||'—'}</p></div>
                       ))}
                     </div>
                   )}
@@ -898,23 +700,12 @@ export default function AdminPage() {
           <div>
             <div className="card mb-6">
               <div className="flex flex-wrap items-end gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Desde</label>
-                  <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-brand-gray-dark mb-1">Hasta</label>
-                  <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                </div>
-                <button onClick={() => { setFechaDesde(''); setFechaHasta('') }} className="text-sm text-brand-gray-mid hover:text-brand-orange transition-colors px-3 py-2">Limpiar</button>
+                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Desde</label><input type="date" value={fechaDesde} onChange={e=>setFechaDesde(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Hasta</label><input type="date" value={fechaHasta} onChange={e=>setFechaHasta(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                <button onClick={()=>{setFechaDesde('');setFechaHasta('')}} className="text-sm text-brand-gray-mid hover:text-brand-orange transition-colors px-3 py-2">Limpiar</button>
                 <div className="ml-auto flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-xs text-brand-gray-mid">Total período</p>
-                    <p className="font-heading font-bold text-xl text-green-600">${totalVentasFiltradas.toFixed(2)}</p>
-                  </div>
-                  <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
-                    <Download size={15} /> Exportar CSV
-                  </button>
+                  <div className="text-right"><p className="text-xs text-brand-gray-mid">Total período</p><p className="font-heading font-bold text-xl text-green-600">${totalVentasFiltradas.toFixed(2)}</p></div>
+                  <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors"><Download size={15}/> Exportar CSV</button>
                 </div>
               </div>
             </div>
@@ -922,91 +713,59 @@ export default function AdminPage() {
               <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
                 <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
                 <div className="flex gap-3">
-                  <button onClick={imprimirOrdenes} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
-                    🖨️ Imprimir Órdenes
-                  </button>
-                  <button onClick={() => setSeleccionados([])} className="text-sm text-blue-300 hover:text-white">Cancelar</button>
+                  <button onClick={imprimirOrdenes} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">🖨️ Imprimir Órdenes</button>
+                  <button onClick={()=>setSeleccionados([])} className="text-sm text-blue-300 hover:text-white">Cancelar</button>
                 </div>
               </div>
             )}
-            {pedidosFiltrados.length === 0 && (
-              <div className="card text-center py-12 text-brand-gray-mid">
-                <ShoppingBag size={40} className="mx-auto mb-3 opacity-25" />
-                <p>No hay pedidos en este período</p>
-              </div>
-            )}
+            {pedidosFiltrados.length === 0 && <div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos en este período</p></div>}
             {GRUPOS.map(grupo => {
               const pedidosGrupo = pedidosFiltrados.filter(p => grupo.key.includes(p.estado))
               if (pedidosGrupo.length === 0) return null
-              const totalGrupo = pedidosGrupo.reduce((sum, p) => sum + (p.total || 0), 0)
+              const totalGrupo = pedidosGrupo.reduce((sum,p)=>sum+(p.total||0),0)
               return (
                 <div key={grupo.label} className={`mb-8 border-2 ${grupo.color} rounded-2xl p-5`}>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-heading font-bold text-brand-navy text-lg flex items-center gap-2">
-                      {grupo.label}
-                      <span className="text-sm font-normal text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{pedidosGrupo.length}</span>
-                    </h2>
+                    <h2 className="font-heading font-bold text-brand-navy text-lg flex items-center gap-2">{grupo.label}<span className="text-sm font-normal text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{pedidosGrupo.length}</span></h2>
                     <span className="font-heading font-bold text-brand-orange">Subtotal: ${totalGrupo.toFixed(2)}</span>
                   </div>
                   <div className="space-y-3">
                     {pedidosGrupo.map(ped => {
                       const cliente = getCliente(ped.cliente_id)
                       const seleccionado = seleccionados.includes(ped.id)
-                      const subtotal = (ped.total || 0) - (ped.fuel_surcharge || 0)
+                      const subtotal = (ped.total||0)-(ped.fuel_surcharge||0)
                       return (
-                        <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado ? 'border-brand-orange' : 'border-transparent'}`}>
+                        <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado?'border-brand-orange':'border-transparent'}`}>
                           <div className="flex items-start gap-3">
-                            <button onClick={() => toggleSeleccion(ped.id)} className="mt-1 flex-shrink-0">
-                              {seleccionado ? <CheckSquare size={18} className="text-brand-orange" /> : <Square size={18} className="text-gray-300" />}
-                            </button>
+                            <button onClick={()=>toggleSeleccion(ped.id)} className="mt-1 flex-shrink-0">{seleccionado?<CheckSquare size={18} className="text-brand-orange"/>:<Square size={18} className="text-gray-300"/>}</button>
                             <div className="flex-1">
                               <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
-                                <div>
-                                  <p className="font-heading font-bold text-brand-navy">#{ped.id.slice(0,8).toUpperCase()}</p>
-                                  <p className="text-xs text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                                </div>
+                                <div><p className="font-heading font-bold text-brand-navy">#{ped.id.slice(0,8).toUpperCase()}</p><p className="text-xs text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</p></div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
-                                  <select value={ped.estado} onChange={e => cambiarEstado(ped.id, e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>
-                                    {ESTADOS.map(e => <option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase() + e.replace('_',' ').slice(1)}</option>)}
-                                  </select>
-                                  <button onClick={() => eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400">
-                                    <Trash2 size={15} />
-                                  </button>
+                                  <select value={ped.estado} onChange={e=>cambiarEstado(ped.id,e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>{ESTADOS.map(e=><option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase()+e.replace('_',' ').slice(1)}</option>)}</select>
+                                  <button onClick={()=>eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={15}/></button>
                                 </div>
                               </div>
                               <div className="bg-blue-50 rounded-lg p-3 mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                                <div><span className="text-brand-gray-mid">Nombre:</span> <span className="font-medium text-brand-navy">{cliente?.nombre || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Negocio:</span> <span className="font-medium text-brand-navy">{cliente?.negocio || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Teléfono:</span> <span className="font-medium text-brand-navy">{cliente?.telefono || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">EIN:</span> <span className="font-medium text-brand-navy">{cliente?.ein || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email || '—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion || '—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Nombre:</span> <span className="font-medium text-brand-navy">{cliente?.nombre||'—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Negocio:</span> <span className="font-medium text-brand-navy">{cliente?.negocio||'—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Teléfono:</span> <span className="font-medium text-brand-navy">{cliente?.telefono||'—'}</span></div>
+                                <div><span className="text-brand-gray-mid">EIN:</span> <span className="font-medium text-brand-navy">{cliente?.ein||'—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email||'—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion||'—'}</span></div>
                                 <div className="col-span-2 flex items-center justify-between mt-1 pt-1 border-t border-blue-100">
-                                  <div><span className="text-brand-gray-mid">Método de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago || '—'}</span></div>
-                                  {ped.comprobante_url && (
-                                    <a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">
-                                      <FileText size={11} /> Ver comprobante
-                                    </a>
-                                  )}
+                                  <div><span className="text-brand-gray-mid">Método de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago||'—'}</span></div>
+                                  {ped.comprobante_url && <a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600"><FileText size={11}/> Ver comprobante</a>}
                                 </div>
                               </div>
                               <div className="border-t pt-2 space-y-1">
-                                {ped.pedido_items?.map((item: any) => (
-                                  <div key={item.id} className="flex justify-between text-sm">
-                                    <span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span>
-                                    <span className="font-medium text-brand-navy">${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
-                                  </div>
+                                {ped.pedido_items?.map((item:any)=>(
+                                  <div key={item.id} className="flex justify-between text-sm"><span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span><span className="font-medium text-brand-navy">${(item.precio_unitario*item.cantidad).toFixed(2)}</span></div>
                                 ))}
-                                <div className="flex justify-between text-xs text-brand-gray-mid border-t pt-1 mt-1">
-                                  <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-xs text-brand-gray-mid">
-                                  <span>Fuel Surcharge</span><span>${(ped.fuel_surcharge||0).toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-sm font-bold text-brand-navy border-t pt-1">
-                                  <span>Total</span><span>${ped.total?.toFixed(2)}</span>
-                                </div>
+                                <div className="flex justify-between text-xs text-brand-gray-mid border-t pt-1 mt-1"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
+                                <div className="flex justify-between text-xs text-brand-gray-mid"><span>Fuel Surcharge</span><span>${(ped.fuel_surcharge||0).toFixed(2)}</span></div>
+                                <div className="flex justify-between text-sm font-bold text-brand-navy border-t pt-1"><span>Total</span><span>${ped.total?.toFixed(2)}</span></div>
                               </div>
                             </div>
                           </div>
@@ -1023,19 +782,24 @@ export default function AdminPage() {
         {/* RUTAS */}
         {tab === 'rutas' && (
           <div>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
               <div>
                 <h2 className="font-heading font-bold text-brand-navy text-xl">Optimización de Rutas</h2>
                 <p className="text-brand-gray-mid text-sm mt-1">Selecciona los pedidos del día y calcula la ruta más eficiente</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
                 {rutaOptimizada.length > 0 && (
-                  <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
-                    🖨️ Imprimir Ruta
-                  </button>
+                  <>
+                    <button onClick={abrirEnGoogleMaps} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">
+                      🗺️ Abrir en Google Maps
+                    </button>
+                    <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">
+                      🖨️ Imprimir Ruta
+                    </button>
+                  </>
                 )}
                 <button onClick={optimizarRuta} disabled={optimizando || pedidosRuta.length === 0} className="btn-primary flex items-center gap-2">
-                  <Map size={16} /> {optimizando ? 'Calculando...' : 'Optimizar Ruta'}
+                  <Map size={16}/> {optimizando ? 'Calculando...' : 'Optimizar Ruta'}
                 </button>
               </div>
             </div>
@@ -1043,7 +807,6 @@ export default function AdminPage() {
             {errorRuta && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorRuta}</div>}
 
             <div className="grid md:grid-cols-2 gap-6">
-              {/* Lista de pedidos para seleccionar */}
               <div>
                 <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">
                   Pedidos Activos
@@ -1051,32 +814,26 @@ export default function AdminPage() {
                   {pedidosRuta.length > 0 && <span className="text-xs font-normal text-brand-orange bg-orange-50 px-2 py-0.5 rounded-full">{pedidosRuta.length} seleccionados</span>}
                 </h3>
                 <div className="flex gap-2 mb-3">
-                  <button onClick={() => setPedidosRuta(pedidosParaRuta.map(p => p.id))} className="text-xs text-brand-orange hover:underline">Seleccionar todos</button>
+                  <button onClick={()=>setPedidosRuta(pedidosParaRuta.map(p=>p.id))} className="text-xs text-brand-orange hover:underline">Seleccionar todos</button>
                   <span className="text-brand-gray-mid text-xs">·</span>
-                  <button onClick={() => setPedidosRuta([])} className="text-xs text-brand-gray-mid hover:underline">Limpiar</button>
+                  <button onClick={()=>setPedidosRuta([])} className="text-xs text-brand-gray-mid hover:underline">Limpiar</button>
                 </div>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {pedidosParaRuta.length === 0 ? (
-                    <div className="card text-center py-8 text-brand-gray-mid">
-                      <p>No hay pedidos activos para entregar</p>
-                    </div>
+                    <div className="card text-center py-8 text-brand-gray-mid"><p>No hay pedidos activos para entregar</p></div>
                   ) : (
                     pedidosParaRuta.map(ped => {
                       const cliente = getCliente(ped.cliente_id)
                       const enRuta = pedidosRuta.includes(ped.id)
                       return (
-                        <div key={ped.id} onClick={() => togglePedidoRuta(ped.id)} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${enRuta ? 'border-brand-orange bg-orange-50' : 'border-gray-100 bg-white hover:border-gray-300'}`}>
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${enRuta ? 'bg-brand-orange border-brand-orange' : 'border-gray-300'}`}>
-                            {enRuta && <span className="text-white text-xs font-bold">✓</span>}
-                          </div>
+                        <div key={ped.id} onClick={()=>togglePedidoRuta(ped.id)} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${enRuta?'border-brand-orange bg-orange-50':'border-gray-100 bg-white hover:border-gray-300'}`}>
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${enRuta?'bg-brand-orange border-brand-orange':'border-gray-300'}`}>{enRuta&&<span className="text-white text-xs font-bold">✓</span>}</div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-brand-navy text-sm truncate">{cliente?.negocio || cliente?.nombre || '—'}</p>
-                            <p className="text-xs text-brand-gray-mid truncate">📍 {cliente?.direccion || 'Sin dirección'}</p>
+                            <p className="font-medium text-brand-navy text-sm truncate">{cliente?.negocio||cliente?.nombre||'—'}</p>
+                            <p className="text-xs text-brand-gray-mid truncate">📍 {cliente?.direccion||'Sin dirección'}</p>
                             <p className="text-xs text-brand-gray-mid">#{ped.id.slice(0,8).toUpperCase()} · ${ped.total?.toFixed(2)}</p>
                           </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${estadoColor[ped.estado]}`}>
-                            {ped.estado.replace('_',' ')}
-                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${estadoColor[ped.estado]}`}>{ped.estado.replace('_',' ')}</span>
                         </div>
                       )
                     })
@@ -1084,7 +841,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Resultado y mapa */}
               <div>
                 {rutaOptimizada.length > 0 && (
                   <div className="mb-4">
@@ -1095,16 +851,13 @@ export default function AdminPage() {
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg">
                         <div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div>
-                        <div>
-                          <p className="font-medium text-brand-navy text-sm">Origen — Bood Supply</p>
-                          <p className="text-xs text-brand-gray-mid">2900 N Richmond St, Chicago</p>
-                        </div>
+                        <div><p className="font-medium text-brand-navy text-sm">Origen — Bood Supply</p><p className="text-xs text-brand-gray-mid">2900 N Richmond St, Chicago</p></div>
                       </div>
                       {rutaOptimizada.map((parada, idx) => (
                         <div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-100">
-                          <div className="w-7 h-7 bg-brand-orange rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{idx + 1}</div>
+                          <div className="w-7 h-7 bg-brand-orange rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{idx+1}</div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-brand-navy text-sm truncate">{parada.negocio || parada.nombre}</p>
+                            <p className="font-medium text-brand-navy text-sm truncate">{parada.negocio||parada.nombre}</p>
                             <p className="text-xs text-brand-gray-mid truncate">📍 {parada.direccion}</p>
                             <p className="text-xs text-brand-gray-mid">📞 {parada.telefono} · 💳 {parada.metodo_pago} · ${parada.total?.toFixed(2)}</p>
                           </div>
@@ -1112,20 +865,15 @@ export default function AdminPage() {
                       ))}
                       <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg">
                         <div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div>
-                        <div>
-                          <p className="font-medium text-brand-navy text-sm">Regreso — Bood Supply</p>
-                        </div>
+                        <div><p className="font-medium text-brand-navy text-sm">Regreso — Bood Supply</p></div>
                       </div>
                     </div>
                   </div>
                 )}
-                <div ref={mapRef} className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{ height: rutaOptimizada.length > 0 ? '300px' : '400px' }}>
-                  {!rutaOptimizada.length && (
+                <div ref={mapRef} className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{ height: '400px' }}>
+                  {!rutaOptimizada.length && !mapaCargado && (
                     <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand-gray-mid">
-                      <div className="text-center">
-                        <Map size={40} className="mx-auto mb-2 opacity-25" />
-                        <p className="text-sm">Selecciona pedidos y optimiza la ruta</p>
-                      </div>
+                      <div className="text-center"><Map size={40} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Selecciona pedidos y optimiza la ruta</p></div>
                     </div>
                   )}
                 </div>
@@ -1138,48 +886,27 @@ export default function AdminPage() {
         {tab === 'mensajes' && (
           <div className="card">
             <h2 className="font-heading font-bold text-brand-navy text-xl mb-6">Enviar Mensaje a Clientes</h2>
-            {mensajeEnviado && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">
-                ✓ Mensaje enviado correctamente
-              </div>
-            )}
+            {mensajeEnviado && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">✓ Mensaje enviado correctamente</div>}
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-brand-gray-dark mb-1">Asunto *</label>
-                <input value={mensajeAsunto} onChange={e => setMensajeAsunto(e.target.value)} placeholder="Asunto del mensaje" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-brand-gray-dark mb-1">Mensaje *</label>
-                <textarea value={mensajeCuerpo} onChange={e => setMensajeCuerpo(e.target.value)} placeholder="Escribe tu mensaje aquí..." rows={6} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange resize-none" />
-              </div>
+              <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Asunto *</label><input value={mensajeAsunto} onChange={e=>setMensajeAsunto(e.target.value)} placeholder="Asunto del mensaje" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+              <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Mensaje *</label><textarea value={mensajeCuerpo} onChange={e=>setMensajeCuerpo(e.target.value)} placeholder="Escribe tu mensaje aquí..." rows={6} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange resize-none"/></div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-brand-gray-dark">Destinatarios *</label>
-                  <button onClick={() => setDestinatarios(clientes.filter(c => c.aprobado).map(c => c.email))} className="text-xs text-brand-orange hover:underline">
-                    Seleccionar todos los aprobados
-                  </button>
+                  <button onClick={()=>setDestinatarios(clientes.filter(c=>c.aprobado).map(c=>c.email))} className="text-xs text-brand-orange hover:underline">Seleccionar todos los aprobados</button>
                 </div>
                 <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
-                  {clientes.map(c => (
-                    <div key={c.id} onClick={() => toggleDestinatario(c.email)} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 border-b last:border-0 ${destinatarios.includes(c.email) ? 'bg-blue-50' : ''}`}>
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${destinatarios.includes(c.email) ? 'bg-brand-orange border-brand-orange' : 'border-gray-300'}`}>
-                        {destinatarios.includes(c.email) && <span className="text-white text-xs">✓</span>}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-brand-navy">{c.nombre || c.email}</p>
-                        <p className="text-xs text-brand-gray-mid">{c.email}</p>
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${c.aprobado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                        {c.aprobado ? 'Aprobado' : 'Pendiente'}
-                      </span>
+                  {clientes.map(c=>(
+                    <div key={c.id} onClick={()=>toggleDestinatario(c.email)} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 border-b last:border-0 ${destinatarios.includes(c.email)?'bg-blue-50':''}`}>
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${destinatarios.includes(c.email)?'bg-brand-orange border-brand-orange':'border-gray-300'}`}>{destinatarios.includes(c.email)&&<span className="text-white text-xs">✓</span>}</div>
+                      <div className="flex-1"><p className="text-sm font-medium text-brand-navy">{c.nombre||c.email}</p><p className="text-xs text-brand-gray-mid">{c.email}</p></div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${c.aprobado?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{c.aprobado?'Aprobado':'Pendiente'}</span>
                     </div>
                   ))}
                 </div>
-                {destinatarios.length > 0 && <p className="text-xs text-brand-gray-mid mt-1">{destinatarios.length} destinatario(s) seleccionado(s)</p>}
+                {destinatarios.length>0&&<p className="text-xs text-brand-gray-mid mt-1">{destinatarios.length} destinatario(s) seleccionado(s)</p>}
               </div>
-              <button onClick={enviarMensaje} disabled={enviandoMensaje} className="btn-primary flex items-center gap-2">
-                <Mail size={16} /> {enviandoMensaje ? 'Enviando...' : 'Enviar Mensaje'}
-              </button>
+              <button onClick={enviarMensaje} disabled={enviandoMensaje} className="btn-primary flex items-center gap-2"><Mail size={16}/> {enviandoMensaje?'Enviando...':'Enviar Mensaje'}</button>
             </div>
           </div>
         )}
@@ -1188,104 +915,61 @@ export default function AdminPage() {
         {tab === 'productos' && (
           <>
             <div className="flex items-center justify-between mb-6">
-              <p className="text-brand-gray-mid text-sm">{productos.length} productos · {productos.filter(p => p.activo).length} activos</p>
-              <button onClick={() => setShowFormProducto(!showFormProducto)} className="btn-primary flex items-center gap-2">
-                <Plus size={18} /> Agregar Producto
-              </button>
+              <p className="text-brand-gray-mid text-sm">{productos.length} productos · {productos.filter(p=>p.activo).length} activos</p>
+              <button onClick={()=>setShowFormProducto(!showFormProducto)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Agregar Producto</button>
             </div>
             {showFormProducto && (
               <div className="card mb-6 border-2 border-brand-orange/30">
                 <h2 className="font-heading font-bold text-brand-navy text-lg mb-5">Nuevo Producto</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre * <span className="text-brand-gray-mid font-normal text-xs">(se traducirá automáticamente)</span></label>
-                    <input value={formProducto.nombre} onChange={e => setFormProducto({...formProducto, nombre: e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Categoría *</label>
-                    <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
-                      <option value="">Selecciona categoría</option>
-                      {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Precio * (USD)</label>
-                    <input value={formProducto.precio} onChange={e => setFormProducto({...formProducto, precio: e.target.value})} placeholder="Ej: 9.99" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Unidad *</label>
-                    <input value={formProducto.unidad} onChange={e => setFormProducto({...formProducto, unidad: e.target.value})} placeholder="Ej: paquete 100u" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripción</label>
-                    <input value={formProducto.descripcion} onChange={e => setFormProducto({...formProducto, descripcion: e.target.value})} placeholder="Descripción breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen <span className="text-brand-gray-mid font-normal">(JPG, PNG)</span></label>
-                    <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors">
-                      <input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e => setImagenProducto(e.target.files?.[0] || null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer" />
-                      {imagenProducto && <p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}
-                    </div>
-                  </div>
+                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre * <span className="text-brand-gray-mid font-normal text-xs">(se traducirá automáticamente)</span></label><input value={formProducto.nombre} onChange={e=>setFormProducto({...formProducto,nombre:e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Categoría *</label><select value={formProducto.categoria} onChange={e=>setFormProducto({...formProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white"><option value="">Selecciona categoría</option>{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Precio * (USD)</label><input value={formProducto.precio} onChange={e=>setFormProducto({...formProducto,precio:e.target.value})} placeholder="Ej: 9.99" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Unidad *</label><input value={formProducto.unidad} onChange={e=>setFormProducto({...formProducto,unidad:e.target.value})} placeholder="Ej: paquete 100u" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripción</label><input value={formProducto.descripcion} onChange={e=>setFormProducto({...formProducto,descripcion:e.target.value})} placeholder="Descripción breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen <span className="text-brand-gray-mid font-normal">(JPG, PNG)</span></label><div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e=>setImagenProducto(e.target.files?.[0]||null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer"/>{imagenProducto&&<p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}</div></div>
                 </div>
                 <div className="flex gap-3 mt-5">
-                  <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">
-                    {guardando ? 'Guardando y traduciendo...' : <><Plus size={16} /> Guardar</>}
-                  </button>
-                  <button onClick={() => setShowFormProducto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
+                  <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">{guardando?'Guardando y traduciendo...':<><Plus size={16}/> Guardar</>}</button>
+                  <button onClick={()=>setShowFormProducto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                 </div>
               </div>
             )}
             <div className="space-y-6">
               {categorias.map(cat => {
-                const prods = productos.filter(p => p.categoria === cat)
-                if (prods.length === 0) return null
+                const prods = productos.filter(p=>p.categoria===cat)
+                if (prods.length===0) return null
                 return (
                   <div key={cat} className="card">
-                    <h2 className="font-heading font-bold text-brand-navy mb-4 flex items-center gap-2">
-                      {cat} <span className="text-xs font-normal text-brand-gray-mid bg-gray-100 px-2 py-0.5 rounded-full">{prods.length}</span>
-                    </h2>
+                    <h2 className="font-heading font-bold text-brand-navy mb-4 flex items-center gap-2">{cat} <span className="text-xs font-normal text-brand-gray-mid bg-gray-100 px-2 py-0.5 rounded-full">{prods.length}</span></h2>
                     <div className="space-y-2">
-                      {prods.map(p => (
+                      {prods.map(p=>(
                         <div key={p.id}>
-                          <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${p.activo ? 'border-gray-100 bg-gray-50' : 'border-red-100 bg-red-50 opacity-60'}`}>
-                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
-                              {p.imagen_url ? <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-contain" /> : <ImageIcon size={20} className="text-gray-400" />}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-brand-navy text-sm">{p.nombre}</span>
-                                {p.nombre_en && <span className="text-xs text-gray-400">/ {p.nombre_en}</span>}
-                                {!p.activo && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactivo</span>}
-                              </div>
-                              <div className="text-xs text-brand-gray-mid mt-0.5">{p.descripcion} · {p.unidad}</div>
-                            </div>
+                          <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${p.activo?'border-gray-100 bg-gray-50':'border-red-100 bg-red-50 opacity-60'}`}>
+                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">{p.imagen_url?<img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-contain"/>:<ImageIcon size={20} className="text-gray-400"/>}</div>
+                            <div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium text-brand-navy text-sm">{p.nombre}</span>{p.nombre_en&&<span className="text-xs text-gray-400">/ {p.nombre_en}</span>}{!p.activo&&<span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactivo</span>}</div><div className="text-xs text-brand-gray-mid mt-0.5">{p.descripcion} · {p.unidad}</div></div>
                             <div className="font-heading font-bold text-brand-navy">${p.precio}</div>
                             <div className="flex items-center gap-1">
-                              <button onClick={() => iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15} /></button>
-                              <button onClick={() => seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400"><ImageIcon size={15} /></button>
-                              <button onClick={() => toggleActivo(p.id, p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors text-brand-gray-mid">{p.activo ? <Eye size={15} /> : <EyeOff size={15} />}</button>
-                              <button onClick={() => eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15} /></button>
+                              <button onClick={()=>iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button>
+                              <button onClick={()=>seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400"><ImageIcon size={15}/></button>
+                              <button onClick={()=>toggleActivo(p.id,p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors text-brand-gray-mid">{p.activo?<Eye size={15}/>:<EyeOff size={15}/>}</button>
+                              <button onClick={()=>eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button>
                             </div>
                           </div>
-                          {editandoProducto === p.id && (
+                          {editandoProducto===p.id&&(
                             <div className="mt-2 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
                               <div className="grid grid-cols-2 gap-3">
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre (ES)</label><input value={formEditProducto.nombre} onChange={e => setFormEditProducto({...formEditProducto, nombre: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Name (EN)</label><input value={formEditProducto.nombre_en} onChange={e => setFormEditProducto({...formEditProducto, nombre_en: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Descripción (ES)</label><input value={formEditProducto.descripcion} onChange={e => setFormEditProducto({...formEditProducto, descripcion: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Description (EN)</label><input value={formEditProducto.descripcion_en} onChange={e => setFormEditProducto({...formEditProducto, descripcion_en: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Precio (USD)</label><input value={formEditProducto.precio} onChange={e => setFormEditProducto({...formEditProducto, precio: e.target.value})} type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Unidad</label><input value={formEditProducto.unidad} onChange={e => setFormEditProducto({...formEditProducto, unidad: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" /></div>
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoría</label>
-                                  <select value={formEditProducto.categoria} onChange={e => setFormEditProducto({...formEditProducto, categoria: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
-                                    {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-                                  </select>
-                                </div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre (ES)</label><input value={formEditProducto.nombre} onChange={e=>setFormEditProducto({...formEditProducto,nombre:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Name (EN)</label><input value={formEditProducto.nombre_en} onChange={e=>setFormEditProducto({...formEditProducto,nombre_en:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Descripción (ES)</label><input value={formEditProducto.descripcion} onChange={e=>setFormEditProducto({...formEditProducto,descripcion:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Description (EN)</label><input value={formEditProducto.descripcion_en} onChange={e=>setFormEditProducto({...formEditProducto,descripcion_en:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Precio (USD)</label><input value={formEditProducto.precio} onChange={e=>setFormEditProducto({...formEditProducto,precio:e.target.value})} type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Unidad</label><input value={formEditProducto.unidad} onChange={e=>setFormEditProducto({...formEditProducto,unidad:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoría</label><select value={formEditProducto.categoria} onChange={e=>setFormEditProducto({...formEditProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
                               </div>
                               <div className="flex gap-3 mt-4">
-                                <button onClick={() => guardarProducto(p.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"><Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}</button>
-                                <button onClick={() => setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid hover:text-brand-navy"><X size={14} /> Cancelar</button>
+                                <button onClick={()=>guardarProducto(p.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"><Save size={14}/> {guardando?'Guardando...':'Guardar'}</button>
+                                <button onClick={()=>setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid hover:text-brand-navy"><X size={14}/> Cancelar</button>
                               </div>
                             </div>
                           )}
@@ -1304,49 +988,44 @@ export default function AdminPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-heading font-bold text-brand-navy text-xl">Categorías</h2>
-              <button onClick={() => setShowFormCategoria(!showFormCategoria)} className="btn-primary flex items-center gap-2">
-                <Plus size={18} /> Nueva Categoría
-              </button>
+              <button onClick={()=>setShowFormCategoria(!showFormCategoria)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Nueva Categoría</button>
             </div>
             {showFormCategoria && (
               <div className="border-2 border-brand-orange/30 rounded-xl p-4 mb-6">
                 <label className="block text-sm font-medium text-brand-gray-dark mb-2">Nombre *</label>
                 <div className="flex gap-3">
-                  <input value={nuevaCategoria} onChange={e => setNuevaCategoria(e.target.value)} placeholder="Ej: Empaques Especiales" className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e => e.key === 'Enter' && agregarCategoria()} />
-                  <button onClick={agregarCategoria} className="btn-primary flex items-center gap-2"><Plus size={16} /> Agregar</button>
-                  <button onClick={() => setShowFormCategoria(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
+                  <input value={nuevaCategoria} onChange={e=>setNuevaCategoria(e.target.value)} placeholder="Ej: Empaques Especiales" className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e=>e.key==='Enter'&&agregarCategoria()}/>
+                  <button onClick={agregarCategoria} className="btn-primary flex items-center gap-2"><Plus size={16}/> Agregar</button>
+                  <button onClick={()=>setShowFormCategoria(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                 </div>
               </div>
             )}
-            {categorias.length === 0 ? (
-              <div className="text-center py-12 text-brand-gray-mid">
-                <Tag size={40} className="mx-auto mb-3 opacity-25" />
-                <p>No hay categorías aún</p>
-              </div>
+            {categorias.length===0 ? (
+              <div className="text-center py-12 text-brand-gray-mid"><Tag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay categorías aún</p></div>
             ) : (
               <div className="space-y-2">
-                {categorias.map(cat => (
+                {categorias.map(cat=>(
                   <div key={cat}>
                     <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
                       <div className="flex items-center gap-3 flex-1">
-                        <Tag size={16} className="text-brand-orange" />
-                        {editandoCategoria === cat ? (
-                          <input value={categoriaEditNombre} onChange={e => setCategoriaEditNombre(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e => e.key === 'Enter' && guardarCategoria(cat)} autoFocus />
+                        <Tag size={16} className="text-brand-orange"/>
+                        {editandoCategoria===cat ? (
+                          <input value={categoriaEditNombre} onChange={e=>setCategoriaEditNombre(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e=>e.key==='Enter'&&guardarCategoria(cat)} autoFocus/>
                         ) : (
                           <span className="font-medium text-brand-navy">{cat}</span>
                         )}
-                        <span className="text-xs text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{productos.filter(p => p.categoria === cat).length} productos</span>
+                        <span className="text-xs text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{productos.filter(p=>p.categoria===cat).length} productos</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        {editandoCategoria === cat ? (
+                        {editandoCategoria===cat ? (
                           <>
-                            <button onClick={() => guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={13} /> {guardando ? '...' : 'Guardar'}</button>
-                            <button onClick={() => setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid"><X size={15} /></button>
+                            <button onClick={()=>guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={13}/> {guardando?'...':'Guardar'}</button>
+                            <button onClick={()=>setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid"><X size={15}/></button>
                           </>
                         ) : (
                           <>
-                            <button onClick={() => { setEditandoCategoria(cat); setCategoriaEditNombre(cat) }} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15} /></button>
-                            <button onClick={() => eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15} /></button>
+                            <button onClick={()=>{setEditandoCategoria(cat);setCategoriaEditNombre(cat)}} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button>
+                            <button onClick={()=>eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button>
                           </>
                         )}
                       </div>
