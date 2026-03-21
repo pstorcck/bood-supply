@@ -44,6 +44,7 @@ export default function AdminPage() {
   const [clientes, setClientes] = useState<any[]>([])
   const [categorias, setCategorias] = useState<string[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
+  const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
   const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [editandoCliente, setEditandoCliente] = useState<string | null>(null)
   const [formCliente, setFormCliente] = useState<any>({})
@@ -78,7 +79,6 @@ export default function AdminPage() {
   const [rutaOptimizada, setRutaOptimizada] = useState<any[]>([])
   const [rutaKey, setRutaKey] = useState(0)
   const [errorRuta, setErrorRuta] = useState('')
-  const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -122,7 +122,7 @@ export default function AdminPage() {
       const cliente = getCliente(ped.cliente_id)
       return { pedidoId: '#' + ped.id.slice(0,8).toUpperCase(), nombre: cliente?.nombre || '—', negocio: cliente?.negocio || '—', telefono: cliente?.telefono || '—', direccion: cliente?.direccion || '', total: ped.total, metodo_pago: ped.metodo_pago, items: ped.pedido_items }
     }).filter(p => p.direccion)
-    if (paradas.length === 0) { setErrorRuta('Los pedidos no tienen dirección registrada'); setOptimizando(false); return }
+    if (paradas.length === 0) { setErrorRuta('Los pedidos no tienen direccion registrada'); setOptimizando(false); return }
     try {
       const res = await fetch('/api/optimizar-ruta', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -145,9 +145,9 @@ export default function AdminPage() {
   }
 
   function imprimirRuta() {
-    const html = `<html><head><title>Ruta de Entrega — BOOD SUPPLY</title>
+    const html = `<html><head><title>Ruta de Entrega - BOOD SUPPLY</title>
     <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.header{background:#0F2B5B;color:white;padding:16px;border-radius:8px;margin-bottom:20px;text-align:center}.parada{border:1px solid #ccc;border-radius:8px;padding:12px;margin-bottom:12px;page-break-inside:avoid}.num{background:#F47B20;color:white;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;margin-right:8px}.items{margin-top:8px;padding-top:8px;border-top:1px solid #eee;font-size:11px}</style></head><body>
-    <div class="header"><h2 style="margin:0">BOOD SUPPLY — Ruta de Entrega</h2><p style="margin:4px 0 0">${new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p><p style="margin:4px 0 0">Origen: 2900 N Richmond St, Chicago, IL 60618</p></div>
+    <div class="header"><h2 style="margin:0">BOOD SUPPLY - Ruta de Entrega</h2><p style="margin:4px 0 0">${new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p><p style="margin:4px 0 0">Origen: 2900 N Richmond St, Chicago, IL 60618</p></div>
     ${rutaOptimizada.map((p,i)=>`<div class="parada"><div style="display:flex;align-items:center;margin-bottom:6px"><span class="num">${i+1}</span><strong>${p.negocio||p.nombre}</strong></div><p style="margin:2px 0">👤 ${p.nombre}</p><p style="margin:2px 0">📍 ${p.direccion}</p><p style="margin:2px 0">📞 ${p.telefono}</p><p style="margin:2px 0">💳 Pago: ${p.metodo_pago} · Total: $${p.total?.toFixed(2)}</p><p style="margin:2px 0">📦 Pedido: ${p.pedidoId}</p><div class="items">${p.items?.map((item:any)=>`<div>${item.productos?.nombre} x${item.cantidad}</div>`).join('')||''}</div></div>`).join('')}
     </body></html>`
     const win = window.open('', '_blank')
@@ -236,14 +236,14 @@ export default function AdminPage() {
   }
 
   async function eliminarPedido(id: string) {
-    if (!confirm('¿Eliminar este pedido?')) return
+    if (!confirm('Eliminar este pedido?')) return
     await supabase.from('pedido_items').delete().eq('pedido_id', id)
     await supabase.from('pedidos').delete().eq('id', id)
     await cargarPedidos()
   }
 
   async function eliminarCliente(id: string, email: string) {
-    if (!confirm(`¿Eliminar cliente ${email}?`)) return
+    if (!confirm(`Eliminar cliente ${email}?`)) return
     const pedidosCliente = pedidos.filter(p => p.cliente_id === id)
     for (const ped of pedidosCliente) { await supabase.from('pedido_items').delete().eq('pedido_id', ped.id) }
     await supabase.from('pedidos').delete().eq('cliente_id', id)
@@ -334,7 +334,7 @@ export default function AdminPage() {
 
   async function agregarCategoria() {
     if (!nuevaCategoria.trim()) return alert('Escribe un nombre')
-    if (categorias.includes(nuevaCategoria.trim())) return alert('Ya existe esa categoría')
+    if (categorias.includes(nuevaCategoria.trim())) return alert('Ya existe esa categoria')
     setCategorias(prev => [...prev, nuevaCategoria.trim()]); setNuevaCategoria(''); setShowFormCategoria(false)
   }
 
@@ -347,7 +347,7 @@ export default function AdminPage() {
   }
 
   async function eliminarCategoria(cat: string) {
-    if (!confirm(`¿Eliminar categoría "${cat}"?`)) return
+    if (!confirm(`Eliminar categoria "${cat}"?`)) return
     await supabase.from('productos').update({ categoria: '' }).eq('categoria', cat)
     await cargarProductos()
   }
@@ -357,7 +357,7 @@ export default function AdminPage() {
   }
 
   async function eliminarProducto(id: string) {
-    if (!confirm('¿Eliminar este producto?')) return
+    if (!confirm('Eliminar este producto?')) return
     const { error } = await supabase.from('productos').delete().eq('id', id)
     if (error) { alert('Error al eliminar: ' + error.message); return }
     await cargarProductos()
@@ -368,7 +368,7 @@ export default function AdminPage() {
   function toggleDestinatario(email: string) { setDestinatarios(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]) }
 
   function exportarVentas() {
-    const headers = ['# Pedido', 'Fecha', 'Cliente', 'Negocio', 'Email', 'Dirección', 'EIN', 'Método Pago', 'Productos', 'Subtotal', 'Fuel Surcharge', 'Total', 'Estado']
+    const headers = ['# Pedido', 'Fecha', 'Cliente', 'Negocio', 'Email', 'Direccion', 'EIN', 'Metodo Pago', 'Productos', 'Subtotal', 'Fuel Surcharge', 'Total', 'Estado']
     const filas = pedidosFiltrados.map(ped => {
       const cliente = getCliente(ped.cliente_id)
       const prods = ped.pedido_items?.map((i: any) => `${i.productos?.nombre} x${i.cantidad}`).join(' | ') || ''
@@ -379,21 +379,21 @@ export default function AdminPage() {
   }
 
   function exportarClientes() {
-    const headers = ['Nombre', 'Negocio', 'Email', 'Teléfono', 'Dirección', 'EIN', 'Fecha Nacimiento', 'Aprobado', 'Pedidos', 'Total Gastado', 'Último Pedido', 'Registro']
+    const headers = ['Nombre', 'Negocio', 'Email', 'Telefono', 'Direccion', 'EIN', 'Fecha Nacimiento', 'Aprobado', 'Pedidos', 'Total Gastado', 'Ultimo Pedido', 'Registro']
     const filas = clientes.map(c => {
       const pedidosC = getPedidosCliente(c.id)
       const totalGastado = pedidosC.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
       const ultimoPedido = pedidosC[0]
-      return [c.nombre || '—', c.negocio || '—', c.email || '—', c.telefono || '—', c.direccion || '—', c.ein || '—', c.fecha_nacimiento || '—', c.aprobado ? 'Sí' : 'No', String(pedidosC.length), `$${totalGastado.toFixed(2)}`, ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : '—', new Date(c.created_at).toLocaleDateString('es-MX')]
+      return [c.nombre || '—', c.negocio || '—', c.email || '—', c.telefono || '—', c.direccion || '—', c.ein || '—', c.fecha_nacimiento || '—', c.aprobado ? 'Si' : 'No', String(pedidosC.length), `$${totalGastado.toFixed(2)}`, ultimoPedido ? new Date(ultimoPedido.created_at).toLocaleDateString('es-MX') : '—', new Date(c.created_at).toLocaleDateString('es-MX')]
     })
     descargarCSV('clientes-bood-supply', filas, headers)
   }
 
   function imprimirOrdenes() {
     const pedidosSeleccionados = pedidos.filter(p => seleccionados.includes(p.id))
-    const html = `<html><head><title>Órdenes — BOOD SUPPLY</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.orden{border:1px solid #ccc;padding:16px;margin-bottom:28px;page-break-inside:avoid;border-radius:8px}.header{background:#0F2B5B;color:white;padding:10px 16px;border-radius:6px;margin-bottom:14px;display:flex;justify-content:space-between}.header h2{margin:0;font-size:15px}.header p{margin:0;font-size:11px;opacity:.8}.seccion{margin-bottom:12px}.seccion h3{font-size:10px;text-transform:uppercase;color:#888;margin:0 0 6px;border-bottom:1px solid #eee;padding-bottom:3px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.campo{font-size:11px;padding:2px 0}.campo b{color:#0F2B5B}.item-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f5f5f5;font-size:11px}.total{font-size:15px;font-weight:bold;color:#F47B20;text-align:right;margin-top:10px;padding-top:8px;border-top:2px solid #F47B20}.logo-header{text-align:center;margin-bottom:24px;border-bottom:2px solid #0F2B5B;padding-bottom:12px}.logo-header h1{color:#0F2B5B;margin:0;font-size:20px}</style></head><body>
-    <div class="logo-header"><h1>BOOD SUPPLY</h1><p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p><p>Órdenes de Entrega — ${new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p></div>
-    ${pedidosSeleccionados.map(ped=>{const cliente=getCliente(ped.cliente_id);const subtotal=(ped.total||0)-(ped.fuel_surcharge||0);return`<div class="orden"><div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div><div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')} · Pago: ${ped.metodo_pago||'N/A'}</p></div></div><div class="seccion"><h3>Datos del Cliente</h3><div class="grid2"><div class="campo"><b>Nombre:</b> ${cliente?.nombre||'N/A'}</div><div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div><div class="campo"><b>Teléfono:</b> ${cliente?.telefono||'N/A'}</div><div class="campo"><b>EIN:</b> ${cliente?.ein||'N/A'}</div><div class="campo" style="grid-column:span 2"><b>Dirección:</b> ${cliente?.direccion||'N/A'}</div></div></div><div class="seccion"><h3>Detalle del Pedido</h3>${ped.pedido_items?.map((item:any)=>`<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}<div class="item-row" style="color:#888"><span>Fuel Surcharge</span><span>$${(ped.fuel_surcharge||0).toFixed(2)}</span></div></div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`}).join('')}</body></html>`
+    const html = `<html><head><title>Ordenes - BOOD SUPPLY</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.orden{border:1px solid #ccc;padding:16px;margin-bottom:28px;page-break-inside:avoid;border-radius:8px}.header{background:#0F2B5B;color:white;padding:10px 16px;border-radius:6px;margin-bottom:14px;display:flex;justify-content:space-between}.header h2{margin:0;font-size:15px}.header p{margin:0;font-size:11px;opacity:.8}.seccion{margin-bottom:12px}.seccion h3{font-size:10px;text-transform:uppercase;color:#888;margin:0 0 6px;border-bottom:1px solid #eee;padding-bottom:3px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.campo{font-size:11px;padding:2px 0}.campo b{color:#0F2B5B}.item-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f5f5f5;font-size:11px}.total{font-size:15px;font-weight:bold;color:#F47B20;text-align:right;margin-top:10px;padding-top:8px;border-top:2px solid #F47B20}.logo-header{text-align:center;margin-bottom:24px;border-bottom:2px solid #0F2B5B;padding-bottom:12px}.logo-header h1{color:#0F2B5B;margin:0;font-size:20px}</style></head><body>
+    <div class="logo-header"><h1>BOOD SUPPLY</h1><p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p><p>Ordenes de Entrega - ${new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p></div>
+    ${pedidosSeleccionados.map(ped=>{const cliente=getCliente(ped.cliente_id);const subtotal=(ped.total||0)-(ped.fuel_surcharge||0);return`<div class="orden"><div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div><div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')} · Pago: ${ped.metodo_pago||'N/A'}</p></div></div><div class="seccion"><h3>Datos del Cliente</h3><div class="grid2"><div class="campo"><b>Nombre:</b> ${cliente?.nombre||'N/A'}</div><div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div><div class="campo"><b>Telefono:</b> ${cliente?.telefono||'N/A'}</div><div class="campo"><b>EIN:</b> ${cliente?.ein||'N/A'}</div><div class="campo" style="grid-column:span 2"><b>Direccion:</b> ${cliente?.direccion||'N/A'}</div></div></div><div class="seccion"><h3>Detalle del Pedido</h3>${ped.pedido_items?.map((item:any)=>`<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}<div class="item-row" style="color:#888"><span>Fuel Surcharge</span><span>$${(ped.fuel_surcharge||0).toFixed(2)}</span></div></div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`}).join('')}</body></html>`
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
   }
@@ -405,14 +405,14 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-brand-gray-light">
-      {usuarioCreado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">✓ Usuario creado y correo enviado</div>}
+      {usuarioCreado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">Usuario creado y correo enviado</div>}
 
       <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Admin — BOOD SUPPLY</span></div>
+        <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Admin - BOOD SUPPLY</span></div>
         <div className="flex items-center gap-4">
-          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm">📘 Facebook</a>
+          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm flex items-center gap-1">Facebook</a>
           <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
-          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white"><LogOut size={16}/> Salir</button>
+          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors"><LogOut size={16}/> Salir</button>
         </div>
       </nav>
 
@@ -424,7 +424,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-2 flex-wrap mb-8">
-          {[{key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion},{key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},{key:'invoices',label:'Invoices',icon:Receipt,badge:0},{key:'rutas',label:'Rutas',icon:Map,badge:0},{key:'mensajes',label:'Mensajes',icon:Mail,badge:0},{key:'productos',label:'Productos',icon:Package,badge:0},{key:'categorias',label:'Categorías',icon:Tag,badge:0}].map(({key,label,icon:Icon,badge})=>(
+          {[{key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion},{key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},{key:'invoices',label:'Invoices',icon:Receipt,badge:0},{key:'rutas',label:'Rutas',icon:Map,badge:0},{key:'mensajes',label:'Mensajes',icon:Mail,badge:0},{key:'productos',label:'Productos',icon:Package,badge:0},{key:'categorias',label:'Categorias',icon:Tag,badge:0}].map(({key,label,icon:Icon,badge})=>(
             <button key={key} onClick={()=>setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab===key?'bg-brand-navy text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
               <Icon size={16}/> {label}
               {badge>0&&<span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${tab===key?'bg-white text-brand-navy':'bg-red-500 text-white'}`}>{badge}</span>}
@@ -436,12 +436,13 @@ export default function AdminPage() {
         {tab === 'clientes' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
-              <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes — {clientes.length}{pendientesAprobacion>0&&<span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s)</span>}</h2>
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes - {clientes.length}{pendientesAprobacion>0&&<span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s)</span>}</h2>
               <div className="flex gap-2">
-                <button onClick={()=>setShowFormUsuario(!showFormUsuario)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600"><UserPlus size={15}/> Crear Usuario</button>
-                <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange"><Download size={15}/> Exportar CSV</button>
+                <button onClick={()=>setShowFormUsuario(!showFormUsuario)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"><UserPlus size={15}/> Crear Usuario</button>
+                <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors"><Download size={15}/> Exportar CSV</button>
               </div>
             </div>
+
             {showFormUsuario && (
               <div className="card border-2 border-brand-orange/30 mb-4">
                 <h3 className="font-heading font-bold text-brand-navy text-lg mb-4 flex items-center gap-2"><UserPlus size={18} className="text-brand-orange"/> Crear Nuevo Usuario</h3>
@@ -450,21 +451,22 @@ export default function AdminPage() {
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre Completo *</label><input value={formUsuario.nombre} onChange={e=>setFormUsuario({...formUsuario,nombre:e.target.value})} placeholder="Nombre completo" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Email *</label><input value={formUsuario.email} onChange={e=>setFormUsuario({...formUsuario,email:e.target.value})} placeholder="correo@email.com" type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Negocio</label><input value={formUsuario.negocio} onChange={e=>setFormUsuario({...formUsuario,negocio:e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Teléfono</label><input value={formUsuario.telefono} onChange={e=>setFormUsuario({...formUsuario,telefono:e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Telefono</label><input value={formUsuario.telefono} onChange={e=>setFormUsuario({...formUsuario,telefono:e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label><input value={formUsuario.ein} onChange={e=>setFormUsuario({...formUsuario,ein:e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento</label><input value={formUsuario.fecha_nacimiento} onChange={e=>setFormUsuario({...formUsuario,fecha_nacimiento:e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label><input value={formUsuario.direccion} onChange={e=>setFormUsuario({...formUsuario,direccion:e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoTaxUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoTaxUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}</div></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange"><input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e=>setArchivoIdUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoIdUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}</div></div>
-                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoCRTUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoCRTUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
+                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formUsuario.direccion} onChange={e=>setFormUsuario({...formUsuario,direccion:e.target.value})} placeholder="Direccion del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoTaxUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoTaxUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}</div></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e=>setArchivoIdUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoIdUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}</div></div>
+                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoCRTUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoCRTUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
                 </div>
-                <p className="text-xs text-brand-gray-mid mt-3">✓ El usuario recibirá un correo con sus credenciales y deberá cambiar su contraseña al primer inicio de sesión.</p>
+                <p className="text-xs text-brand-gray-mid mt-3">El usuario recibira un correo con sus credenciales y debera cambiar su contrasena al primer inicio de sesion.</p>
                 <div className="flex gap-3 mt-4">
                   <button onClick={crearUsuario} disabled={creandoUsuario} className="btn-primary flex items-center gap-2"><UserPlus size={15}/> {creandoUsuario?'Creando...':'Crear y Enviar Correo'}</button>
                   <button onClick={()=>{setShowFormUsuario(false);setErrorUsuario('')}} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                 </div>
               </div>
             )}
+
             {clientes.map(c => {
               const pedidosCliente = getPedidosCliente(c.id)
               const ultimoPedido = pedidosCliente[0]
@@ -478,8 +480,8 @@ export default function AdminPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-heading font-bold text-brand-navy">{c.nombre||'—'}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.aprobado?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{c.aprobado?'✓ Aprobado':'⏳ Pendiente'}</span>
-                          {c.must_change_password&&<span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">🔑 Debe cambiar contraseña</span>}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.aprobado?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{c.aprobado?'Aprobado':'Pendiente'}</span>
+                          {c.must_change_password&&<span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">Debe cambiar contrasena</span>}
                         </div>
                         <p className="text-xs text-brand-gray-mid">{c.email}</p>
                       </div>
@@ -494,21 +496,21 @@ export default function AdminPage() {
                   </div>
                   {(c.sales_tax_url||c.id_foto_url||c.crt61_url)&&(
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {c.sales_tax_url&&<div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48"><FileText size={15} className="text-blue-500 flex-shrink-0"/><span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span><a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg">Ver</a></div>}
-                      {c.id_foto_url&&<div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48"><FileText size={15} className="text-purple-500 flex-shrink-0"/><span className="text-xs text-purple-700 flex-1">ID / Identificación</span><a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg">Ver</a></div>}
-                      {c.crt61_url&&<div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48"><FileText size={15} className="text-green-500 flex-shrink-0"/><span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span><a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg">Ver</a></div>}
+                      {c.sales_tax_url&&<div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48"><FileText size={15} className="text-blue-500 flex-shrink-0"/><span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span><a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600">Ver</a></div>}
+                      {c.id_foto_url&&<div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48"><FileText size={15} className="text-purple-500 flex-shrink-0"/><span className="text-xs text-purple-700 flex-1">ID / Identificacion</span><a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600">Ver</a></div>}
+                      {c.crt61_url&&<div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48"><FileText size={15} className="text-green-500 flex-shrink-0"/><span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span><a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">Ver</a></div>}
                     </div>
                   )}
                   {editando?(
                     <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
-                      {[{key:'nombre',label:'Nombre',ph:'Nombre completo'},{key:'negocio',label:'Negocio',ph:'Nombre del negocio'},{key:'telefono',label:'Teléfono',ph:'(312) 000-0000'},{key:'ein',label:'EIN',ph:'XX-XXXXXXX'}].map(({key,label,ph})=>(
+                      {[{key:'nombre',label:'Nombre',ph:'Nombre completo'},{key:'negocio',label:'Negocio',ph:'Nombre del negocio'},{key:'telefono',label:'Telefono',ph:'(312) 000-0000'},{key:'ein',label:'EIN',ph:'XX-XXXXXXX'}].map(({key,label,ph})=>(
                         <div key={key}><label className="block text-xs font-medium text-brand-gray-dark mb-1">{label}</label><input value={formCliente[key]||''} onChange={e=>setFormCliente({...formCliente,[key]:e.target.value})} placeholder={ph} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                       ))}
-                      <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label><input value={formCliente.direccion||''} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                      <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formCliente.direccion||''} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Direccion del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                     </div>
                   ):(
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs mt-3 border-t pt-3">
-                      {[{label:'Negocio',value:c.negocio},{label:'Teléfono',value:c.telefono},{label:'EIN',value:c.ein},{label:'Fecha Nacimiento',value:c.fecha_nacimiento?new Date(c.fecha_nacimiento).toLocaleDateString('es-MX',{timeZone:'UTC'}):null},{label:'Dirección',value:c.direccion,full:true},{label:'Último pedido',value:ultimoPedido?new Date(ultimoPedido.created_at).toLocaleDateString('es-MX'):null},{label:'Registro',value:new Date(c.created_at).toLocaleDateString('es-MX')}].map(({label,value,full}:any)=>(
+                      {[{label:'Negocio',value:c.negocio},{label:'Telefono',value:c.telefono},{label:'EIN',value:c.ein},{label:'Fecha Nacimiento',value:c.fecha_nacimiento?new Date(c.fecha_nacimiento).toLocaleDateString('es-MX',{timeZone:'UTC'}):null},{label:'Direccion',value:c.direccion,full:true},{label:'Ultimo pedido',value:ultimoPedido?new Date(ultimoPedido.created_at).toLocaleDateString('es-MX'):null},{label:'Registro',value:new Date(c.created_at).toLocaleDateString('es-MX')}].map(({label,value,full}:any)=>(
                         <div key={label} className={`bg-gray-50 rounded-lg p-2 border border-gray-100 ${full?'col-span-2':''}`}><p className="text-brand-gray-mid">{label}</p><p className="font-medium text-brand-navy">{value||'—'}</p></div>
                       ))}
                     </div>
@@ -526,10 +528,10 @@ export default function AdminPage() {
               <div className="flex flex-wrap items-end gap-4">
                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Desde</label><input type="date" value={fechaDesde} onChange={e=>setFechaDesde(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Hasta</label><input type="date" value={fechaHasta} onChange={e=>setFechaHasta(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                <button onClick={()=>{setFechaDesde('');setFechaHasta('')}} className="text-sm text-brand-gray-mid hover:text-brand-orange px-3 py-2">Limpiar</button>
+                <button onClick={()=>{setFechaDesde('');setFechaHasta('')}} className="text-sm text-brand-gray-mid hover:text-brand-orange transition-colors px-3 py-2">Limpiar</button>
                 <div className="ml-auto flex items-center gap-3">
-                  <div className="text-right"><p className="text-xs text-brand-gray-mid">Total período</p><p className="font-heading font-bold text-xl text-green-600">${totalVentasFiltradas.toFixed(2)}</p></div>
-                  <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange"><Download size={15}/> Exportar CSV</button>
+                  <div className="text-right"><p className="text-xs text-brand-gray-mid">Total periodo</p><p className="font-heading font-bold text-xl text-green-600">${totalVentasFiltradas.toFixed(2)}</p></div>
+                  <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors"><Download size={15}/> Exportar CSV</button>
                 </div>
               </div>
             </div>
@@ -537,12 +539,12 @@ export default function AdminPage() {
               <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
                 <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
                 <div className="flex gap-3">
-                  <button onClick={imprimirOrdenes} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">🖨️ Imprimir Órdenes</button>
+                  <button onClick={imprimirOrdenes} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">Imprimir Ordenes</button>
                   <button onClick={()=>setSeleccionados([])} className="text-sm text-blue-300 hover:text-white">Cancelar</button>
                 </div>
               </div>
             )}
-            {pedidosFiltrados.length===0&&<div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos en este período</p></div>}
+            {pedidosFiltrados.length===0&&<div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos en este periodo</p></div>}
             {GRUPOS.map(grupo=>{
               const pedidosGrupo=pedidosFiltrados.filter(p=>grupo.key.includes(p.estado))
               if(pedidosGrupo.length===0) return null
@@ -558,7 +560,7 @@ export default function AdminPage() {
                       const cliente=getCliente(ped.cliente_id)
                       const seleccionado=seleccionados.includes(ped.id)
                       const subtotal=(ped.total||0)-(ped.fuel_surcharge||0)
-                      const invoiceExistente = invoices.find(inv => inv.pedido_id === ped.id)
+                      const invoiceExistente=invoices.find(inv=>inv.pedido_id===ped.id)
                       return(
                         <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado?'border-brand-orange':'border-transparent'}`}>
                           <div className="flex items-start gap-3">
@@ -572,19 +574,24 @@ export default function AdminPage() {
                                   <button onClick={()=>generarInvoice(ped)} disabled={generandoInvoice===ped.id} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${invoiceExistente?'bg-green-100 text-green-700 hover:bg-green-200':'bg-brand-navy text-white hover:bg-brand-navy/80'}`}>
                                     <Receipt size={13}/> {generandoInvoice===ped.id?'Generando...':(invoiceExistente?invoiceExistente.numero:'Invoice')}
                                   </button>
+                                  {invoiceExistente&&(
+                                    <a href={`/es/invoice/${invoiceExistente.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-200">
+                                      <Eye size={13}/> Ver
+                                    </a>
+                                  )}
                                   <button onClick={()=>eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={15}/></button>
                                 </div>
                               </div>
                               <div className="bg-blue-50 rounded-lg p-3 mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                                 <div><span className="text-brand-gray-mid">Nombre:</span> <span className="font-medium text-brand-navy">{cliente?.nombre||'—'}</span></div>
                                 <div><span className="text-brand-gray-mid">Negocio:</span> <span className="font-medium text-brand-navy">{cliente?.negocio||'—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Teléfono:</span> <span className="font-medium text-brand-navy">{cliente?.telefono||'—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Telefono:</span> <span className="font-medium text-brand-navy">{cliente?.telefono||'—'}</span></div>
                                 <div><span className="text-brand-gray-mid">EIN:</span> <span className="font-medium text-brand-navy">{cliente?.ein||'—'}</span></div>
                                 <div><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email||'—'}</span></div>
-                                <div><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion||'—'}</span></div>
+                                <div><span className="text-brand-gray-mid">Direccion:</span> <span className="font-medium text-brand-navy">{cliente?.direccion||'—'}</span></div>
                                 <div className="col-span-2 flex items-center justify-between mt-1 pt-1 border-t border-blue-100">
-                                  <div><span className="text-brand-gray-mid">Método de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago||'—'}</span></div>
-                                  {ped.comprobante_url&&<a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg"><FileText size={11}/> Ver comprobante</a>}
+                                  <div><span className="text-brand-gray-mid">Metodo de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago||'—'}</span></div>
+                                  {ped.comprobante_url&&<a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600"><FileText size={11}/> Ver comprobante</a>}
                                 </div>
                               </div>
                               <div className="border-t pt-2 space-y-1">
@@ -611,10 +618,10 @@ export default function AdminPage() {
         {tab === 'invoices' && (
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-heading font-bold text-brand-navy text-xl">Invoices — {invoices.length}</h2>
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Invoices - {invoices.length}</h2>
             </div>
             {invoices.length===0?(
-              <div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados aún</p><p className="text-sm mt-1">Genera invoices desde la pestaña Pedidos</p></div>
+              <div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados</p></div>
             ):(
               <div className="space-y-3">
                 {invoices.map(inv=>{
@@ -622,22 +629,20 @@ export default function AdminPage() {
                   return(
                     <div key={inv.id} className="card flex items-center justify-between flex-wrap gap-3">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-brand-navy rounded-xl flex items-center justify-center flex-shrink-0">
-                          <Receipt size={22} className="text-brand-orange"/>
-                        </div>
+                        <div className="w-10 h-10 bg-brand-navy rounded-xl flex items-center justify-center flex-shrink-0"><Receipt size={18} className="text-brand-orange"/></div>
                         <div>
-                          <p className="font-heading font-bold text-brand-navy text-lg">{inv.numero}</p>
-                          <p className="text-xs text-brand-gray-mid">{new Date(inv.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p>
-                          <p className="text-sm text-brand-gray-dark mt-0.5">{cliente?.nombre||inv.datos_cliente?.nombre||'—'} · {cliente?.negocio||inv.datos_cliente?.negocio||'—'}</p>
+                          <p className="font-heading font-bold text-brand-navy">{inv.numero}</p>
+                          <p className="text-xs text-brand-gray-mid">{cliente?.nombre||'—'} · {cliente?.negocio||'—'}</p>
+                          <p className="text-xs text-brand-gray-mid">{new Date(inv.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'})}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="font-heading font-bold text-brand-orange text-xl">${inv.total?.toFixed(2)}</p>
+                          <p className="font-heading font-bold text-brand-orange">${inv.total?.toFixed(2)}</p>
                           <p className="text-xs text-brand-gray-mid">{inv.metodo_pago}</p>
                         </div>
-                        <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80">
-                          <FileText size={15}/> Ver Invoice
+                        <a href={`/es/invoice/${inv.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80">
+                          <Eye size={15}/> Ver Invoice
                         </a>
                       </div>
                     </div>
@@ -653,14 +658,14 @@ export default function AdminPage() {
           <div>
             <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
               <div>
-                <h2 className="font-heading font-bold text-brand-navy text-xl">Optimización de Rutas</h2>
-                <p className="text-brand-gray-mid text-sm mt-1">Selecciona los pedidos del día y calcula la ruta más eficiente</p>
+                <h2 className="font-heading font-bold text-brand-navy text-xl">Optimizacion de Rutas</h2>
+                <p className="text-brand-gray-mid text-sm mt-1">Selecciona los pedidos del dia y calcula la ruta mas eficiente</p>
               </div>
               <div className="flex gap-3 flex-wrap">
                 {rutaOptimizada.length>0&&(
                   <>
-                    <button onClick={abrirEnGoogleMaps} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600">🗺️ Abrir en Google Maps</button>
-                    <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange">🖨️ Imprimir Ruta</button>
+                    <button onClick={abrirEnGoogleMaps} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">Abrir en Google Maps</button>
+                    <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">Imprimir Ruta</button>
                   </>
                 )}
                 <button onClick={optimizarRuta} disabled={optimizando||pedidosRuta.length===0} className="btn-primary flex items-center gap-2"><Map size={16}/> {optimizando?'Calculando...':'Optimizar Ruta'}</button>
@@ -691,7 +696,7 @@ export default function AdminPage() {
                           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${enRuta?'bg-brand-orange border-brand-orange':'border-gray-300'}`}>{enRuta&&<span className="text-white text-xs font-bold">✓</span>}</div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-brand-navy text-sm truncate">{cliente?.negocio||cliente?.nombre||'—'}</p>
-                            <p className="text-xs text-brand-gray-mid truncate">📍 {cliente?.direccion||'Sin dirección'}</p>
+                            <p className="text-xs text-brand-gray-mid truncate">📍 {cliente?.direccion||'Sin direccion'}</p>
                             <p className="text-xs text-brand-gray-mid">#{ped.id.slice(0,8).toUpperCase()} · ${ped.total?.toFixed(2)}</p>
                           </div>
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${estadoColor[ped.estado]}`}>{ped.estado.replace('_',' ')}</span>
@@ -704,9 +709,9 @@ export default function AdminPage() {
               <div>
                 {rutaOptimizada.length>0&&(
                   <div className="mb-4">
-                    <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">🚚 Ruta Óptima<span className="text-xs font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{rutaOptimizada.length} paradas</span></h3>
+                    <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">Ruta Optima<span className="text-xs font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{rutaOptimizada.length} paradas</span></h3>
                     <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg"><div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div><div><p className="font-medium text-brand-navy text-sm">Origen — Bood Supply</p><p className="text-xs text-brand-gray-mid">2900 N Richmond St, Chicago</p></div></div>
+                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg"><div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div><div><p className="font-medium text-brand-navy text-sm">Origen - Bood Supply</p><p className="text-xs text-brand-gray-mid">2900 N Richmond St, Chicago</p></div></div>
                       {rutaOptimizada.map((parada,idx)=>(
                         <div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-100">
                           <div className="w-7 h-7 bg-brand-orange rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{idx+1}</div>
@@ -738,10 +743,10 @@ export default function AdminPage() {
         {tab === 'mensajes' && (
           <div className="card">
             <h2 className="font-heading font-bold text-brand-navy text-xl mb-6">Enviar Mensaje a Clientes</h2>
-            {mensajeEnviado&&<div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">✓ Mensaje enviado correctamente</div>}
+            {mensajeEnviado&&<div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">Mensaje enviado correctamente</div>}
             <div className="space-y-4">
               <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Asunto *</label><input value={mensajeAsunto} onChange={e=>setMensajeAsunto(e.target.value)} placeholder="Asunto del mensaje" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-              <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Mensaje *</label><textarea value={mensajeCuerpo} onChange={e=>setMensajeCuerpo(e.target.value)} placeholder="Escribe tu mensaje aquí..." rows={6} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange resize-none"/></div>
+              <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Mensaje *</label><textarea value={mensajeCuerpo} onChange={e=>setMensajeCuerpo(e.target.value)} placeholder="Escribe tu mensaje aqui..." rows={6} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange resize-none"/></div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-brand-gray-dark">Destinatarios *</label>
@@ -775,14 +780,14 @@ export default function AdminPage() {
                 <h2 className="font-heading font-bold text-brand-navy text-lg mb-5">Nuevo Producto</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre *</label><input value={formProducto.nombre} onChange={e=>setFormProducto({...formProducto,nombre:e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Categoría *</label><select value={formProducto.categoria} onChange={e=>setFormProducto({...formProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white"><option value="">Selecciona categoría</option>{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Categoria *</label><select value={formProducto.categoria} onChange={e=>setFormProducto({...formProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white"><option value="">Selecciona categoria</option>{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Precio * (USD)</label><input value={formProducto.precio} onChange={e=>setFormProducto({...formProducto,precio:e.target.value})} placeholder="Ej: 9.99" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Unidad *</label><input value={formProducto.unidad} onChange={e=>setFormProducto({...formProducto,unidad:e.target.value})} placeholder="Ej: paquete 100u" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripción</label><input value={formProducto.descripcion} onChange={e=>setFormProducto({...formProducto,descripcion:e.target.value})} placeholder="Descripción breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange"><input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e=>setImagenProducto(e.target.files?.[0]||null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{imagenProducto&&<p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}</div></div>
+                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripcion</label><input value={formProducto.descripcion} onChange={e=>setFormProducto({...formProducto,descripcion:e.target.value})} placeholder="Descripcion breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e=>setImagenProducto(e.target.files?.[0]||null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer"/>{imagenProducto&&<p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}</div></div>
                 </div>
                 <div className="flex gap-3 mt-5">
-                  <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">{guardando?'Guardando...':<><Plus size={16}/> Guardar</>}</button>
+                  <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">{guardando?'Guardando y traduciendo...':<><Plus size={16}/> Guardar</>}</button>
                   <button onClick={()=>setShowFormProducto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                 </div>
               </div>
@@ -802,10 +807,10 @@ export default function AdminPage() {
                             <div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium text-brand-navy text-sm">{p.nombre}</span>{p.nombre_en&&<span className="text-xs text-gray-400">/ {p.nombre_en}</span>}{!p.activo&&<span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactivo</span>}</div><div className="text-xs text-brand-gray-mid mt-0.5">{p.descripcion} · {p.unidad}</div></div>
                             <div className="font-heading font-bold text-brand-navy">${p.precio}</div>
                             <div className="flex items-center gap-1">
-                              <button onClick={()=>iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 text-yellow-500"><Pencil size={15}/></button>
-                              <button onClick={()=>seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 text-blue-400"><ImageIcon size={15}/></button>
-                              <button onClick={()=>toggleActivo(p.id,p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid">{p.activo?<Eye size={15}/>:<EyeOff size={15}/>}</button>
-                              <button onClick={()=>eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={15}/></button>
+                              <button onClick={()=>iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button>
+                              <button onClick={()=>seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400"><ImageIcon size={15}/></button>
+                              <button onClick={()=>toggleActivo(p.id,p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors text-brand-gray-mid">{p.activo?<Eye size={15}/>:<EyeOff size={15}/>}</button>
+                              <button onClick={()=>eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button>
                             </div>
                           </div>
                           {editandoProducto===p.id&&(
@@ -813,15 +818,15 @@ export default function AdminPage() {
                               <div className="grid grid-cols-2 gap-3">
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre (ES)</label><input value={formEditProducto.nombre} onChange={e=>setFormEditProducto({...formEditProducto,nombre:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Name (EN)</label><input value={formEditProducto.nombre_en} onChange={e=>setFormEditProducto({...formEditProducto,nombre_en:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Descripción (ES)</label><input value={formEditProducto.descripcion} onChange={e=>setFormEditProducto({...formEditProducto,descripcion:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Descripcion (ES)</label><input value={formEditProducto.descripcion} onChange={e=>setFormEditProducto({...formEditProducto,descripcion:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Description (EN)</label><input value={formEditProducto.descripcion_en} onChange={e=>setFormEditProducto({...formEditProducto,descripcion_en:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Precio (USD)</label><input value={formEditProducto.precio} onChange={e=>setFormEditProducto({...formEditProducto,precio:e.target.value})} type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Unidad</label><input value={formEditProducto.unidad} onChange={e=>setFormEditProducto({...formEditProducto,unidad:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoría</label><select value={formEditProducto.categoria} onChange={e=>setFormEditProducto({...formEditProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoria</label><select value={formEditProducto.categoria} onChange={e=>setFormEditProducto({...formEditProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
                               </div>
                               <div className="flex gap-3 mt-4">
                                 <button onClick={()=>guardarProducto(p.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"><Save size={14}/> {guardando?'Guardando...':'Guardar'}</button>
-                                <button onClick={()=>setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid"><X size={14}/> Cancelar</button>
+                                <button onClick={()=>setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid hover:text-brand-navy"><X size={14}/> Cancelar</button>
                               </div>
                             </div>
                           )}
@@ -839,8 +844,8 @@ export default function AdminPage() {
         {tab === 'categorias' && (
           <div className="card">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-heading font-bold text-brand-navy text-xl">Categorías</h2>
-              <button onClick={()=>setShowFormCategoria(!showFormCategoria)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Nueva Categoría</button>
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Categorias</h2>
+              <button onClick={()=>setShowFormCategoria(!showFormCategoria)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Nueva Categoria</button>
             </div>
             {showFormCategoria&&(
               <div className="border-2 border-brand-orange/30 rounded-xl p-4 mb-6">
@@ -853,7 +858,7 @@ export default function AdminPage() {
               </div>
             )}
             {categorias.length===0?(
-              <div className="text-center py-12 text-brand-gray-mid"><Tag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay categorías aún</p></div>
+              <div className="text-center py-12 text-brand-gray-mid"><Tag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay categorias aun</p></div>
             ):(
               <div className="space-y-2">
                 {categorias.map(cat=>(
@@ -868,7 +873,7 @@ export default function AdminPage() {
                         {editandoCategoria===cat?(
                           <><button onClick={()=>guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={13}/> {guardando?'...':'Guardar'}</button><button onClick={()=>setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid"><X size={15}/></button></>
                         ):(
-                          <><button onClick={()=>{setEditandoCategoria(cat);setCategoriaEditNombre(cat)}} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 text-yellow-500"><Pencil size={15}/></button><button onClick={()=>eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={15}/></button></>
+                          <><button onClick={()=>{setEditandoCategoria(cat);setCategoriaEditNombre(cat)}} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button><button onClick={()=>eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button></>
                         )}
                       </div>
                     </div>
