@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map } from 'lucide-react'
 import MapaRutas from '@/components/MapaRutas'
@@ -75,6 +75,7 @@ export default function AdminPage() {
   const [pedidosRuta, setPedidosRuta] = useState<string[]>([])
   const [optimizando, setOptimizando] = useState(false)
   const [rutaOptimizada, setRutaOptimizada] = useState<any[]>([])
+  const [rutaKey, setRutaKey] = useState(0)
   const [errorRuta, setErrorRuta] = useState('')
   const supabase = createClient()
 
@@ -107,6 +108,7 @@ export default function AdminPage() {
       if (data.error) { setErrorRuta(data.error); setOptimizando(false); return }
       const rutaOrdenada = data.orden.map((i: number) => paradas[i])
       setRutaOptimizada(rutaOrdenada)
+      setRutaKey(prev => prev + 1)
     } catch (e: any) { setErrorRuta(e.message) }
     setOptimizando(false)
   }
@@ -115,7 +117,7 @@ export default function AdminPage() {
     if (rutaOptimizada.length === 0) return
     const origen = '2900+N+Richmond+St,+Chicago,+IL+60618'
     const paradas = rutaOptimizada.map(p => encodeURIComponent(p.direccion + ', Chicago, IL')).join('/')
-    window.open(`https://www.google.com/maps/dir/${origen}/${paradas}/${origen}`, '_blank')
+    window.open(`https://www.google.com/maps/dir/${origen}/${paradas}`, '_blank')
   }
 
   function imprimirRuta() {
@@ -651,14 +653,13 @@ export default function AdminPage() {
                           </div>
                         </div>
                       ))}
-                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg"><div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div><div><p className="font-medium text-brand-navy text-sm">Regreso — Bood Supply</p></div></div>
                     </div>
                   </div>
                 )}
                 <div className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{height:'400px'}}>
-                  {rutaOptimizada.length>0 ? (
-                    <MapaRutas key={rutaOptimizada.map(p=>p.pedidoId).join(',')} paradas={rutaOptimizada} />
-                  ) : (
+                  {rutaOptimizada.length>0?(
+                    <MapaRutas key={rutaKey} paradas={rutaOptimizada}/>
+                  ):(
                     <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand-gray-mid">
                       <div className="text-center"><Map size={40} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Selecciona pedidos y optimiza la ruta</p></div>
                     </div>
