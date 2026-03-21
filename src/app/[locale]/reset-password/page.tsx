@@ -1,70 +1,53 @@
 "use client"
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [listo, setListo] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [sesionLista, setSesionLista] = useState(false)
+  const [listo, setListo] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
-    async function procesarToken() {
+    async function init() {
+      // Verificar si hay sesión activa (must_change_password flow)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) { setSesionLista(true); return }
+
+      // Procesar token desde URL hash
       const hash = window.location.hash
-      const query = window.location.search
-
-      // Intentar desde hash
-      if (hash && hash.length > 1) {
-        const params = new URLSearchParams(hash.substring(1))
-        const access_token = params.get('access_token')
-        const refresh_token = params.get('refresh_token') || params.get('TokenHash') || ''
-        if (access_token) {
-          const { error } = await supabase.auth.setSession({ access_token, refresh_token })
-          if (!error) { setSesionLista(true); return }
-        }
-        // Intentar con token hash
-        const token_hash = params.get('TokenHash') || params.get('token_hash')
-        if (token_hash) {
-          const { error } = await supabase.auth.verifyOtp({ token_hash, type: 'recovery' })
+      if (hash) {
+        const params = new URLSearchParams(hash.replace('#', '?'))
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
           if (!error) { setSesionLista(true); return }
         }
       }
 
-      // Intentar desde query params
-      if (query) {
-        const params = new URLSearchParams(query)
-        const token_hash = params.get('token_hash')
-        const code = params.get('code')
-        if (token_hash) {
-          const { error } = await supabase.auth.verifyOtp({ token_hash, type: 'recovery' })
-          if (!error) { setSesionLista(true); return }
-        }
-        if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code)
-          if (!error) { setSesionLista(true); return }
-        }
+      // Procesar token desde query params
+      const searchParams = new URLSearchParams(window.location.search)
+      const code = searchParams.get('code')
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error) { setSesionLista(true); return }
       }
-
-      // Verificar si ya hay sesión activa
-      const { data } = await supabase.auth.getSession()
-      if (data.session) { setSesionLista(true); return }
-
-      setError('Link inválido o expirado. Solicita uno nuevo desde el login.')
     }
-    procesarToken()
+    init()
   }, [])
 
   async function handleReset() {
-    if (!password || !confirm) return setError('Llena todos los campos')
+    if (!password || password.length < 6) return setError('La contraseña debe tener al menos 6 caracteres')
     if (password !== confirm) return setError('Las contraseñas no coinciden')
-    if (password.length < 6) return setError('Mínimo 6 caracteres')
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
     const { error } = await supabase.auth.updateUser({ password })
     if (error) { setError(error.message); setLoading(false); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id)
     await supabase.auth.signOut()
     setListo(true)
     setTimeout(() => { window.location.href = '/es/login' }, 3000)
@@ -84,25 +67,25 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-brand-gray-light flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <h1 className="font-heading text-3xl font-bold text-brand-navy">BOOD <span className="text-brand-orange">SUPPLY</span></h1>
-          <p className="text-brand-gray-mid mt-2">Nueva contraseña</p>
+          <a href="/es"><img src="/logo.png" alt="Bood Supply" className="h-16 mx-auto mb-4 object-contain"/></a>
+          <h1 className="font-heading font-bold text-2xl text-brand-navy">Cambiar Contraseña</h1>
+          <p className="text-brand-gray-mid text-sm mt-1">Crea tu nueva contraseña de acceso</p>
         </div>
         {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>}
-        {!sesionLista && !error && (
+        {!sesionLista ? (
           <div className="text-center text-brand-gray-mid py-8">Verificando link...</div>
-        )}
-        {sesionLista && (
+        ) : (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-brand-gray-dark mb-1">Nueva contraseña</label>
-              <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Mínimo 6 caracteres" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" />
+              <input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="Mínimo 6 caracteres" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange"/>
             </div>
             <div>
               <label className="block text-sm font-medium text-brand-gray-dark mb-1">Confirmar contraseña</label>
-              <input value={confirm} onChange={e => setConfirm(e.target.value)} type="password" placeholder="Repite la contraseña" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e => e.key === 'Enter' && handleReset()} />
+              <input value={confirm} onChange={e=>setConfirm(e.target.value)} type="password" placeholder="Repite la contraseña" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e=>e.key==='Enter'&&handleReset()}/>
             </div>
             <button onClick={handleReset} disabled={loading} className="btn-primary w-full py-3 text-base">
-              {loading ? 'Actualizando...' : 'Actualizar contraseña'}
+              {loading?'Actualizando...':'Actualizar contraseña'}
             </button>
           </div>
         )}
