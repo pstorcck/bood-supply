@@ -1,16 +1,18 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, ShoppingBag, Users, Search, X, UserPlus, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, ShoppingBag, Users, Search, X, UserPlus, Receipt, Eye } from 'lucide-react'
 
 export default function VendedorPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'nuevo_pedido' | 'mis_pedidos' | 'clientes'>('nuevo_pedido')
+  const [tab, setTab] = useState<'nuevo_pedido' | 'mis_pedidos' | 'clientes' | 'invoices'>('nuevo_pedido')
   const [clientes, setClientes] = useState<any[]>([])
   const [productos, setProductos] = useState<any[]>([])
   const [categorias, setCategorias] = useState<string[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
+  const [invoices, setInvoices] = useState<any[]>([])
+  const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
   const [clienteSeleccionado, setClienteSeleccionado] = useState<any>(null)
   const [busquedaCliente, setBusquedaCliente] = useState('')
   const [busquedaProducto, setBusquedaProducto] = useState('')
@@ -27,7 +29,7 @@ export default function VendedorPage() {
 
   const FUEL_SURCHARGE = 5.00
   const TAX_RATE = 0.1025
-  const CAT_QUIMICOS = 'Químicos y Limpieza'
+  const CAT_QUIMICOS = 'Quimicos y Limpieza'
 
   useEffect(() => {
     async function init() {
@@ -36,7 +38,7 @@ export default function VendedorPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'vendedor' && user.email !== 'boodsupplies@gmail.com') { window.location.href = '/es/login'; return }
       setUser(user)
-      await Promise.all([cargarClientes(), cargarProductos(), cargarPedidos(user.id)])
+      await Promise.all([cargarClientes(), cargarProductos(), cargarPedidos(), cargarInvoices()])
       setLoading(false)
     }
     init()
@@ -55,9 +57,31 @@ export default function VendedorPage() {
     setCategorias(cats)
   }
 
-  async function cargarPedidos(userId: string) {
+  async function cargarPedidos() {
     const { data } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').order('created_at', { ascending: false })
     setPedidos(data || [])
+  }
+
+  async function cargarInvoices() {
+    const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false })
+    setInvoices(data || [])
+  }
+
+  async function generarInvoice(ped: any) {
+    setGenerandoInvoice(ped.id)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const res = await fetch('/api/crear-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedido_id: ped.id, cliente_id: ped.cliente_id, creado_por: user?.id })
+      })
+      const data = await res.json()
+      if (data.error) { alert('Error: ' + data.error); return }
+      await cargarInvoices()
+      window.open(`/es/invoice/${data.invoice.id}`, '_blank')
+    } catch (e: any) { alert('Error: ' + e.message) }
+    setGenerandoInvoice(null)
   }
 
   async function crearCliente() {
@@ -119,7 +143,7 @@ export default function VendedorPage() {
 
       setCarrito([]); setClienteSeleccionado(null); setMetodoPago('Efectivo')
       setPedidoEnviado(true); setTimeout(() => setPedidoEnviado(false), 4000)
-      await cargarPedidos(user.id)
+      await cargarPedidos()
       setTab('mis_pedidos')
     } catch (e: any) { alert('Error: ' + e.message) }
     setEnviando(false)
@@ -148,10 +172,10 @@ export default function VendedorPage() {
 
   return (
     <div className="min-h-screen bg-brand-gray-light">
-      {pedidoEnviado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">✓ Pedido enviado correctamente</div>}
+      {pedidoEnviado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">Pedido enviado correctamente</div>}
 
       <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Vendedor — BOOD SUPPLY</span></div>
+        <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Vendedor - BOOD SUPPLY</span></div>
         <div className="flex items-center gap-4">
           <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
           <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white"><LogOut size={16}/> Salir</button>
@@ -160,7 +184,7 @@ export default function VendedorPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex gap-2 flex-wrap mb-8">
-          {[{key:'nuevo_pedido',label:'Nuevo Pedido',icon:Plus},{key:'mis_pedidos',label:'Pedidos',icon:ShoppingBag},{key:'clientes',label:'Clientes',icon:Users}].map(({key,label,icon:Icon})=>(
+          {[{key:'nuevo_pedido',label:'Nuevo Pedido',icon:Plus},{key:'mis_pedidos',label:'Pedidos',icon:ShoppingBag},{key:'invoices',label:'Invoices',icon:Receipt},{key:'clientes',label:'Clientes',icon:Users}].map(({key,label,icon:Icon})=>(
             <button key={key} onClick={()=>setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab===key?'bg-brand-navy text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
               <Icon size={16}/> {label}
             </button>
@@ -171,7 +195,6 @@ export default function VendedorPage() {
         {tab === 'nuevo_pedido' && (
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
-              {/* Seleccionar cliente */}
               <div className="card">
                 <h2 className="font-heading font-bold text-brand-navy mb-3 flex items-center gap-2"><Users size={18}/> Cliente</h2>
                 {clienteSeleccionado ? (
@@ -201,7 +224,6 @@ export default function VendedorPage() {
                 )}
               </div>
 
-              {/* Catálogo */}
               <div className="card">
                 <h2 className="font-heading font-bold text-brand-navy mb-3 flex items-center gap-2"><Package size={18}/> Productos</h2>
                 <div className="relative mb-3">
@@ -230,18 +252,17 @@ export default function VendedorPage() {
               </div>
             </div>
 
-            {/* Carrito */}
             <div className="card h-fit sticky top-24">
               <h2 className="font-heading font-bold text-brand-navy mb-4 flex items-center gap-2"><ShoppingBag size={18}/> Carrito {carrito.length>0&&<span className="bg-brand-orange text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{carrito.reduce((s,i)=>s+i.cantidad,0)}</span>}</h2>
               {carrito.length===0?(
-                <div className="text-center py-8 text-brand-gray-mid"><ShoppingBag size={32} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Carrito vacío</p></div>
+                <div className="text-center py-8 text-brand-gray-mid"><ShoppingBag size={32} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Carrito vacio</p></div>
               ):(
                 <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
                   {carrito.map(item=>(
                     <div key={item.id} className="flex items-center gap-2">
                       <div className="flex-1 min-w-0"><p className="text-sm font-medium text-brand-navy truncate">{item.nombre}</p><p className="text-xs text-brand-gray-mid">${item.precio} c/u</p></div>
                       <div className="flex items-center gap-1">
-                        <button onClick={()=>cambiarCantidad(item.id,item.cantidad-1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-brand-navy flex items-center justify-center text-sm font-bold">−</button>
+                        <button onClick={()=>cambiarCantidad(item.id,item.cantidad-1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-brand-navy flex items-center justify-center text-sm font-bold">-</button>
                         <span className="w-6 text-center text-sm font-medium">{item.cantidad}</span>
                         <button onClick={()=>cambiarCantidad(item.id,item.cantidad+1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-brand-navy flex items-center justify-center text-sm font-bold">+</button>
                       </div>
@@ -252,14 +273,14 @@ export default function VendedorPage() {
               )}
               <div className="border-t pt-3 space-y-1 text-sm mb-4">
                 <div className="flex justify-between text-brand-gray-mid"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
-                {taxQuimicos>0&&<div className="flex justify-between text-brand-gray-mid"><span>Tax Químicos (10.25%)</span><span>${taxQuimicos.toFixed(2)}</span></div>}
+                {taxQuimicos>0&&<div className="flex justify-between text-brand-gray-mid"><span>Tax Quimicos (10.25%)</span><span>${taxQuimicos.toFixed(2)}</span></div>}
                 <div className="flex justify-between text-brand-gray-mid"><span>Fuel Surcharge</span><span>${FUEL_SURCHARGE.toFixed(2)}</span></div>
                 <div className="flex justify-between font-bold text-brand-navy text-base border-t pt-2"><span>Total</span><span>${total.toFixed(2)}</span></div>
               </div>
               <div className="mb-4">
-                <label className="block text-xs font-medium text-brand-gray-dark mb-1">Método de pago</label>
+                <label className="block text-xs font-medium text-brand-gray-dark mb-1">Metodo de pago</label>
                 <select value={metodoPago} onChange={e=>setMetodoPago(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
-                  {['Efectivo','Zelle','Tarjeta de crédito','Cheque'].map(m=><option key={m} value={m}>{m}</option>)}
+                  {['Efectivo','Zelle','Tarjeta de credito','Cheque'].map(m=><option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
               <button onClick={enviarPedido} disabled={enviando||carrito.length===0||!clienteSeleccionado} className="btn-primary w-full">{enviando?'Enviando...':'Enviar Pedido'}</button>
@@ -267,27 +288,36 @@ export default function VendedorPage() {
           </div>
         )}
 
-        {/* MIS PEDIDOS */}
+        {/* PEDIDOS */}
         {tab === 'mis_pedidos' && (
           <div className="space-y-3">
-            <h2 className="font-heading font-bold text-brand-navy text-xl mb-4">Pedidos — {pedidos.length}</h2>
-            {pedidos.length===0&&<div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos aún</p></div>}
+            <h2 className="font-heading font-bold text-brand-navy text-xl mb-4">Pedidos - {pedidos.length}</h2>
+            {pedidos.length===0&&<div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos aun</p></div>}
             {pedidos.map(ped=>{
               const cliente = clientes.find(c=>c.id===ped.cliente_id)
+              const invoiceExistente = invoices.find(inv=>inv.pedido_id===ped.id)
               return(
                 <div key={ped.id} className="card">
-                  <div className="flex items-start justify-between flex-wrap gap-2">
+                  <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
                     <div>
                       <p className="font-heading font-bold text-brand-navy">#{ped.id.slice(0,8).toUpperCase()}</p>
                       <p className="text-xs text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</p>
                       <p className="text-sm text-brand-gray-dark mt-1">{cliente?.nombre||'—'} · {cliente?.negocio||''}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${estadoColor[ped.estado]||'bg-gray-100 text-gray-600'}`}>{ped.estado.replace('_',' ')}</span>
+                      <button onClick={()=>generarInvoice(ped)} disabled={generandoInvoice===ped.id} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${invoiceExistente?'bg-green-100 text-green-700 hover:bg-green-200':'bg-brand-navy text-white hover:bg-brand-navy/80'}`}>
+                        <Receipt size={13}/> {generandoInvoice===ped.id?'Generando...':(invoiceExistente?invoiceExistente.numero:'Invoice')}
+                      </button>
+                      {invoiceExistente&&(
+                        <a href={`/es/invoice/${invoiceExistente.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-200">
+                          <Eye size={13}/> Ver
+                        </a>
+                      )}
                     </div>
                   </div>
-                  <div className="border-t mt-3 pt-3 space-y-1">
+                  <div className="border-t pt-3 space-y-1">
                     {ped.pedido_items?.map((item:any)=>(
                       <div key={item.id} className="flex justify-between text-sm"><span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span><span className="font-medium text-brand-navy">${(item.precio_unitario*item.cantidad).toFixed(2)}</span></div>
                     ))}
@@ -298,11 +328,50 @@ export default function VendedorPage() {
           </div>
         )}
 
+        {/* INVOICES */}
+        {tab === 'invoices' && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Invoices - {invoices.length}</h2>
+            </div>
+            {invoices.length===0?(
+              <div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados</p></div>
+            ):(
+              <div className="space-y-3">
+                {invoices.map(inv=>{
+                  const cliente = clientes.find(c=>c.id===inv.cliente_id)
+                  return(
+                    <div key={inv.id} className="card flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-brand-navy rounded-xl flex items-center justify-center flex-shrink-0"><Receipt size={18} className="text-brand-orange"/></div>
+                        <div>
+                          <p className="font-heading font-bold text-brand-navy">{inv.numero}</p>
+                          <p className="text-xs text-brand-gray-mid">{cliente?.nombre||'—'} · {cliente?.negocio||'—'}</p>
+                          <p className="text-xs text-brand-gray-mid">{new Date(inv.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'})}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-heading font-bold text-brand-orange">${inv.total?.toFixed(2)}</p>
+                          <p className="text-xs text-brand-gray-mid">{inv.metodo_pago}</p>
+                        </div>
+                        <a href={`/es/invoice/${inv.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80">
+                          <Eye size={15}/> Ver Invoice
+                        </a>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* CLIENTES */}
         {tab === 'clientes' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes — {clientes.length}</h2>
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes - {clientes.length}</h2>
               <button onClick={()=>setShowFormCliente(!showFormCliente)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600"><UserPlus size={15}/> Nuevo Cliente</button>
             </div>
 
@@ -314,9 +383,9 @@ export default function VendedorPage() {
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre *</label><input value={formCliente.nombre} onChange={e=>setFormCliente({...formCliente,nombre:e.target.value})} placeholder="Nombre completo" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Email *</label><input value={formCliente.email} onChange={e=>setFormCliente({...formCliente,email:e.target.value})} placeholder="correo@email.com" type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Negocio</label><input value={formCliente.negocio} onChange={e=>setFormCliente({...formCliente,negocio:e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Teléfono</label><input value={formCliente.telefono} onChange={e=>setFormCliente({...formCliente,telefono:e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Telefono</label><input value={formCliente.telefono} onChange={e=>setFormCliente({...formCliente,telefono:e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label><input value={formCliente.ein} onChange={e=>setFormCliente({...formCliente,ein:e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label><input value={formCliente.direccion} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Dirección" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formCliente.direccion} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Direccion" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                 </div>
                 <div className="flex gap-3 mt-4">
                   <button onClick={crearCliente} disabled={creandoCliente} className="btn-primary flex items-center gap-2"><UserPlus size={15}/> {creandoCliente?'Creando...':'Crear Cliente'}</button>
