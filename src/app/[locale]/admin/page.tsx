@@ -109,7 +109,7 @@ export default function AdminPage() {
       const data = await res.json()
       if (data.error) { alert('Error: ' + data.error); return }
       await cargarInvoices()
-      window.open(data.invoice.pdf_url, '_blank')
+      window.open(`/es/invoice/${data.invoice.id}`, '_blank')
     } catch (e: any) { alert('Error: ' + e.message) }
     setGenerandoInvoice(null)
   }
