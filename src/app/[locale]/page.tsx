@@ -6,41 +6,41 @@ import { useState } from 'react'
 const TEXTS = {
   es: {
     nav_productos: 'Productos',
-    nav_areas: 'Áreas',
+    nav_areas: 'Areas',
     nav_contacto: 'Contacto',
-    nav_login: 'Iniciar Sesión',
+    nav_login: 'Iniciar Sesion',
     nav_registro: 'Crear Cuenta',
     hero_badge: 'Distribuidor de Suministros en Chicago',
     hero_title: 'Los suministros que necesitas',
     hero_title_accent: 'en un solo lugar',
-    hero_subtitle: 'Vasos, platos, cubiertos, bolsas y más — entregados directo a tu restaurante en Chicago y área metropolitana.',
+    hero_subtitle: 'Vasos, platos, cubiertos, bolsas y mas — entregados directo a tu restaurante en Chicago y area metropolitana.',
     hero_cta1: 'Crear Cuenta Gratis',
     hero_cta2: 'Ver Productos',
     stat1_value: 'Gran variedad',
     stat1_label: 'de productos disponibles',
-    stat2_label: 'Años en servicio al cliente y ventas',
+    stat2_label: 'Anos en servicio al cliente y ventas',
     stat3_label: 'Clientes satisfechos',
-    stat4_label: 'Entrega rápida garantizada',
+    stat4_label: 'Entrega rapida garantizada',
     products_title: 'Nuestros Productos',
-    products_subtitle: 'Suministros de calidad para restaurantes, cafeterías y negocios de food service',
-    products_cta: 'Ver Precios y Hacer Pedido →',
-    areas_title: 'Áreas de Servicio',
-    areas_subtitle: 'Entregamos en Chicago y toda el área metropolitana',
+    products_subtitle: 'Suministros de calidad para restaurantes, cafeterias y negocios de food service',
+    products_cta: 'Ver Precios y Hacer Pedido',
+    areas_title: 'Areas de Servicio',
+    areas_subtitle: 'Entregamos en Chicago y toda el area metropolitana',
     areas_subtitle2: 'Chicago y Suburbios',
-    how_title: '¿Cómo funciona?',
+    how_title: 'Como funciona?',
     step1_title: 'Crea tu cuenta',
     step1_desc: 'Registro gratis en menos de 1 minuto',
     step2_title: 'Haz tu pedido',
-    step2_desc: 'Elige productos y cantidades desde tu catálogo',
+    step2_desc: 'Elige productos y cantidades desde tu catalogo',
     step3_title: 'Recibe en tu negocio',
     step3_desc: 'Entregamos directo a tu puerta en 48 horas',
-    cta_title: '¿Listo para ordenar?',
-    cta_subtitle: 'Crea tu cuenta gratis y accede a nuestro catálogo completo con precios especiales',
+    cta_title: 'Listo para ordenar?',
+    cta_subtitle: 'Crea tu cuenta gratis y accede a nuestro catalogo completo con precios especiales',
     cta_btn: 'Empezar Ahora',
-    footer_desc: 'Distribuidor de suministros para restaurantes en Chicago y área metropolitana.',
+    footer_desc: 'Distribuidor de suministros para restaurantes en Chicago y area metropolitana.',
     footer_products: 'Productos',
     footer_contact: 'Contacto',
-    footer_rights: '© 2025 Bood Supply. Todos los derechos reservados.',
+    footer_rights: '2025 Bood Supply. Todos los derechos reservados.',
   },
   en: {
     nav_productos: 'Products',
@@ -61,7 +61,7 @@ const TEXTS = {
     stat4_label: 'Fast guaranteed delivery',
     products_title: 'Our Products',
     products_subtitle: 'Quality supplies for restaurants, cafeterias and food service businesses',
-    products_cta: 'View Prices and Place Order →',
+    products_cta: 'View Prices and Place Order',
     areas_title: 'Service Areas',
     areas_subtitle: 'We deliver in Chicago and the entire metropolitan area',
     areas_subtitle2: 'Chicago and Suburbs',
@@ -78,22 +78,22 @@ const TEXTS = {
     footer_desc: 'Restaurant supply distributor in Chicago and the metropolitan area.',
     footer_products: 'Products',
     footer_contact: 'Contact',
-    footer_rights: '© 2025 Bood Supply. All rights reserved.',
+    footer_rights: '2025 Bood Supply. All rights reserved.',
   }
 }
 
 const PRODUCTS = {
   es: [
     { name: 'Vasos Desechables', emoji: '🥤', desc: 'Vasos transparentes 8oz, 12oz, 16oz y 32oz' },
-    { name: 'Platos Desechables', emoji: '🍽️', desc: 'Platos de cartón y foam en diferentes tamaños' },
+    { name: 'Platos Desechables', emoji: '🍽️', desc: 'Platos de carton y foam en diferentes tamanos' },
     { name: 'Cubiertos', emoji: '🍴', desc: 'Tenedores, cuchillos, cucharas y sets completos' },
-    { name: 'Bolsas y Contenedores', emoji: '🛍️', desc: 'Bolsas de papel, plástico y contenedores con tapa' },
+    { name: 'Bolsas y Contenedores', emoji: '🛍️', desc: 'Bolsas de papel, plastico y contenedores con tapa' },
     { name: 'Servilletas', emoji: '🗒️', desc: 'Servilletas de papel blancas en paquetes grandes' },
-    { name: 'Papel para Baño', emoji: '🧻', desc: 'Papel higiénico y papel toalla para tu negocio' },
+    { name: 'Papel para Bano', emoji: '🧻', desc: 'Papel higienico y papel toalla para tu negocio' },
     { name: 'Papel', emoji: '📄', desc: 'Papel encerado y papel para envolver alimentos' },
     { name: 'Palillos', emoji: '🪥', desc: 'Palillos de dientes y palillos removedores' },
     { name: 'Grocery', emoji: '🛒', desc: 'Productos de abarrotes y alimentos no perecederos' },
-    { name: 'Químicos y Limpieza', emoji: '🧴', desc: 'Productos de limpieza e higiene para tu negocio' },
+    { name: 'Quimicos y Limpieza', emoji: '🧴', desc: 'Productos de limpieza e higiene para tu negocio' },
   ],
   en: [
     { name: 'Disposable Cups', emoji: '🥤', desc: 'Clear cups 8oz, 12oz, 16oz and 32oz' },
@@ -112,7 +112,7 @@ const PRODUCTS = {
 const AREAS = ['Chicago', 'Cicero', 'Berwyn', 'Oak Park', 'Evanston', 'Skokie', 'Schaumburg', 'Naperville', 'Aurora', 'Joliet', 'Waukegan', 'Elgin', 'Arlington Heights', 'Bolingbrook']
 
 const FOOTER_PRODUCTS = {
-  es: ['Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Grocery', 'Químicos y Limpieza'],
+  es: ['Vasos Desechables', 'Platos Desechables', 'Cubiertos', 'Bolsas y Contenedores', 'Servilletas', 'Grocery', 'Quimicos y Limpieza'],
   en: ['Disposable Cups', 'Disposable Plates', 'Cutlery', 'Bags & Containers', 'Napkins', 'Grocery', 'Chemicals & Cleaning'],
 }
 
@@ -137,7 +137,7 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="flex items-center gap-1.5 text-sm font-medium border border-gray-200 px-3 py-1.5 rounded-lg hover:border-brand-orange transition-colors text-brand-gray-dark">
-              {lang === 'es' ? '🇺🇸 EN' : '🇲🇽 ES'}
+              {lang === 'es' ? 'EN' : 'ES'}
             </button>
             <Link href="/es/login" className="text-sm font-medium text-brand-navy hover:text-brand-orange transition-colors">{t.nav_login}</Link>
             <Link href="/es/registro" className="btn-primary text-sm !py-2 !px-4">{t.nav_registro}</Link>
@@ -150,7 +150,7 @@ export default function HomePage() {
           <div className="inline-block bg-brand-orange/20 border border-brand-orange/30 text-brand-orange-light px-4 py-1.5 rounded-full text-sm font-medium mb-6">
             {t.hero_badge}
           </div>
-          <h1 className="font-heading text-5xl md:text-6xl font-bold leading-tight mb-6">
+          <h1 className="font-heading text-5xl md:text-6xl font-bold leading-normal mb-8 pb-2">
             {t.hero_title}<br />
             <span className="text-brand-orange">{t.hero_title_accent}</span>
           </h1>
@@ -268,9 +268,9 @@ export default function HomePage() {
           <div>
             <h4 className="font-heading font-bold mb-4">{t.footer_contact}</h4>
             <div className="space-y-2 text-blue-200 text-sm">
-              <p>📍 2900 N Richmond St, Chicago, IL 60618</p>
-              <p>📞 +1 (312) 409-0106</p>
-              <p>✉️ boodsupplies@gmail.com</p>
+              <p>2900 N Richmond St, Chicago, IL 60618</p>
+              <p>+1 (312) 409-0106</p>
+              <p>boodsupplies@gmail.com</p>
             </div>
           </div>
         </div>
