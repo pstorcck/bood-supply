@@ -150,9 +150,9 @@ export default function HomePage() {
           <div className="inline-block bg-brand-orange/20 border border-brand-orange/30 text-brand-orange-light px-4 py-1.5 rounded-full text-sm font-medium mb-6">
             {t.hero_badge}
           </div>
-          <h1 className="font-heading text-5xl md:text-6xl font-bold leading-normal mb-8 pb-2">
+          <h1 className="font-heading text-5xl md:text-6xl font-bold mb-8" style={{lineHeight:'1.4', overflow:'visible'}}>
             {t.hero_title}<br />
-            <span className="text-brand-orange">{t.hero_title_accent}</span>
+            <span className="text-brand-orange" style={{lineHeight:'1.6', display:'block', paddingBottom:'6px'}}>{t.hero_title_accent}</span>
           </h1>
           <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">{t.hero_subtitle}</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
