@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map, Receipt } from 'lucide-react'
 import MapaRutas from '@/components/MapaRutas'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
@@ -38,11 +38,12 @@ function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas'>('clientes')
+  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices'>('clientes')
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
   const [categorias, setCategorias] = useState<string[]>([])
+  const [invoices, setInvoices] = useState<any[]>([])
   const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [editandoCliente, setEditandoCliente] = useState<string | null>(null)
   const [formCliente, setFormCliente] = useState<any>({})
@@ -77,6 +78,7 @@ export default function AdminPage() {
   const [rutaOptimizada, setRutaOptimizada] = useState<any[]>([])
   const [rutaKey, setRutaKey] = useState(0)
   const [errorRuta, setErrorRuta] = useState('')
+  const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -84,11 +86,33 @@ export default function AdminPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || user.email !== ADMIN_EMAIL) { window.location.href = '/es/login'; return }
       setUser(user)
-      await Promise.all([cargarProductos(), cargarPedidos(), cargarClientes()])
+      await Promise.all([cargarProductos(), cargarPedidos(), cargarClientes(), cargarInvoices()])
       setLoading(false)
     }
     init()
   }, [])
+
+  async function cargarInvoices() {
+    const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false })
+    setInvoices(data || [])
+  }
+
+  async function generarInvoice(ped: any) {
+    setGenerandoInvoice(ped.id)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const res = await fetch('/api/crear-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedido_id: ped.id, cliente_id: ped.cliente_id, creado_por: user?.id })
+      })
+      const data = await res.json()
+      if (data.error) { alert('Error: ' + data.error); return }
+      await cargarInvoices()
+      window.open(data.invoice.pdf_url, '_blank')
+    } catch (e: any) { alert('Error: ' + e.message) }
+    setGenerandoInvoice(null)
+  }
 
   async function optimizarRuta() {
     if (pedidosRuta.length < 1) return setErrorRuta('Selecciona al menos 1 pedido')
@@ -386,9 +410,9 @@ export default function AdminPage() {
       <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Admin — BOOD SUPPLY</span></div>
         <div className="flex items-center gap-4">
-          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm flex items-center gap-1">📘 Facebook</a>
+          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm">📘 Facebook</a>
           <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
-          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors"><LogOut size={16}/> Salir</button>
+          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white"><LogOut size={16}/> Salir</button>
         </div>
       </nav>
 
@@ -400,7 +424,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-2 flex-wrap mb-8">
-          {[{key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion},{key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},{key:'rutas',label:'Rutas',icon:Map,badge:0},{key:'mensajes',label:'Mensajes',icon:Mail,badge:0},{key:'productos',label:'Productos',icon:Package,badge:0},{key:'categorias',label:'Categorías',icon:Tag,badge:0}].map(({key,label,icon:Icon,badge})=>(
+          {[{key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion},{key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},{key:'invoices',label:'Invoices',icon:Receipt,badge:0},{key:'rutas',label:'Rutas',icon:Map,badge:0},{key:'mensajes',label:'Mensajes',icon:Mail,badge:0},{key:'productos',label:'Productos',icon:Package,badge:0},{key:'categorias',label:'Categorías',icon:Tag,badge:0}].map(({key,label,icon:Icon,badge})=>(
             <button key={key} onClick={()=>setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab===key?'bg-brand-navy text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
               <Icon size={16}/> {label}
               {badge>0&&<span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${tab===key?'bg-white text-brand-navy':'bg-red-500 text-white'}`}>{badge}</span>}
@@ -414,11 +438,10 @@ export default function AdminPage() {
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
               <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes — {clientes.length}{pendientesAprobacion>0&&<span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s)</span>}</h2>
               <div className="flex gap-2">
-                <button onClick={()=>setShowFormUsuario(!showFormUsuario)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"><UserPlus size={15}/> Crear Usuario</button>
-                <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors"><Download size={15}/> Exportar CSV</button>
+                <button onClick={()=>setShowFormUsuario(!showFormUsuario)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600"><UserPlus size={15}/> Crear Usuario</button>
+                <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange"><Download size={15}/> Exportar CSV</button>
               </div>
             </div>
-
             {showFormUsuario && (
               <div className="card border-2 border-brand-orange/30 mb-4">
                 <h3 className="font-heading font-bold text-brand-navy text-lg mb-4 flex items-center gap-2"><UserPlus size={18} className="text-brand-orange"/> Crear Nuevo Usuario</h3>
@@ -431,9 +454,9 @@ export default function AdminPage() {
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label><input value={formUsuario.ein} onChange={e=>setFormUsuario({...formUsuario,ein:e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento</label><input value={formUsuario.fecha_nacimiento} onChange={e=>setFormUsuario({...formUsuario,fecha_nacimiento:e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Dirección</label><input value={formUsuario.direccion} onChange={e=>setFormUsuario({...formUsuario,direccion:e.target.value})} placeholder="Dirección del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoTaxUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoTaxUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}</div></div>
-                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e=>setArchivoIdUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoIdUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}</div></div>
-                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoCRTUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoCRTUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoTaxUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoTaxUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}</div></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange"><input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e=>setArchivoIdUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoIdUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}</div></div>
+                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoCRTUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoCRTUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
                 </div>
                 <p className="text-xs text-brand-gray-mid mt-3">✓ El usuario recibirá un correo con sus credenciales y deberá cambiar su contraseña al primer inicio de sesión.</p>
                 <div className="flex gap-3 mt-4">
@@ -442,7 +465,6 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-
             {clientes.map(c => {
               const pedidosCliente = getPedidosCliente(c.id)
               const ultimoPedido = pedidosCliente[0]
@@ -472,9 +494,9 @@ export default function AdminPage() {
                   </div>
                   {(c.sales_tax_url||c.id_foto_url||c.crt61_url)&&(
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {c.sales_tax_url&&<div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48"><FileText size={15} className="text-blue-500 flex-shrink-0"/><span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span><a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600">Ver</a></div>}
-                      {c.id_foto_url&&<div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48"><FileText size={15} className="text-purple-500 flex-shrink-0"/><span className="text-xs text-purple-700 flex-1">ID / Identificación</span><a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600">Ver</a></div>}
-                      {c.crt61_url&&<div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48"><FileText size={15} className="text-green-500 flex-shrink-0"/><span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span><a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">Ver</a></div>}
+                      {c.sales_tax_url&&<div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48"><FileText size={15} className="text-blue-500 flex-shrink-0"/><span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span><a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg">Ver</a></div>}
+                      {c.id_foto_url&&<div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48"><FileText size={15} className="text-purple-500 flex-shrink-0"/><span className="text-xs text-purple-700 flex-1">ID / Identificación</span><a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg">Ver</a></div>}
+                      {c.crt61_url&&<div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48"><FileText size={15} className="text-green-500 flex-shrink-0"/><span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span><a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg">Ver</a></div>}
                     </div>
                   )}
                   {editando?(
@@ -504,10 +526,10 @@ export default function AdminPage() {
               <div className="flex flex-wrap items-end gap-4">
                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Desde</label><input type="date" value={fechaDesde} onChange={e=>setFechaDesde(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Hasta</label><input type="date" value={fechaHasta} onChange={e=>setFechaHasta(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                <button onClick={()=>{setFechaDesde('');setFechaHasta('')}} className="text-sm text-brand-gray-mid hover:text-brand-orange transition-colors px-3 py-2">Limpiar</button>
+                <button onClick={()=>{setFechaDesde('');setFechaHasta('')}} className="text-sm text-brand-gray-mid hover:text-brand-orange px-3 py-2">Limpiar</button>
                 <div className="ml-auto flex items-center gap-3">
                   <div className="text-right"><p className="text-xs text-brand-gray-mid">Total período</p><p className="font-heading font-bold text-xl text-green-600">${totalVentasFiltradas.toFixed(2)}</p></div>
-                  <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors"><Download size={15}/> Exportar CSV</button>
+                  <button onClick={exportarVentas} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange"><Download size={15}/> Exportar CSV</button>
                 </div>
               </div>
             </div>
@@ -536,6 +558,7 @@ export default function AdminPage() {
                       const cliente=getCliente(ped.cliente_id)
                       const seleccionado=seleccionados.includes(ped.id)
                       const subtotal=(ped.total||0)-(ped.fuel_surcharge||0)
+                      const invoiceExistente = invoices.find(inv => inv.pedido_id === ped.id)
                       return(
                         <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado?'border-brand-orange':'border-transparent'}`}>
                           <div className="flex items-start gap-3">
@@ -546,6 +569,9 @@ export default function AdminPage() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
                                   <select value={ped.estado} onChange={e=>cambiarEstado(ped.id,e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>{ESTADOS.map(e=><option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase()+e.replace('_',' ').slice(1)}</option>)}</select>
+                                  <button onClick={()=>generarInvoice(ped)} disabled={generandoInvoice===ped.id} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${invoiceExistente?'bg-green-100 text-green-700 hover:bg-green-200':'bg-brand-navy text-white hover:bg-brand-navy/80'}`}>
+                                    <Receipt size={13}/> {generandoInvoice===ped.id?'Generando...':(invoiceExistente?invoiceExistente.numero:'Invoice')}
+                                  </button>
                                   <button onClick={()=>eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={15}/></button>
                                 </div>
                               </div>
@@ -558,7 +584,7 @@ export default function AdminPage() {
                                 <div><span className="text-brand-gray-mid">Dirección:</span> <span className="font-medium text-brand-navy">{cliente?.direccion||'—'}</span></div>
                                 <div className="col-span-2 flex items-center justify-between mt-1 pt-1 border-t border-blue-100">
                                   <div><span className="text-brand-gray-mid">Método de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago||'—'}</span></div>
-                                  {ped.comprobante_url&&<a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600"><FileText size={11}/> Ver comprobante</a>}
+                                  {ped.comprobante_url&&<a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg"><FileText size={11}/> Ver comprobante</a>}
                                 </div>
                               </div>
                               <div className="border-t pt-2 space-y-1">
@@ -581,6 +607,47 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* INVOICES */}
+        {tab === 'invoices' && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Invoices — {invoices.length}</h2>
+            </div>
+            {invoices.length===0?(
+              <div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados aún</p><p className="text-sm mt-1">Genera invoices desde la pestaña Pedidos</p></div>
+            ):(
+              <div className="space-y-3">
+                {invoices.map(inv=>{
+                  const cliente = clientes.find(c=>c.id===inv.cliente_id)
+                  return(
+                    <div key={inv.id} className="card flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-brand-navy rounded-xl flex items-center justify-center flex-shrink-0">
+                          <Receipt size={22} className="text-brand-orange"/>
+                        </div>
+                        <div>
+                          <p className="font-heading font-bold text-brand-navy text-lg">{inv.numero}</p>
+                          <p className="text-xs text-brand-gray-mid">{new Date(inv.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p>
+                          <p className="text-sm text-brand-gray-dark mt-0.5">{cliente?.nombre||inv.datos_cliente?.nombre||'—'} · {cliente?.negocio||inv.datos_cliente?.negocio||'—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-heading font-bold text-brand-orange text-xl">${inv.total?.toFixed(2)}</p>
+                          <p className="text-xs text-brand-gray-mid">{inv.metodo_pago}</p>
+                        </div>
+                        <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80">
+                          <FileText size={15}/> Ver Invoice
+                        </a>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* RUTAS */}
         {tab === 'rutas' && (
           <div>
@@ -592,16 +659,14 @@ export default function AdminPage() {
               <div className="flex gap-3 flex-wrap">
                 {rutaOptimizada.length>0&&(
                   <>
-                    <button onClick={abrirEnGoogleMaps} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">🗺️ Abrir en Google Maps</button>
-                    <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">🖨️ Imprimir Ruta</button>
+                    <button onClick={abrirEnGoogleMaps} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600">🗺️ Abrir en Google Maps</button>
+                    <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange">🖨️ Imprimir Ruta</button>
                   </>
                 )}
                 <button onClick={optimizarRuta} disabled={optimizando||pedidosRuta.length===0} className="btn-primary flex items-center gap-2"><Map size={16}/> {optimizando?'Calculando...':'Optimizar Ruta'}</button>
               </div>
             </div>
-
             {errorRuta&&<div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorRuta}</div>}
-
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">
@@ -636,7 +701,6 @@ export default function AdminPage() {
                   )}
                 </div>
               </div>
-
               <div>
                 {rutaOptimizada.length>0&&(
                   <div className="mb-4">
@@ -710,15 +774,15 @@ export default function AdminPage() {
               <div className="card mb-6 border-2 border-brand-orange/30">
                 <h2 className="font-heading font-bold text-brand-navy text-lg mb-5">Nuevo Producto</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre * <span className="text-brand-gray-mid font-normal text-xs">(se traducirá automáticamente)</span></label><input value={formProducto.nombre} onChange={e=>setFormProducto({...formProducto,nombre:e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre *</label><input value={formProducto.nombre} onChange={e=>setFormProducto({...formProducto,nombre:e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Categoría *</label><select value={formProducto.categoria} onChange={e=>setFormProducto({...formProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white"><option value="">Selecciona categoría</option>{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Precio * (USD)</label><input value={formProducto.precio} onChange={e=>setFormProducto({...formProducto,precio:e.target.value})} placeholder="Ej: 9.99" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Unidad *</label><input value={formProducto.unidad} onChange={e=>setFormProducto({...formProducto,unidad:e.target.value})} placeholder="Ej: paquete 100u" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripción</label><input value={formProducto.descripcion} onChange={e=>setFormProducto({...formProducto,descripcion:e.target.value})} placeholder="Descripción breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e=>setImagenProducto(e.target.files?.[0]||null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer"/>{imagenProducto&&<p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}</div></div>
+                  <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange"><input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e=>setImagenProducto(e.target.files?.[0]||null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{imagenProducto&&<p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}</div></div>
                 </div>
                 <div className="flex gap-3 mt-5">
-                  <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">{guardando?'Guardando y traduciendo...':<><Plus size={16}/> Guardar</>}</button>
+                  <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">{guardando?'Guardando...':<><Plus size={16}/> Guardar</>}</button>
                   <button onClick={()=>setShowFormProducto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                 </div>
               </div>
@@ -738,10 +802,10 @@ export default function AdminPage() {
                             <div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium text-brand-navy text-sm">{p.nombre}</span>{p.nombre_en&&<span className="text-xs text-gray-400">/ {p.nombre_en}</span>}{!p.activo&&<span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactivo</span>}</div><div className="text-xs text-brand-gray-mid mt-0.5">{p.descripcion} · {p.unidad}</div></div>
                             <div className="font-heading font-bold text-brand-navy">${p.precio}</div>
                             <div className="flex items-center gap-1">
-                              <button onClick={()=>iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button>
-                              <button onClick={()=>seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400"><ImageIcon size={15}/></button>
-                              <button onClick={()=>toggleActivo(p.id,p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors text-brand-gray-mid">{p.activo?<Eye size={15}/>:<EyeOff size={15}/>}</button>
-                              <button onClick={()=>eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button>
+                              <button onClick={()=>iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 text-yellow-500"><Pencil size={15}/></button>
+                              <button onClick={()=>seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 text-blue-400"><ImageIcon size={15}/></button>
+                              <button onClick={()=>toggleActivo(p.id,p.activo)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid">{p.activo?<Eye size={15}/>:<EyeOff size={15}/>}</button>
+                              <button onClick={()=>eliminarProducto(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={15}/></button>
                             </div>
                           </div>
                           {editandoProducto===p.id&&(
@@ -757,7 +821,7 @@ export default function AdminPage() {
                               </div>
                               <div className="flex gap-3 mt-4">
                                 <button onClick={()=>guardarProducto(p.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"><Save size={14}/> {guardando?'Guardando...':'Guardar'}</button>
-                                <button onClick={()=>setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid hover:text-brand-navy"><X size={14}/> Cancelar</button>
+                                <button onClick={()=>setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid"><X size={14}/> Cancelar</button>
                               </div>
                             </div>
                           )}
@@ -804,7 +868,7 @@ export default function AdminPage() {
                         {editandoCategoria===cat?(
                           <><button onClick={()=>guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={13}/> {guardando?'...':'Guardar'}</button><button onClick={()=>setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid"><X size={15}/></button></>
                         ):(
-                          <><button onClick={()=>{setEditandoCategoria(cat);setCategoriaEditNombre(cat)}} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button><button onClick={()=>eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button></>
+                          <><button onClick={()=>{setEditandoCategoria(cat);setCategoriaEditNombre(cat)}} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 text-yellow-500"><Pencil size={15}/></button><button onClick={()=>eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={15}/></button></>
                         )}
                       </div>
                     </div>
