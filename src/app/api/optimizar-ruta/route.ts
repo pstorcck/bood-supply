@@ -13,30 +13,22 @@ export async function POST(req: NextRequest) {
 
     const origin = '2900 N Richmond St, Chicago, IL 60618'
 
-    const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': process.env.GOOGLE_MAPS_KEY!,
-        'X-Goog-FieldMask': 'routes.optimizedIntermediateWaypointIndex',
-      },
-      body: JSON.stringify({
-        origin: { address: origin },
-        destination: { address: origin },
-        intermediates: direcciones.map((d: string) => ({ address: d })),
-        travelMode: 'DRIVE',
-        optimizeWaypointOrder: true,
-      }),
-    })
+    // Obtener distancia de cada parada al origen usando Distance Matrix
+    const destinos = direcciones.join('|')
+    const distanceRes = await fetch(
+      `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(destinos)}&mode=driving&key=${process.env.GOOGLE_MAPS_KEY}`
+    )
+    const distanceData = await distanceRes.json()
 
-    const data = await res.json()
-    console.log('Routes API response:', JSON.stringify(data))
+    // Extraer distancias en metros
+    const distancias = distanceData.rows?.[0]?.elements?.map((el: any, idx: number) => ({
+      idx,
+      metros: el.distance?.value ?? 999999
+    })) || direcciones.map((_: any, idx: number) => ({ idx, metros: idx }))
 
-    if (!data.routes || data.routes.length === 0) {
-      return NextResponse.json({ error: 'No se pudo calcular la ruta' }, { status: 400 })
-    }
-
-    const orden = data.routes[0].optimizedIntermediateWaypointIndex || direcciones.map((_: any, i: number) => i)
+    // Ordenar de más cercano a más lejano (sin regreso al origen)
+    distancias.sort((a: any, b: any) => a.metros - b.metros)
+    const orden = distancias.map((d: any) => d.idx)
 
     return NextResponse.json({
       orden,
