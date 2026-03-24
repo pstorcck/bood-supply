@@ -410,7 +410,7 @@ export default function AdminPage() {
       <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Admin - BOOD SUPPLY</span></div>
         <div className="flex items-center gap-4">
-          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm flex items-center gap-1">Facebook</a>
+          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm">Facebook</a>
           <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
           <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors"><LogOut size={16}/> Salir</button>
         </div>
@@ -619,6 +619,7 @@ export default function AdminPage() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-heading font-bold text-brand-navy text-xl">Invoices - {invoices.length}</h2>
+              <a href="/es/invoice/nuevo" className="btn-primary flex items-center gap-2"><Receipt size={15}/> Nueva Invoice</a>
             </div>
             {invoices.length===0?(
               <div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados</p></div>
