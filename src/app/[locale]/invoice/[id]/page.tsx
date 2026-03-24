@@ -11,11 +11,7 @@ export default function InvoicePage() {
 
   useEffect(() => {
     async function cargar() {
-      const { data } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('id', params.id)
-        .single()
+      const { data } = await supabase.from('invoices').select('*').eq('id', params.id).single()
       setInvoice(data)
       setLoading(false)
     }
@@ -34,39 +30,38 @@ export default function InvoicePage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap');
         * { margin:0; padding:0; box-sizing:border-box }
-        body { font-family:'DM Sans',Arial,sans-serif; font-size:12px; color:#2D3748; background:#f5f5f5 }
-        .page { background:white; max-width:800px; margin:0 auto; padding:32px }
-        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; padding-bottom:16px; border-bottom:3px solid #0F2B5B }
-        .logo { width:56px; height:56px; object-fit:contain }
-        .logo-section { display:flex; align-items:center; gap:12px }
-        .company-name { font-family:'Syne',sans-serif; font-size:24px; font-weight:800; color:#0F2B5B }
+        body { font-family:'DM Sans',Arial,sans-serif; font-size:11px; color:#2D3748; background:#f5f5f5 }
+        .page { background:white; max-width:780px; margin:0 auto; padding:28px }
+        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; padding-bottom:12px; border-bottom:3px solid #0F2B5B }
+        .logo { width:48px; height:48px; object-fit:contain }
+        .logo-section { display:flex; align-items:center; gap:10px }
+        .company-name { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:#0F2B5B }
         .company-name span { color:#F47B20 }
-        .company-info { font-size:10px; color:#718096; margin-top:3px; line-height:1.5 }
-        .invoice-number { font-family:'Syne',sans-serif; font-size:22px; font-weight:700; color:#0F2B5B; text-align:right }
-        .invoice-date { font-size:11px; color:#718096; text-align:right; margin-top:3px }
-        .badge { background:#F47B20; color:white; font-size:9px; font-weight:600; padding:3px 10px; border-radius:20px; display:inline-block; margin-top:6px; letter-spacing:1px; text-transform:uppercase }
-        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px }
-        .info-box { background:#F7FAFC; border-radius:8px; padding:12px; border:1px solid #E2E8F0 }
-        .label { font-size:9px; color:#A0AEC0; text-transform:uppercase; letter-spacing:1px; margin-bottom:1px; margin-top:6px }
-        .label:first-child { margin-top:0 }
-        .value { font-size:12px; font-weight:500; color:#2D3748 }
-        .name { font-size:14px; font-weight:600; color:#0F2B5B; margin-bottom:6px }
-        .section-title { font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:#A0AEC0; margin-bottom:8px }
+        .company-info { font-size:9px; color:#718096; margin-top:2px; line-height:1.4 }
+        .invoice-number { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; color:#0F2B5B; text-align:right }
+        .invoice-date { font-size:10px; color:#718096; text-align:right; margin-top:2px }
+        .badge { background:#F47B20; color:white; font-size:8px; font-weight:600; padding:2px 8px; border-radius:20px; display:inline-block; margin-top:4px; letter-spacing:1px; text-transform:uppercase }
+        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px }
+        .info-box { background:#F7FAFC; border-radius:6px; padding:8px 10px; border:1px solid #E2E8F0 }
+        .info-row { display:flex; gap:6px; align-items:baseline; padding:1px 0 }
+        .info-label { font-size:8px; color:#A0AEC0; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; min-width:52px }
+        .info-value { font-size:10px; font-weight:500; color:#2D3748 }
+        .client-name { font-size:13px; font-weight:600; color:#0F2B5B; margin-bottom:4px }
+        .section-title { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:#A0AEC0; margin-bottom:5px }
         table { width:100%; border-collapse:collapse }
         thead tr { background:#0F2B5B; color:white }
-        thead th { padding:7px 10px; text-align:left; font-size:10px; font-weight:600 }
+        thead th { padding:5px 8px; text-align:left; font-size:9px; font-weight:600 }
         thead th:last-child { text-align:right }
         tbody tr { border-bottom:1px solid #EDF2F7 }
         tbody tr:nth-child(even) { background:#F7FAFC }
-        tbody td { padding:5px 10px; font-size:11px }
+        tbody td { padding:4px 8px; font-size:10px }
         tbody td:last-child { text-align:right; font-weight:500 }
-        .totals { margin-left:auto; width:240px; margin-top:12px }
-        .total-row { display:flex; justify-content:space-between; padding:4px 0; font-size:11px; color:#4A5568; border-bottom:1px solid #EDF2F7 }
-        .grand { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; color:#0F2B5B; border-top:2px solid #0F2B5B; border-bottom:none; padding-top:8px; margin-top:3px }
+        .totals { margin-left:auto; width:220px; margin-top:10px }
+        .total-row { display:flex; justify-content:space-between; padding:3px 0; font-size:10px; color:#4A5568; border-bottom:1px solid #EDF2F7 }
+        .grand { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; color:#0F2B5B; border-top:2px solid #0F2B5B; border-bottom:none; padding-top:6px; margin-top:2px }
         .grand span:last-child { color:#F47B20 }
-        .payment-badge { display:inline-flex; align-items:center; gap:4px; background:#EBF8FF; color:#2B6CB0; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:500; margin-top:6px }
-        .footer { margin-top:24px; padding-top:14px; border-top:1px solid #E2E8F0; text-align:center; color:#A0AEC0; font-size:10px; line-height:1.7 }
-        .print-btn { position:fixed; bottom:24px; right:24px; background:#F47B20; color:white; border:none; padding:12px 24px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 4px 12px rgba(244,123,32,0.4); font-family:'DM Sans',sans-serif }
+        .footer { margin-top:18px; padding-top:10px; border-top:1px solid #E2E8F0; text-align:center; color:#A0AEC0; font-size:9px; line-height:1.6 }
+        .print-btn { position:fixed; bottom:20px; right:20px; background:#F47B20; color:white; border:none; padding:10px 22px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 4px 12px rgba(244,123,32,0.4); font-family:'DM Sans',sans-serif }
         @media print { .print-btn { display:none } body { background:white } .page { padding:16px } }
       `}</style>
 
@@ -80,8 +75,7 @@ export default function InvoicePage() {
               <div className="company-name">BOOD <span>SUPPLY</span></div>
               <div className="company-info">
                 2900 N Richmond St, Chicago, IL 60618<br/>
-                Tel: (312) 409-0106<br/>
-                boodsupplies@gmail.com<br/>
+                Tel: (312) 409-0106 · boodsupplies@gmail.com<br/>
                 www.boodsupply.com
               </div>
             </div>
@@ -96,25 +90,19 @@ export default function InvoicePage() {
         <div className="grid2">
           <div className="info-box">
             <div className="section-title">Facturado a</div>
-            <div className="name">{cliente?.nombre || '—'}</div>
-            {cliente?.negocio && <><div className="label">Negocio</div><div className="value">{cliente.negocio}</div></>}
-            {cliente?.direccion && <><div className="label">Direccion</div><div className="value">{cliente.direccion}</div></>}
-            {cliente?.telefono && <><div className="label">Telefono</div><div className="value">{cliente.telefono}</div></>}
-            {cliente?.ein && <><div className="label">EIN</div><div className="value">{cliente.ein}</div></>}
-            {cliente?.email && <><div className="label">Email</div><div className="value">{cliente.email}</div></>}
+            <div className="client-name">{cliente?.nombre || '—'}</div>
+            {cliente?.negocio && <div className="info-row"><span className="info-label">Negocio</span><span className="info-value">{cliente.negocio}</span></div>}
+            {cliente?.direccion && <div className="info-row"><span className="info-label">Direccion</span><span className="info-value">{cliente.direccion}</span></div>}
+            {cliente?.telefono && <div className="info-row"><span className="info-label">Tel</span><span className="info-value">{cliente.telefono}</span></div>}
+            {cliente?.ein && <div className="info-row"><span className="info-label">EIN</span><span className="info-value">{cliente.ein}</span></div>}
+            {cliente?.email && <div className="info-row"><span className="info-label">Email</span><span className="info-value">{cliente.email}</span></div>}
           </div>
           <div className="info-box">
             <div className="section-title">Detalles</div>
-            <div className="label">Numero de invoice</div>
-            <div className="value">{invoice.numero}</div>
-            {invoice.pedido_id && <>
-              <div className="label">Pedido</div>
-              <div className="value">#{invoice.pedido_id?.slice(0,8).toUpperCase()}</div>
-            </>}
-            <div className="label">Fecha</div>
-            <div className="value">{fecha}</div>
-            <div className="label">Metodo de pago</div>
-            <div className="value">{invoice.metodo_pago || '—'}</div>
+            <div className="info-row"><span className="info-label">Invoice</span><span className="info-value" style={{fontWeight:'700',color:'#0F2B5B'}}>{invoice.numero}</span></div>
+            {invoice.pedido_id && <div className="info-row"><span className="info-label">Pedido</span><span className="info-value">#{invoice.pedido_id?.slice(0,8).toUpperCase()}</span></div>}
+            <div className="info-row"><span className="info-label">Fecha</span><span className="info-value">{fecha}</span></div>
+            <div className="info-row"><span className="info-label">Pago</span><span className="info-value">{invoice.metodo_pago || '—'}</span></div>
           </div>
         </div>
 
@@ -150,8 +138,8 @@ export default function InvoicePage() {
         </div>
 
         <div className="footer">
-          BOOD SUPPLY - 2900 N Richmond St, Chicago, IL 60618<br/>
-          Tel: (312) 409-0106 - boodsupplies@gmail.com - www.boodsupply.com<br/>
+          BOOD SUPPLY · 2900 N Richmond St, Chicago, IL 60618<br/>
+          Tel: (312) 409-0106 · boodsupplies@gmail.com · www.boodsupply.com<br/>
           Gracias por su preferencia
         </div>
       </div>
