@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, ShoppingBag, Users, Search, X, UserPlus, Receipt, Eye } from 'lucide-react'
+import { Plus, LogOut, Package, ShoppingBag, Users, Search, X, UserPlus, Receipt, Eye } from 'lucide-react'
 
 export default function VendedorPage() {
   const [user, setUser] = useState<any>(null)
@@ -131,16 +131,13 @@ export default function VendedorPage() {
         metodo_pago: metodoPago,
       }).select().single()
       if (error) throw error
-
       await supabase.from('pedido_items').insert(
         carrito.map(item => ({ pedido_id: pedido.id, producto_id: item.id, cantidad: item.cantidad, precio_unitario: item.precio }))
       )
-
       await fetch('/api/notificar-admin', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tipo: 'pedido', clienteEmail: clienteSeleccionado.email, clienteNombre: clienteSeleccionado.nombre, total: total.toFixed(2) })
       })
-
       setCarrito([]); setClienteSeleccionado(null); setMetodoPago('Efectivo')
       setPedidoEnviado(true); setTimeout(() => setPedidoEnviado(false), 4000)
       await cargarPedidos()
@@ -333,6 +330,7 @@ export default function VendedorPage() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-heading font-bold text-brand-navy text-xl">Invoices - {invoices.length}</h2>
+              <a href="/es/invoice/nuevo" className="btn-primary flex items-center gap-2"><Receipt size={15}/> Nueva Invoice</a>
             </div>
             {invoices.length===0?(
               <div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados</p></div>
