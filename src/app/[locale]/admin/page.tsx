@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map, Receipt } from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map, Receipt, TrendingUp, TrendingDown, DollarSign, BarChart2, AlertTriangle } from 'lucide-react'
 import MapaRutas from '@/components/MapaRutas'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
@@ -24,6 +24,8 @@ const estadoColor: Record<string, string> = {
   cancelado: 'bg-red-100 text-red-700',
 }
 
+const CATEGORIAS_GASTO = ['Proveedores', 'Renta', 'Gasolina', 'Sueldos', 'Servicios', 'Mantenimiento', 'Otros']
+
 function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
   const contenido = [headers, ...filas].map(r => r.map(c => `"${(c||'').replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob(['\uFEFF' + contenido], { type: 'text/csv;charset=utf-8;' })
@@ -38,12 +40,13 @@ function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices'>('clientes')
+  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices' | 'finanzas'>('clientes')
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
   const [categorias, setCategorias] = useState<string[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
+  const [gastos, setGastos] = useState<any[]>([])
   const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
   const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [editandoCliente, setEditandoCliente] = useState<string | null>(null)
@@ -79,6 +82,20 @@ export default function AdminPage() {
   const [rutaOptimizada, setRutaOptimizada] = useState<any[]>([])
   const [rutaKey, setRutaKey] = useState(0)
   const [errorRuta, setErrorRuta] = useState('')
+
+  // Finanzas state
+  const [finanzasTab, setFinanzasTab] = useState<'resumen' | 'gastos' | 'inventario'>('resumen')
+  const [finanzasPeriodo, setFinanzasPeriodo] = useState<'dia' | 'semana' | 'mes' | 'anio'>('mes')
+  const [fechaFinDesde, setFechaFinDesde] = useState('')
+  const [fechaFinHasta, setFechaFinHasta] = useState('')
+  const [showFormGasto, setShowFormGasto] = useState(false)
+  const [formGasto, setFormGasto] = useState({ categoria: 'Proveedores', proveedor: '', monto: '', fecha: new Date().toISOString().slice(0,10), nota: '' })
+  const [guardandoGasto, setGuardandoGasto] = useState(false)
+  const [editandoStock, setEditandoStock] = useState<string | null>(null)
+  const [editandoCosto, setEditandoCosto] = useState<string | null>(null)
+  const [stockTemp, setStockTemp] = useState('')
+  const [costoTemp, setCostoTemp] = useState('')
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -86,11 +103,35 @@ export default function AdminPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || user.email !== ADMIN_EMAIL) { window.location.href = '/es/login'; return }
       setUser(user)
-      await Promise.all([cargarProductos(), cargarPedidos(), cargarClientes(), cargarInvoices()])
+      await Promise.all([cargarProductos(), cargarPedidos(), cargarClientes(), cargarInvoices(), cargarGastos()])
       setLoading(false)
     }
     init()
   }, [])
+
+  // Set default date range when switching to finanzas
+  useEffect(() => {
+    if (tab === 'finanzas') {
+      calcularRangoFechas(finanzasPeriodo)
+    }
+  }, [tab])
+
+  function calcularRangoFechas(periodo: string) {
+    const hoy = new Date()
+    let desde = new Date()
+    if (periodo === 'dia') { desde = new Date(hoy); }
+    else if (periodo === 'semana') { desde = new Date(hoy); desde.setDate(hoy.getDate() - 7); }
+    else if (periodo === 'mes') { desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1); }
+    else if (periodo === 'anio') { desde = new Date(hoy.getFullYear(), 0, 1); }
+    setFechaFinDesde(desde.toISOString().slice(0,10))
+    setFechaFinHasta(hoy.toISOString().slice(0,10))
+    setFinanzasPeriodo(periodo as any)
+  }
+
+  async function cargarGastos() {
+    const { data } = await supabase.from('gastos').select('*').order('fecha', { ascending: false })
+    setGastos(data || [])
+  }
 
   async function cargarInvoices() {
     const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false })
@@ -185,6 +226,80 @@ export default function AdminPage() {
 
   const totalVentasFiltradas = pedidosFiltrados.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
   const totalVentas = pedidos.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
+
+  // ── Finanzas computados ──────────────────────────────────────────────────────
+  const pedidosFinanzas = pedidos.filter(p => {
+    if (p.estado === 'cancelado') return false
+    if (!fechaFinDesde && !fechaFinHasta) return true
+    const fecha = new Date(p.created_at)
+    if (fechaFinDesde && fecha < new Date(fechaFinDesde)) return false
+    if (fechaFinHasta && fecha > new Date(fechaFinHasta + 'T23:59:59')) return false
+    return true
+  })
+
+  const gastosFinanzas = gastos.filter(g => {
+    if (!fechaFinDesde && !fechaFinHasta) return true
+    const fecha = new Date(g.fecha)
+    if (fechaFinDesde && fecha < new Date(fechaFinDesde)) return false
+    if (fechaFinHasta && fecha > new Date(fechaFinHasta + 'T23:59:59')) return false
+    return true
+  })
+
+  const totalIngresos = pedidosFinanzas.reduce((sum, p) => sum + (p.total || 0), 0)
+  const totalEgresos = gastosFinanzas.reduce((sum, g) => sum + (g.monto || 0), 0)
+  const resultado = totalIngresos - totalEgresos
+  const margenPct = totalIngresos > 0 ? (resultado / totalIngresos * 100) : 0
+
+  const egresosPorCategoria = CATEGORIAS_GASTO.map(cat => ({
+    cat,
+    total: gastosFinanzas.filter(g => g.categoria === cat).reduce((sum, g) => sum + (g.monto || 0), 0)
+  })).filter(c => c.total > 0).sort((a, b) => b.total - a.total)
+
+  // ── Gastos CRUD ──────────────────────────────────────────────────────────────
+  async function guardarGasto() {
+    if (!formGasto.monto || !formGasto.fecha) return alert('Monto y fecha son requeridos')
+    setGuardandoGasto(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('gastos').insert({
+      categoria: formGasto.categoria,
+      proveedor: formGasto.proveedor || null,
+      monto: parseFloat(formGasto.monto),
+      fecha: formGasto.fecha,
+      nota: formGasto.nota || null,
+      creado_por: user?.id
+    })
+    setFormGasto({ categoria: 'Proveedores', proveedor: '', monto: '', fecha: new Date().toISOString().slice(0,10), nota: '' })
+    setShowFormGasto(false)
+    await cargarGastos()
+    setGuardandoGasto(false)
+  }
+
+  async function eliminarGasto(id: string) {
+    if (!confirm('Eliminar este gasto?')) return
+    await supabase.from('gastos').delete().eq('id', id)
+    await cargarGastos()
+  }
+
+  // ── Inventario / Costo ───────────────────────────────────────────────────────
+  async function guardarStock(id: string) {
+    await supabase.from('productos').update({ stock: parseInt(stockTemp) || 0 }).eq('id', id)
+    setEditandoStock(null)
+    await cargarProductos()
+  }
+
+  async function guardarCosto(id: string) {
+    await supabase.from('productos').update({ costo: parseFloat(costoTemp) || 0 }).eq('id', id)
+    setEditandoCosto(null)
+    await cargarProductos()
+  }
+
+  function exportarGastos() {
+    const headers = ['Fecha', 'Categoria', 'Proveedor', 'Monto', 'Nota']
+    const filas = gastosFinanzas.map(g => [
+      g.fecha, g.categoria, g.proveedor || '—', `$${g.monto?.toFixed(2)}`, g.nota || '—'
+    ])
+    descargarCSV('gastos-bood-supply', filas, headers)
+  }
 
   async function crearUsuario() {
     if (!formUsuario.email || !formUsuario.nombre) return setErrorUsuario('Email y nombre son requeridos')
@@ -424,13 +539,284 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-2 flex-wrap mb-8">
-          {[{key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion},{key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},{key:'invoices',label:'Invoices',icon:Receipt,badge:0},{key:'rutas',label:'Rutas',icon:Map,badge:0},{key:'mensajes',label:'Mensajes',icon:Mail,badge:0},{key:'productos',label:'Productos',icon:Package,badge:0},{key:'categorias',label:'Categorias',icon:Tag,badge:0}].map(({key,label,icon:Icon,badge})=>(
+          {[
+            {key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion},
+            {key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},
+            {key:'invoices',label:'Invoices',icon:Receipt,badge:0},
+            {key:'finanzas',label:'Finanzas',icon:BarChart2,badge:0},
+            {key:'rutas',label:'Rutas',icon:Map,badge:0},
+            {key:'mensajes',label:'Mensajes',icon:Mail,badge:0},
+            {key:'productos',label:'Productos',icon:Package,badge:0},
+            {key:'categorias',label:'Categorias',icon:Tag,badge:0}
+          ].map(({key,label,icon:Icon,badge})=>(
             <button key={key} onClick={()=>setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab===key?'bg-brand-navy text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
               <Icon size={16}/> {label}
               {badge>0&&<span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${tab===key?'bg-white text-brand-navy':'bg-red-500 text-white'}`}>{badge}</span>}
             </button>
           ))}
         </div>
+
+        {/* FINANZAS */}
+        {tab === 'finanzas' && (
+          <div>
+            {/* Sub-tabs */}
+            <div className="flex gap-2 mb-6">
+              {[{key:'resumen',label:'📊 Resumen'},{key:'gastos',label:'💸 Gastos'},{key:'inventario',label:'📦 Inventario'}].map(({key,label})=>(
+                <button key={key} onClick={()=>setFinanzasTab(key as any)} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${finanzasTab===key?'bg-brand-orange text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-orange'}`}>{label}</button>
+              ))}
+            </div>
+
+            {/* Filtro de periodo */}
+            <div className="card mb-6">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex gap-2">
+                  {[{key:'dia',label:'Hoy'},{key:'semana',label:'7 días'},{key:'mes',label:'Este mes'},{key:'anio',label:'Este año'}].map(({key,label})=>(
+                    <button key={key} onClick={()=>calcularRangoFechas(key)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${finanzasPeriodo===key?'bg-brand-navy text-white':'bg-gray-100 text-brand-navy hover:bg-gray-200'}`}>{label}</button>
+                  ))}
+                </div>
+                <div className="flex items-end gap-2 ml-auto">
+                  <div><label className="block text-xs text-brand-gray-mid mb-1">Desde</label><input type="date" value={fechaFinDesde} onChange={e=>setFechaFinDesde(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs text-brand-gray-mid mb-1">Hasta</label><input type="date" value={fechaFinHasta} onChange={e=>setFechaFinHasta(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                </div>
+              </div>
+            </div>
+
+            {/* RESUMEN */}
+            {finanzasTab === 'resumen' && (
+              <div className="space-y-6">
+                {/* KPIs */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="card border-l-4 border-l-green-400">
+                    <div className="flex items-center gap-2 mb-1"><TrendingUp size={16} className="text-green-500"/><span className="text-xs text-brand-gray-mid font-medium">Ingresos</span></div>
+                    <div className="font-heading font-bold text-2xl text-green-600">${totalIngresos.toFixed(2)}</div>
+                    <div className="text-xs text-brand-gray-mid mt-1">{pedidosFinanzas.length} pedidos</div>
+                  </div>
+                  <div className="card border-l-4 border-l-red-400">
+                    <div className="flex items-center gap-2 mb-1"><TrendingDown size={16} className="text-red-500"/><span className="text-xs text-brand-gray-mid font-medium">Egresos</span></div>
+                    <div className="font-heading font-bold text-2xl text-red-500">${totalEgresos.toFixed(2)}</div>
+                    <div className="text-xs text-brand-gray-mid mt-1">{gastosFinanzas.length} gastos</div>
+                  </div>
+                  <div className={`card border-l-4 ${resultado >= 0 ? 'border-l-brand-navy' : 'border-l-red-500'}`}>
+                    <div className="flex items-center gap-2 mb-1"><DollarSign size={16} className={resultado >= 0 ? 'text-brand-navy' : 'text-red-500'}/><span className="text-xs text-brand-gray-mid font-medium">Resultado</span></div>
+                    <div className={`font-heading font-bold text-2xl ${resultado >= 0 ? 'text-brand-navy' : 'text-red-500'}`}>{resultado >= 0 ? '+' : ''}${resultado.toFixed(2)}</div>
+                    <div className="text-xs text-brand-gray-mid mt-1">{resultado >= 0 ? 'Ganancia' : 'Perdida'}</div>
+                  </div>
+                  <div className="card border-l-4 border-l-brand-orange">
+                    <div className="flex items-center gap-2 mb-1"><BarChart2 size={16} className="text-brand-orange"/><span className="text-xs text-brand-gray-mid font-medium">Margen</span></div>
+                    <div className={`font-heading font-bold text-2xl ${margenPct >= 0 ? 'text-brand-orange' : 'text-red-500'}`}>{margenPct.toFixed(1)}%</div>
+                    <div className="text-xs text-brand-gray-mid mt-1">Sobre ingresos</div>
+                  </div>
+                </div>
+
+                {/* Barra visual ingresos vs egresos */}
+                {totalIngresos > 0 && (
+                  <div className="card">
+                    <h3 className="font-heading font-semibold text-brand-navy mb-4">Ingresos vs Egresos</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex justify-between text-xs mb-1"><span className="text-green-600 font-medium">Ingresos</span><span className="text-green-600 font-bold">${totalIngresos.toFixed(2)}</span></div>
+                        <div className="w-full bg-gray-100 rounded-full h-4"><div className="bg-green-500 h-4 rounded-full" style={{width:'100%'}}/></div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs mb-1"><span className="text-red-500 font-medium">Egresos</span><span className="text-red-500 font-bold">${totalEgresos.toFixed(2)}</span></div>
+                        <div className="w-full bg-gray-100 rounded-full h-4"><div className="bg-red-400 h-4 rounded-full transition-all" style={{width:`${Math.min((totalEgresos/totalIngresos)*100,100)}%`}}/></div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs mb-1"><span className={resultado>=0?'text-brand-navy font-medium':'text-red-600 font-medium'}>Resultado neto</span><span className={resultado>=0?'text-brand-navy font-bold':'text-red-600 font-bold'}>${resultado.toFixed(2)}</span></div>
+                        <div className="w-full bg-gray-100 rounded-full h-4"><div className={`h-4 rounded-full transition-all ${resultado>=0?'bg-brand-navy':'bg-red-600'}`} style={{width:`${Math.min(Math.abs(resultado/totalIngresos)*100,100)}%`}}/></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Egresos por categoria */}
+                {egresosPorCategoria.length > 0 && (
+                  <div className="card">
+                    <h3 className="font-heading font-semibold text-brand-navy mb-4">Egresos por Categoria</h3>
+                    <div className="space-y-3">
+                      {egresosPorCategoria.map(({cat, total}) => (
+                        <div key={cat}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-brand-gray-dark font-medium">{cat}</span>
+                            <span className="text-brand-navy font-bold">${total.toFixed(2)} <span className="text-brand-gray-mid font-normal">({totalEgresos>0?(total/totalEgresos*100).toFixed(0):0}%)</span></span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2.5">
+                            <div className="bg-brand-orange h-2.5 rounded-full" style={{width:`${totalEgresos>0?(total/totalEgresos*100):0}%`}}/>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {totalIngresos === 0 && totalEgresos === 0 && (
+                  <div className="card text-center py-16 text-brand-gray-mid">
+                    <BarChart2 size={48} className="mx-auto mb-3 opacity-20"/>
+                    <p className="font-medium">No hay datos en este periodo</p>
+                    <p className="text-sm mt-1">Selecciona un rango de fechas diferente o agrega gastos</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* GASTOS */}
+            {finanzasTab === 'gastos' && (
+              <div>
+                <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+                  <h3 className="font-heading font-bold text-brand-navy text-lg">Registro de Gastos <span className="text-sm font-normal text-brand-gray-mid">({gastosFinanzas.length} en periodo · Total: ${totalEgresos.toFixed(2)})</span></h3>
+                  <div className="flex gap-2">
+                    <button onClick={()=>setShowFormGasto(!showFormGasto)} className="btn-primary flex items-center gap-2"><Plus size={15}/> Agregar Gasto</button>
+                    {gastosFinanzas.length > 0 && <button onClick={exportarGastos} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange"><Download size={15}/> CSV</button>}
+                  </div>
+                </div>
+
+                {showFormGasto && (
+                  <div className="card border-2 border-brand-orange/30 mb-5">
+                    <h4 className="font-heading font-semibold text-brand-navy mb-4">Nuevo Gasto</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoria *</label>
+                        <select value={formGasto.categoria} onChange={e=>setFormGasto({...formGasto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
+                          {CATEGORIAS_GASTO.map(c=><option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Proveedor / Descripcion</label><input value={formGasto.proveedor} onChange={e=>setFormGasto({...formGasto,proveedor:e.target.value})} placeholder="Ej: Sysco Foods" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                      <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Monto (USD) *</label><input value={formGasto.monto} onChange={e=>setFormGasto({...formGasto,monto:e.target.value})} placeholder="0.00" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                      <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha *</label><input value={formGasto.fecha} onChange={e=>setFormGasto({...formGasto,fecha:e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                      <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nota</label><input value={formGasto.nota} onChange={e=>setFormGasto({...formGasto,nota:e.target.value})} placeholder="Nota adicional (opcional)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                    </div>
+                    <div className="flex gap-3 mt-4">
+                      <button onClick={guardarGasto} disabled={guardandoGasto} className="btn-primary flex items-center gap-2"><Save size={15}/> {guardandoGasto?'Guardando...':'Guardar Gasto'}</button>
+                      <button onClick={()=>setShowFormGasto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
+                    </div>
+                  </div>
+                )}
+
+                {gastosFinanzas.length === 0 ? (
+                  <div className="card text-center py-16 text-brand-gray-mid"><TrendingDown size={48} className="mx-auto mb-3 opacity-20"/><p className="font-medium">No hay gastos en este periodo</p><p className="text-sm mt-1">Haz clic en "Agregar Gasto" para registrar uno</p></div>
+                ) : (
+                  <div className="space-y-2">
+                    {gastosFinanzas.map(g => (
+                      <div key={g.id} className="card flex items-center justify-between flex-wrap gap-3 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0"><TrendingDown size={16} className="text-red-500"/></div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-brand-navy text-sm">{g.proveedor || g.categoria}</span>
+                              <span className="text-xs bg-gray-100 text-brand-gray-mid px-2 py-0.5 rounded-full">{g.categoria}</span>
+                            </div>
+                            <p className="text-xs text-brand-gray-mid">{new Date(g.fecha + 'T12:00:00').toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'})}{g.nota && <span> · {g.nota}</span>}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-heading font-bold text-red-500">${g.monto?.toFixed(2)}</span>
+                          <button onClick={()=>eliminarGasto(g.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={14}/></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* INVENTARIO */}
+            {finanzasTab === 'inventario' && (
+              <div>
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-heading font-bold text-brand-navy text-lg">Inventario y Margenes</h3>
+                  <p className="text-xs text-brand-gray-mid">Haz clic en el costo o stock para editarlo</p>
+                </div>
+                {/* Alertas stock bajo */}
+                {productos.filter(p => p.activo && (p.stock ?? 0) <= 5 && (p.stock ?? 0) >= 0).length > 0 && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-5 flex items-start gap-3">
+                    <AlertTriangle size={18} className="text-yellow-500 flex-shrink-0 mt-0.5"/>
+                    <div>
+                      <p className="font-semibold text-yellow-700 text-sm">Stock bajo en {productos.filter(p=>p.activo&&(p.stock??0)<=5).length} producto(s)</p>
+                      <p className="text-xs text-yellow-600 mt-0.5">{productos.filter(p=>p.activo&&(p.stock??0)<=5).map(p=>p.nombre).join(', ')}</p>
+                    </div>
+                  </div>
+                )}
+                <div className="card overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-brand-gray-mid">Producto</th>
+                        <th className="text-center py-3 px-3 text-xs font-semibold text-brand-gray-mid">Stock</th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Costo</th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Precio</th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Ganancia/u</th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Margen %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productos.filter(p=>p.activo).map(p => {
+                        const costo = p.costo || 0
+                        const precio = p.precio || 0
+                        const ganancia = precio - costo
+                        const margen = precio > 0 ? (ganancia / precio * 100) : 0
+                        const stockBajo = (p.stock ?? 0) <= 5
+                        return (
+                          <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                            <td className="py-3 px-3">
+                              <div className="flex items-center gap-2">
+                                {p.imagen_url && <img src={p.imagen_url} alt={p.nombre} className="w-8 h-8 rounded-lg object-contain bg-gray-100 flex-shrink-0"/>}
+                                <div>
+                                  <p className="font-medium text-brand-navy">{p.nombre}</p>
+                                  <p className="text-xs text-brand-gray-mid">{p.categoria} · {p.unidad}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              {editandoStock === p.id ? (
+                                <div className="flex items-center gap-1 justify-center">
+                                  <input value={stockTemp} onChange={e=>setStockTemp(e.target.value)} type="number" className="w-20 border border-brand-orange rounded-lg px-2 py-1 text-sm text-center focus:outline-none" autoFocus onKeyDown={e=>e.key==='Enter'&&guardarStock(p.id)}/>
+                                  <button onClick={()=>guardarStock(p.id)} className="text-green-500 hover:text-green-700"><Save size={14}/></button>
+                                  <button onClick={()=>setEditandoStock(null)} className="text-brand-gray-mid hover:text-brand-navy"><X size={14}/></button>
+                                </div>
+                              ) : (
+                                <button onClick={()=>{setEditandoStock(p.id);setStockTemp(String(p.stock??0))}} className={`font-bold px-3 py-1 rounded-lg text-sm cursor-pointer hover:opacity-80 transition-opacity ${stockBajo?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>
+                                  {p.stock ?? 0} {stockBajo && '⚠️'}
+                                </button>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              {editandoCosto === p.id ? (
+                                <div className="flex items-center gap-1 justify-end">
+                                  <input value={costoTemp} onChange={e=>setCostoTemp(e.target.value)} type="number" step="0.01" className="w-24 border border-brand-orange rounded-lg px-2 py-1 text-sm text-right focus:outline-none" autoFocus onKeyDown={e=>e.key==='Enter'&&guardarCosto(p.id)}/>
+                                  <button onClick={()=>guardarCosto(p.id)} className="text-green-500 hover:text-green-700"><Save size={14}/></button>
+                                  <button onClick={()=>setEditandoCosto(null)} className="text-brand-gray-mid hover:text-brand-navy"><X size={14}/></button>
+                                </div>
+                              ) : (
+                                <button onClick={()=>{setEditandoCosto(p.id);setCostoTemp(String(p.costo??0))}} className="font-medium text-brand-gray-dark hover:text-brand-navy cursor-pointer hover:bg-gray-100 px-2 py-1 rounded-lg transition-colors">
+                                  {costo > 0 ? `$${costo.toFixed(2)}` : <span className="text-brand-gray-mid text-xs italic">Agregar</span>}
+                                </button>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right font-medium text-brand-navy">${precio.toFixed(2)}</td>
+                            <td className="py-3 px-3 text-right">
+                              {costo > 0 ? (
+                                <span className={`font-bold ${ganancia >= 0 ? 'text-green-600' : 'text-red-500'}`}>${ganancia.toFixed(2)}</span>
+                              ) : <span className="text-brand-gray-mid text-xs">—</span>}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              {costo > 0 ? (
+                                <span className={`font-bold text-sm px-2 py-0.5 rounded-full ${margen >= 30 ? 'bg-green-100 text-green-700' : margen >= 10 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'}`}>{margen.toFixed(1)}%</span>
+                              ) : <span className="text-brand-gray-mid text-xs">—</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex gap-3 mt-3 text-xs text-brand-gray-mid">
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-100 inline-block"/>&ge;30% buen margen</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-100 inline-block"/>10–30% margen medio</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-100 inline-block"/>&lt;10% margen bajo</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* CLIENTES */}
         {tab === 'clientes' && (
