@@ -208,8 +208,7 @@ export default function DashboardPage() {
     return catES
   }
 
-  function agregarAlCarrito(producto: any) {
-    if ((producto.stock ?? -1) === 0) return // bloquear sin stock
+  function agregarAlCarrito(producto: any, preorder = false) {
     setCarrito(prev => {
       const existe = prev.find(i => i.id === producto.id)
       if (existe) return prev.map(i => i.id === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i)
@@ -259,7 +258,7 @@ export default function DashboardPage() {
     }
     const { data: pedido } = await supabase.from('pedidos').insert({
       cliente_id: user.id, total, fuel_surcharge: FUEL_SURCHARGE,
-      metodo_pago: metodoPago, comprobante_url, estado: 'pendiente'
+      metodo_pago: metodoPago, comprobante_url, estado: carrito.some(i => (i.stock ?? -1) === 0) ? 'esperando_stock' : 'pendiente'
     }).select().single()
     if (pedido) {
       await supabase.from('pedido_items').insert(carrito.map(i => ({ pedido_id: pedido.id, producto_id: i.id, cantidad: i.cantidad, precio_unitario: i.precio })))
@@ -440,7 +439,7 @@ export default function DashboardPage() {
                 return (
                   <div key={p.id} className={`bg-white rounded-2xl shadow-sm border flex flex-col hover:shadow-md transition-shadow overflow-hidden relative ${sinStock ? 'border-red-200 opacity-75' : 'border-gray-100'}`}>
                     {sinStock && (
-                      <div className="absolute top-2 left-2 z-10 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg">OUT OF STOCK</div>
+                      <div className="absolute top-2 left-2 z-10 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded-lg">⏱ 48hrs</div>
                     )}
                     <div className={sinStock ? 'cursor-default' : 'cursor-pointer'} onClick={() => !sinStock && setProductoModal(p)}>
                       {p.imagen_url ? (
@@ -466,8 +465,8 @@ export default function DashboardPage() {
                             <button onClick={() => cambiarCantidad(p.id, 1)} className="w-7 h-7 rounded-full bg-brand-orange text-white flex items-center justify-center"><Plus size={12} /></button>
                           </div>
                         ) : (
-                          <button onClick={() => agregarAlCarrito(p)} disabled={sinStock} className={`btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1 ${sinStock ? "opacity-50 cursor-not-allowed" : ""}`}>
-                            <Plus size={14} /> {t.add}
+                          <button onClick={() => agregarAlCarrito(p, sinStock)} className={`!py-1.5 !px-3 text-sm flex items-center gap-1 font-semibold rounded-button transition-all ${sinStock ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "btn-primary"}`}>
+                            <Plus size={14} /> {sinStock ? (t.locale === 'en' ? '48hrs order' : 'Pedir 48hrs') : t.add}
                           </button>
                         )}
                       </div>
