@@ -436,9 +436,13 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {productosFiltrados.map(p => {
                 const enCarrito = carrito.find(i => i.id === p.id)
+                const sinStock = (p.stock ?? -1) === 0
                 return (
-                  <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow overflow-hidden">
-                    <div className="cursor-pointer" onClick={() => setProductoModal(p)}>
+                  <div key={p.id} className={`bg-white rounded-2xl shadow-sm border flex flex-col hover:shadow-md transition-shadow overflow-hidden relative ${sinStock ? 'border-red-200 opacity-75' : 'border-gray-100'}`}>
+                    {sinStock && (
+                      <div className="absolute top-2 left-2 z-10 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg">OUT OF STOCK</div>
+                    )}
+                    <div className={sinStock ? 'cursor-default' : 'cursor-pointer'} onClick={() => !sinStock && setProductoModal(p)}>
                       {p.imagen_url ? (
                         <img src={p.imagen_url} alt={getNombreProducto(p)} className="w-full h-36 object-contain bg-gray-50 hover:opacity-90 transition-opacity" />
                       ) : (
@@ -462,7 +466,7 @@ export default function DashboardPage() {
                             <button onClick={() => cambiarCantidad(p.id, 1)} className="w-7 h-7 rounded-full bg-brand-orange text-white flex items-center justify-center"><Plus size={12} /></button>
                           </div>
                         ) : (
-                          <button onClick={() => agregarAlCarrito(p)} className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1">
+                          <button onClick={() => agregarAlCarrito(p)} disabled={sinStock} className={`btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1 ${sinStock ? "opacity-50 cursor-not-allowed" : ""}`}>
                             <Plus size={14} /> {t.add}
                           </button>
                         )}
