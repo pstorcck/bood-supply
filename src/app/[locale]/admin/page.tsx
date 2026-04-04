@@ -104,7 +104,8 @@ export default function AdminPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || user.email !== ADMIN_EMAIL) { window.location.href = '/es/login'; return }
       setUser(user)
-      await Promise.all([cargarProductos(), cargarPedidos(), cargarClientes(), cargarInvoices(), cargarGastos()])
+      await Promise.all([cargarProductos(), cargarPedidos(), cargarClientes(), cargarInvoices()])
+      await cargarGastos()
       setLoading(false)
     }
     init()
