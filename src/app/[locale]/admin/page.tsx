@@ -91,6 +91,7 @@ export default function AdminPage() {
   const [showFormGasto, setShowFormGasto] = useState(false)
   const [formGasto, setFormGasto] = useState({ categoria: 'Proveedores', proveedor: '', monto: '', fecha: new Date().toISOString().slice(0,10), nota: '' })
   const [guardandoGasto, setGuardandoGasto] = useState(false)
+  const [errorGasto, setErrorGasto] = useState('')
   const [editandoStock, setEditandoStock] = useState<string | null>(null)
   const [editandoCosto, setEditandoCosto] = useState<string | null>(null)
   const [stockTemp, setStockTemp] = useState('')
@@ -109,20 +110,17 @@ export default function AdminPage() {
     init()
   }, [])
 
-  // Set default date range when switching to finanzas
   useEffect(() => {
-    if (tab === 'finanzas') {
-      calcularRangoFechas(finanzasPeriodo)
-    }
+    if (tab === 'finanzas') calcularRangoFechas(finanzasPeriodo)
   }, [tab])
 
   function calcularRangoFechas(periodo: string) {
     const hoy = new Date()
     let desde = new Date()
-    if (periodo === 'dia') { desde = new Date(hoy); }
-    else if (periodo === 'semana') { desde = new Date(hoy); desde.setDate(hoy.getDate() - 7); }
-    else if (periodo === 'mes') { desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1); }
-    else if (periodo === 'anio') { desde = new Date(hoy.getFullYear(), 0, 1); }
+    if (periodo === 'dia') { desde = new Date(hoy) }
+    else if (periodo === 'semana') { desde = new Date(hoy); desde.setDate(hoy.getDate() - 7) }
+    else if (periodo === 'mes') { desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1) }
+    else if (periodo === 'anio') { desde = new Date(hoy.getFullYear(), 0, 1) }
     setFechaFinDesde(desde.toISOString().slice(0,10))
     setFechaFinHasta(hoy.toISOString().slice(0,10))
     setFinanzasPeriodo(periodo as any)
@@ -142,11 +140,7 @@ export default function AdminPage() {
     setGenerandoInvoice(ped.id)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const res = await fetch('/api/crear-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pedido_id: ped.id, cliente_id: ped.cliente_id, creado_por: user?.id })
-      })
+      const res = await fetch('/api/crear-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pedido_id: ped.id, cliente_id: ped.cliente_id, creado_por: user?.id }) })
       const data = await res.json()
       if (data.error) { alert('Error: ' + data.error); return }
       await cargarInvoices()
@@ -165,14 +159,10 @@ export default function AdminPage() {
     }).filter(p => p.direccion)
     if (paradas.length === 0) { setErrorRuta('Los pedidos no tienen direccion registrada'); setOptimizando(false); return }
     try {
-      const res = await fetch('/api/optimizar-ruta', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ direcciones: paradas.map((p: any) => p.direccion + ', Chicago, IL') })
-      })
+      const res = await fetch('/api/optimizar-ruta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direcciones: paradas.map((p: any) => p.direccion + ', Chicago, IL') }) })
       const data = await res.json()
       if (data.error) { setErrorRuta(data.error); setOptimizando(false); return }
-      const rutaOrdenada = data.orden.map((i: number) => paradas[i])
-      setRutaOptimizada(rutaOrdenada)
+      setRutaOptimizada(data.orden.map((i: number) => paradas[i]))
       setRutaKey(prev => prev + 1)
     } catch (e: any) { setErrorRuta(e.message) }
     setOptimizando(false)
@@ -186,11 +176,7 @@ export default function AdminPage() {
   }
 
   function imprimirRuta() {
-    const html = `<html><head><title>Ruta de Entrega - BOOD SUPPLY</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.header{background:#0F2B5B;color:white;padding:16px;border-radius:8px;margin-bottom:20px;text-align:center}.parada{border:1px solid #ccc;border-radius:8px;padding:12px;margin-bottom:12px;page-break-inside:avoid}.num{background:#F47B20;color:white;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;margin-right:8px}.items{margin-top:8px;padding-top:8px;border-top:1px solid #eee;font-size:11px}</style></head><body>
-    <div class="header"><h2 style="margin:0">BOOD SUPPLY - Ruta de Entrega</h2><p style="margin:4px 0 0">${new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p><p style="margin:4px 0 0">Origen: 2900 N Richmond St, Chicago, IL 60618</p></div>
-    ${rutaOptimizada.map((p,i)=>`<div class="parada"><div style="display:flex;align-items:center;margin-bottom:6px"><span class="num">${i+1}</span><strong>${p.negocio||p.nombre}</strong></div><p style="margin:2px 0">👤 ${p.nombre}</p><p style="margin:2px 0">📍 ${p.direccion}</p><p style="margin:2px 0">📞 ${p.telefono}</p><p style="margin:2px 0">💳 Pago: ${p.metodo_pago} · Total: $${p.total?.toFixed(2)}</p><p style="margin:2px 0">📦 Pedido: ${p.pedidoId}</p><div class="items">${p.items?.map((item:any)=>`<div>${item.productos?.nombre} x${item.cantidad}</div>`).join('')||''}</div></div>`).join('')}
-    </body></html>`
+    const html = `<html><head><title>Ruta de Entrega - BOOD SUPPLY</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.header{background:#0F2B5B;color:white;padding:16px;border-radius:8px;margin-bottom:20px;text-align:center}.parada{border:1px solid #ccc;border-radius:8px;padding:12px;margin-bottom:12px;page-break-inside:avoid}.num{background:#F47B20;color:white;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;margin-right:8px}.items{margin-top:8px;padding-top:8px;border-top:1px solid #eee;font-size:11px}</style></head><body><div class="header"><h2 style="margin:0">BOOD SUPPLY - Ruta de Entrega</h2><p style="margin:4px 0 0">${new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p><p style="margin:4px 0 0">Origen: 2900 N Richmond St, Chicago, IL 60618</p></div>${rutaOptimizada.map((p,i)=>`<div class="parada"><div style="display:flex;align-items:center;margin-bottom:6px"><span class="num">${i+1}</span><strong>${p.negocio||p.nombre}</strong></div><p style="margin:2px 0">👤 ${p.nombre}</p><p style="margin:2px 0">📍 ${p.direccion}</p><p style="margin:2px 0">📞 ${p.telefono}</p><p style="margin:2px 0">💳 Pago: ${p.metodo_pago} · Total: $${p.total?.toFixed(2)}</p><p style="margin:2px 0">📦 Pedido: ${p.pedidoId}</p><div class="items">${p.items?.map((item:any)=>`<div>${item.productos?.nombre} x${item.cantidad}</div>`).join('')||''}</div></div>`).join('')}</body></html>`
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
   }
@@ -227,7 +213,6 @@ export default function AdminPage() {
   const totalVentasFiltradas = pedidosFiltrados.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
   const totalVentas = pedidos.filter(p => p.estado !== 'cancelado').reduce((sum, p) => sum + (p.total || 0), 0)
 
-  // ── Finanzas computados ──────────────────────────────────────────────────────
   const pedidosFinanzas = pedidos.filter(p => {
     if (p.estado === 'cancelado') return false
     if (!fechaFinDesde && !fechaFinHasta) return true
@@ -255,32 +240,34 @@ export default function AdminPage() {
     total: gastosFinanzas.filter(g => g.categoria === cat).reduce((sum, g) => sum + (g.monto || 0), 0)
   })).filter(c => c.total > 0).sort((a, b) => b.total - a.total)
 
-  // ── Gastos CRUD ──────────────────────────────────────────────────────────────
+  // ── Gastos via API route ─────────────────────────────────────────────────────
   async function guardarGasto() {
     if (!formGasto.monto || !formGasto.fecha) return alert('Monto y fecha son requeridos')
     setGuardandoGasto(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('gastos').insert({
-      categoria: formGasto.categoria,
-      proveedor: formGasto.proveedor || null,
-      monto: parseFloat(formGasto.monto),
-      fecha: formGasto.fecha,
-      nota: formGasto.nota || null,
-      creado_por: user?.id
-    })
-    setFormGasto({ categoria: 'Proveedores', proveedor: '', monto: '', fecha: new Date().toISOString().slice(0,10), nota: '' })
-    setShowFormGasto(false)
-    await cargarGastos()
+    setErrorGasto('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const res = await fetch('/api/gastos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formGasto, creado_por: user?.id })
+      })
+      const data = await res.json()
+      if (data.error) { setErrorGasto(data.error); setGuardandoGasto(false); return }
+      setFormGasto({ categoria: 'Proveedores', proveedor: '', monto: '', fecha: new Date().toISOString().slice(0,10), nota: '' })
+      setShowFormGasto(false)
+      await cargarGastos()
+    } catch (e: any) { setErrorGasto(e.message) }
     setGuardandoGasto(false)
   }
 
   async function eliminarGasto(id: string) {
     if (!confirm('Eliminar este gasto?')) return
-    await supabase.from('gastos').delete().eq('id', id)
+    await fetch('/api/gastos', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     await cargarGastos()
   }
 
-  // ── Inventario / Costo ───────────────────────────────────────────────────────
+  // ── Inventario ───────────────────────────────────────────────────────────────
   async function guardarStock(id: string) {
     await supabase.from('productos').update({ stock: parseInt(stockTemp) || 0 }).eq('id', id)
     setEditandoStock(null)
@@ -295,9 +282,7 @@ export default function AdminPage() {
 
   function exportarGastos() {
     const headers = ['Fecha', 'Categoria', 'Proveedor', 'Monto', 'Nota']
-    const filas = gastosFinanzas.map(g => [
-      g.fecha, g.categoria, g.proveedor || '—', `$${g.monto?.toFixed(2)}`, g.nota || '—'
-    ])
+    const filas = gastosFinanzas.map(g => [g.fecha, g.categoria, g.proveedor || '—', `$${g.monto?.toFixed(2)}`, g.nota || '—'])
     descargarCSV('gastos-bood-supply', filas, headers)
   }
 
@@ -310,21 +295,9 @@ export default function AdminPage() {
       if (data.error) { setErrorUsuario(data.error); setCreandoUsuario(false); return }
       const userId = data.userId
       let sales_tax_url = null, id_foto_url = null, crt61_url = null
-      if (archivoTaxUsuario) {
-        const ext = archivoTaxUsuario.name.split('.').pop()
-        const { error: ue } = await supabase.storage.from('documentos').upload(`sales-tax/${userId}.${ext}`, archivoTaxUsuario, { upsert: true })
-        if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`sales-tax/${userId}.${ext}`); sales_tax_url = ud.publicUrl }
-      }
-      if (archivoIdUsuario) {
-        const ext = archivoIdUsuario.name.split('.').pop()
-        const { error: ue } = await supabase.storage.from('documentos').upload(`ids/${userId}.${ext}`, archivoIdUsuario, { upsert: true })
-        if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`ids/${userId}.${ext}`); id_foto_url = ud.publicUrl }
-      }
-      if (archivoCRTUsuario) {
-        const ext = archivoCRTUsuario.name.split('.').pop()
-        const { error: ue } = await supabase.storage.from('documentos').upload(`crt61/${userId}.${ext}`, archivoCRTUsuario, { upsert: true })
-        if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`crt61/${userId}.${ext}`); crt61_url = ud.publicUrl }
-      }
+      if (archivoTaxUsuario) { const ext = archivoTaxUsuario.name.split('.').pop(); const { error: ue } = await supabase.storage.from('documentos').upload(`sales-tax/${userId}.${ext}`, archivoTaxUsuario, { upsert: true }); if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`sales-tax/${userId}.${ext}`); sales_tax_url = ud.publicUrl } }
+      if (archivoIdUsuario) { const ext = archivoIdUsuario.name.split('.').pop(); const { error: ue } = await supabase.storage.from('documentos').upload(`ids/${userId}.${ext}`, archivoIdUsuario, { upsert: true }); if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`ids/${userId}.${ext}`); id_foto_url = ud.publicUrl } }
+      if (archivoCRTUsuario) { const ext = archivoCRTUsuario.name.split('.').pop(); const { error: ue } = await supabase.storage.from('documentos').upload(`crt61/${userId}.${ext}`, archivoCRTUsuario, { upsert: true }); if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`crt61/${userId}.${ext}`); crt61_url = ud.publicUrl } }
       await supabase.from('profiles').update({ fecha_nacimiento: formUsuario.fecha_nacimiento || null, sales_tax_url, id_foto_url, crt61_url }).eq('id', userId)
       setUsuarioCreado(true)
       setFormUsuario({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '', fecha_nacimiento: '' })
@@ -339,10 +312,7 @@ export default function AdminPage() {
   async function aprobarCliente(c: any, aprobar: boolean) {
     setAprobando(c.id)
     await supabase.from('profiles').update({ aprobado: aprobar, aprobado_at: aprobar ? new Date().toISOString() : null }).eq('id', c.id)
-    if (aprobar) {
-      try { await fetch('/api/aprobar-cliente', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: c.email, nombre: c.nombre }) }) }
-      catch (e) { console.error('Email error:', e) }
-    }
+    if (aprobar) { try { await fetch('/api/aprobar-cliente', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: c.email, nombre: c.nombre }) }) } catch (e) { console.error('Email error:', e) } }
     await cargarClientes(); setAprobando(null)
   }
 
@@ -506,9 +476,7 @@ export default function AdminPage() {
 
   function imprimirOrdenes() {
     const pedidosSeleccionados = pedidos.filter(p => seleccionados.includes(p.id))
-    const html = `<html><head><title>Ordenes - BOOD SUPPLY</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.orden{border:1px solid #ccc;padding:16px;margin-bottom:28px;page-break-inside:avoid;border-radius:8px}.header{background:#0F2B5B;color:white;padding:10px 16px;border-radius:6px;margin-bottom:14px;display:flex;justify-content:space-between}.header h2{margin:0;font-size:15px}.header p{margin:0;font-size:11px;opacity:.8}.seccion{margin-bottom:12px}.seccion h3{font-size:10px;text-transform:uppercase;color:#888;margin:0 0 6px;border-bottom:1px solid #eee;padding-bottom:3px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.campo{font-size:11px;padding:2px 0}.campo b{color:#0F2B5B}.item-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f5f5f5;font-size:11px}.total{font-size:15px;font-weight:bold;color:#F47B20;text-align:right;margin-top:10px;padding-top:8px;border-top:2px solid #F47B20}.logo-header{text-align:center;margin-bottom:24px;border-bottom:2px solid #0F2B5B;padding-bottom:12px}.logo-header h1{color:#0F2B5B;margin:0;font-size:20px}</style></head><body>
-    <div class="logo-header"><h1>BOOD SUPPLY</h1><p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p><p>Ordenes de Entrega - ${new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p></div>
-    ${pedidosSeleccionados.map(ped=>{const cliente=getCliente(ped.cliente_id);const subtotal=(ped.total||0)-(ped.fuel_surcharge||0);return`<div class="orden"><div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div><div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')} · Pago: ${ped.metodo_pago||'N/A'}</p></div></div><div class="seccion"><h3>Datos del Cliente</h3><div class="grid2"><div class="campo"><b>Nombre:</b> ${cliente?.nombre||'N/A'}</div><div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div><div class="campo"><b>Telefono:</b> ${cliente?.telefono||'N/A'}</div><div class="campo"><b>EIN:</b> ${cliente?.ein||'N/A'}</div><div class="campo" style="grid-column:span 2"><b>Direccion:</b> ${cliente?.direccion||'N/A'}</div></div></div><div class="seccion"><h3>Detalle del Pedido</h3>${ped.pedido_items?.map((item:any)=>`<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}<div class="item-row" style="color:#888"><span>Fuel Surcharge</span><span>$${(ped.fuel_surcharge||0).toFixed(2)}</span></div></div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`}).join('')}</body></html>`
+    const html = `<html><head><title>Ordenes - BOOD SUPPLY</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#2D3748}.orden{border:1px solid #ccc;padding:16px;margin-bottom:28px;page-break-inside:avoid;border-radius:8px}.header{background:#0F2B5B;color:white;padding:10px 16px;border-radius:6px;margin-bottom:14px;display:flex;justify-content:space-between}.header h2{margin:0;font-size:15px}.header p{margin:0;font-size:11px;opacity:.8}.seccion{margin-bottom:12px}.seccion h3{font-size:10px;text-transform:uppercase;color:#888;margin:0 0 6px;border-bottom:1px solid #eee;padding-bottom:3px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.campo{font-size:11px;padding:2px 0}.campo b{color:#0F2B5B}.item-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f5f5f5;font-size:11px}.total{font-size:15px;font-weight:bold;color:#F47B20;text-align:right;margin-top:10px;padding-top:8px;border-top:2px solid #F47B20}.logo-header{text-align:center;margin-bottom:24px;border-bottom:2px solid #0F2B5B;padding-bottom:12px}.logo-header h1{color:#0F2B5B;margin:0;font-size:20px}</style></head><body><div class="logo-header"><h1>BOOD SUPPLY</h1><p>2900 N Richmond St, Chicago, IL 60618 · (312) 409-0106 · boodsupplies@gmail.com</p><p>Ordenes de Entrega - ${new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p></div>${pedidosSeleccionados.map(ped=>{const cliente=getCliente(ped.cliente_id);const subtotal=(ped.total||0)-(ped.fuel_surcharge||0);return`<div class="orden"><div class="header"><div><h2>Pedido #${ped.id.slice(0,8).toUpperCase()}</h2></div><div style="text-align:right"><p>${new Date(ped.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</p><p>Estado: ${ped.estado.replace('_',' ')} · Pago: ${ped.metodo_pago||'N/A'}</p></div></div><div class="seccion"><h3>Datos del Cliente</h3><div class="grid2"><div class="campo"><b>Nombre:</b> ${cliente?.nombre||'N/A'}</div><div class="campo"><b>Negocio:</b> ${cliente?.negocio||'N/A'}</div><div class="campo"><b>Telefono:</b> ${cliente?.telefono||'N/A'}</div><div class="campo"><b>EIN:</b> ${cliente?.ein||'N/A'}</div><div class="campo" style="grid-column:span 2"><b>Direccion:</b> ${cliente?.direccion||'N/A'}</div></div></div><div class="seccion"><h3>Detalle del Pedido</h3>${ped.pedido_items?.map((item:any)=>`<div class="item-row"><span>${item.productos?.nombre||'Producto'} x${item.cantidad}</span><span><b>$${(item.precio_unitario*item.cantidad).toFixed(2)}</b></span></div>`).join('')}<div class="item-row" style="color:#888"><span>Fuel Surcharge</span><span>$${(ped.fuel_surcharge||0).toFixed(2)}</span></div></div><div class="total">Total: $${ped.total?.toFixed(2)}</div></div>`}).join('')}</body></html>`
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500) }
   }
@@ -559,14 +527,11 @@ export default function AdminPage() {
         {/* FINANZAS */}
         {tab === 'finanzas' && (
           <div>
-            {/* Sub-tabs */}
             <div className="flex gap-2 mb-6">
               {[{key:'resumen',label:'📊 Resumen'},{key:'gastos',label:'💸 Gastos'},{key:'inventario',label:'📦 Inventario'}].map(({key,label})=>(
                 <button key={key} onClick={()=>setFinanzasTab(key as any)} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${finanzasTab===key?'bg-brand-orange text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-orange'}`}>{label}</button>
               ))}
             </div>
-
-            {/* Filtro de periodo */}
             <div className="card mb-6">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="flex gap-2">
@@ -581,85 +546,43 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* RESUMEN */}
             {finanzasTab === 'resumen' && (
               <div className="space-y-6">
-                {/* KPIs */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="card border-l-4 border-l-green-400">
-                    <div className="flex items-center gap-2 mb-1"><TrendingUp size={16} className="text-green-500"/><span className="text-xs text-brand-gray-mid font-medium">Ingresos</span></div>
-                    <div className="font-heading font-bold text-2xl text-green-600">${totalIngresos.toFixed(2)}</div>
-                    <div className="text-xs text-brand-gray-mid mt-1">{pedidosFinanzas.length} pedidos</div>
-                  </div>
-                  <div className="card border-l-4 border-l-red-400">
-                    <div className="flex items-center gap-2 mb-1"><TrendingDown size={16} className="text-red-500"/><span className="text-xs text-brand-gray-mid font-medium">Egresos</span></div>
-                    <div className="font-heading font-bold text-2xl text-red-500">${totalEgresos.toFixed(2)}</div>
-                    <div className="text-xs text-brand-gray-mid mt-1">{gastosFinanzas.length} gastos</div>
-                  </div>
-                  <div className={`card border-l-4 ${resultado >= 0 ? 'border-l-brand-navy' : 'border-l-red-500'}`}>
-                    <div className="flex items-center gap-2 mb-1"><DollarSign size={16} className={resultado >= 0 ? 'text-brand-navy' : 'text-red-500'}/><span className="text-xs text-brand-gray-mid font-medium">Resultado</span></div>
-                    <div className={`font-heading font-bold text-2xl ${resultado >= 0 ? 'text-brand-navy' : 'text-red-500'}`}>{resultado >= 0 ? '+' : ''}${resultado.toFixed(2)}</div>
-                    <div className="text-xs text-brand-gray-mid mt-1">{resultado >= 0 ? 'Ganancia' : 'Perdida'}</div>
-                  </div>
-                  <div className="card border-l-4 border-l-brand-orange">
-                    <div className="flex items-center gap-2 mb-1"><BarChart2 size={16} className="text-brand-orange"/><span className="text-xs text-brand-gray-mid font-medium">Margen</span></div>
-                    <div className={`font-heading font-bold text-2xl ${margenPct >= 0 ? 'text-brand-orange' : 'text-red-500'}`}>{margenPct.toFixed(1)}%</div>
-                    <div className="text-xs text-brand-gray-mid mt-1">Sobre ingresos</div>
-                  </div>
+                  <div className="card border-l-4 border-l-green-400"><div className="flex items-center gap-2 mb-1"><TrendingUp size={16} className="text-green-500"/><span className="text-xs text-brand-gray-mid font-medium">Ingresos</span></div><div className="font-heading font-bold text-2xl text-green-600">${totalIngresos.toFixed(2)}</div><div className="text-xs text-brand-gray-mid mt-1">{pedidosFinanzas.length} pedidos</div></div>
+                  <div className="card border-l-4 border-l-red-400"><div className="flex items-center gap-2 mb-1"><TrendingDown size={16} className="text-red-500"/><span className="text-xs text-brand-gray-mid font-medium">Egresos</span></div><div className="font-heading font-bold text-2xl text-red-500">${totalEgresos.toFixed(2)}</div><div className="text-xs text-brand-gray-mid mt-1">{gastosFinanzas.length} gastos</div></div>
+                  <div className={`card border-l-4 ${resultado >= 0 ? 'border-l-brand-navy' : 'border-l-red-500'}`}><div className="flex items-center gap-2 mb-1"><DollarSign size={16} className={resultado >= 0 ? 'text-brand-navy' : 'text-red-500'}/><span className="text-xs text-brand-gray-mid font-medium">Resultado</span></div><div className={`font-heading font-bold text-2xl ${resultado >= 0 ? 'text-brand-navy' : 'text-red-500'}`}>{resultado >= 0 ? '+' : ''}${resultado.toFixed(2)}</div><div className="text-xs text-brand-gray-mid mt-1">{resultado >= 0 ? 'Ganancia' : 'Perdida'}</div></div>
+                  <div className="card border-l-4 border-l-brand-orange"><div className="flex items-center gap-2 mb-1"><BarChart2 size={16} className="text-brand-orange"/><span className="text-xs text-brand-gray-mid font-medium">Margen</span></div><div className={`font-heading font-bold text-2xl ${margenPct >= 0 ? 'text-brand-orange' : 'text-red-500'}`}>{margenPct.toFixed(1)}%</div><div className="text-xs text-brand-gray-mid mt-1">Sobre ingresos</div></div>
                 </div>
-
-                {/* Barra visual ingresos vs egresos */}
                 {totalIngresos > 0 && (
                   <div className="card">
                     <h3 className="font-heading font-semibold text-brand-navy mb-4">Ingresos vs Egresos</h3>
                     <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-xs mb-1"><span className="text-green-600 font-medium">Ingresos</span><span className="text-green-600 font-bold">${totalIngresos.toFixed(2)}</span></div>
-                        <div className="w-full bg-gray-100 rounded-full h-4"><div className="bg-green-500 h-4 rounded-full" style={{width:'100%'}}/></div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-xs mb-1"><span className="text-red-500 font-medium">Egresos</span><span className="text-red-500 font-bold">${totalEgresos.toFixed(2)}</span></div>
-                        <div className="w-full bg-gray-100 rounded-full h-4"><div className="bg-red-400 h-4 rounded-full transition-all" style={{width:`${Math.min((totalEgresos/totalIngresos)*100,100)}%`}}/></div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-xs mb-1"><span className={resultado>=0?'text-brand-navy font-medium':'text-red-600 font-medium'}>Resultado neto</span><span className={resultado>=0?'text-brand-navy font-bold':'text-red-600 font-bold'}>${resultado.toFixed(2)}</span></div>
-                        <div className="w-full bg-gray-100 rounded-full h-4"><div className={`h-4 rounded-full transition-all ${resultado>=0?'bg-brand-navy':'bg-red-600'}`} style={{width:`${Math.min(Math.abs(resultado/totalIngresos)*100,100)}%`}}/></div>
-                      </div>
+                      <div><div className="flex justify-between text-xs mb-1"><span className="text-green-600 font-medium">Ingresos</span><span className="text-green-600 font-bold">${totalIngresos.toFixed(2)}</span></div><div className="w-full bg-gray-100 rounded-full h-4"><div className="bg-green-500 h-4 rounded-full" style={{width:'100%'}}/></div></div>
+                      <div><div className="flex justify-between text-xs mb-1"><span className="text-red-500 font-medium">Egresos</span><span className="text-red-500 font-bold">${totalEgresos.toFixed(2)}</span></div><div className="w-full bg-gray-100 rounded-full h-4"><div className="bg-red-400 h-4 rounded-full" style={{width:`${Math.min((totalEgresos/totalIngresos)*100,100)}%`}}/></div></div>
+                      <div><div className="flex justify-between text-xs mb-1"><span className={resultado>=0?'text-brand-navy font-medium':'text-red-600 font-medium'}>Resultado neto</span><span className={resultado>=0?'text-brand-navy font-bold':'text-red-600 font-bold'}>${resultado.toFixed(2)}</span></div><div className="w-full bg-gray-100 rounded-full h-4"><div className={`h-4 rounded-full ${resultado>=0?'bg-brand-navy':'bg-red-600'}`} style={{width:`${Math.min(Math.abs(resultado/totalIngresos)*100,100)}%`}}/></div></div>
                     </div>
                   </div>
                 )}
-
-                {/* Egresos por categoria */}
                 {egresosPorCategoria.length > 0 && (
                   <div className="card">
                     <h3 className="font-heading font-semibold text-brand-navy mb-4">Egresos por Categoria</h3>
                     <div className="space-y-3">
                       {egresosPorCategoria.map(({cat, total}) => (
                         <div key={cat}>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-brand-gray-dark font-medium">{cat}</span>
-                            <span className="text-brand-navy font-bold">${total.toFixed(2)} <span className="text-brand-gray-mid font-normal">({totalEgresos>0?(total/totalEgresos*100).toFixed(0):0}%)</span></span>
-                          </div>
-                          <div className="w-full bg-gray-100 rounded-full h-2.5">
-                            <div className="bg-brand-orange h-2.5 rounded-full" style={{width:`${totalEgresos>0?(total/totalEgresos*100):0}%`}}/>
-                          </div>
+                          <div className="flex justify-between text-xs mb-1"><span className="text-brand-gray-dark font-medium">{cat}</span><span className="text-brand-navy font-bold">${total.toFixed(2)} <span className="text-brand-gray-mid font-normal">({totalEgresos>0?(total/totalEgresos*100).toFixed(0):0}%)</span></span></div>
+                          <div className="w-full bg-gray-100 rounded-full h-2.5"><div className="bg-brand-orange h-2.5 rounded-full" style={{width:`${totalEgresos>0?(total/totalEgresos*100):0}%`}}/></div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-
                 {totalIngresos === 0 && totalEgresos === 0 && (
-                  <div className="card text-center py-16 text-brand-gray-mid">
-                    <BarChart2 size={48} className="mx-auto mb-3 opacity-20"/>
-                    <p className="font-medium">No hay datos en este periodo</p>
-                    <p className="text-sm mt-1">Selecciona un rango de fechas diferente o agrega gastos</p>
-                  </div>
+                  <div className="card text-center py-16 text-brand-gray-mid"><BarChart2 size={48} className="mx-auto mb-3 opacity-20"/><p className="font-medium">No hay datos en este periodo</p><p className="text-sm mt-1">Selecciona un rango de fechas diferente o agrega gastos</p></div>
                 )}
               </div>
             )}
 
-            {/* GASTOS */}
             {finanzasTab === 'gastos' && (
               <div>
                 <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
@@ -669,10 +592,10 @@ export default function AdminPage() {
                     {gastosFinanzas.length > 0 && <button onClick={exportarGastos} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange"><Download size={15}/> CSV</button>}
                   </div>
                 </div>
-
                 {showFormGasto && (
                   <div className="card border-2 border-brand-orange/30 mb-5">
                     <h4 className="font-heading font-semibold text-brand-navy mb-4">Nuevo Gasto</h4>
+                    {errorGasto && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorGasto}</div>}
                     <div className="grid grid-cols-2 gap-3">
                       <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoria *</label>
                         <select value={formGasto.categoria} onChange={e=>setFormGasto({...formGasto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
@@ -686,11 +609,10 @@ export default function AdminPage() {
                     </div>
                     <div className="flex gap-3 mt-4">
                       <button onClick={guardarGasto} disabled={guardandoGasto} className="btn-primary flex items-center gap-2"><Save size={15}/> {guardandoGasto?'Guardando...':'Guardar Gasto'}</button>
-                      <button onClick={()=>setShowFormGasto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
+                      <button onClick={()=>{setShowFormGasto(false);setErrorGasto('')}} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
                     </div>
                   </div>
                 )}
-
                 {gastosFinanzas.length === 0 ? (
                   <div className="card text-center py-16 text-brand-gray-mid"><TrendingDown size={48} className="mx-auto mb-3 opacity-20"/><p className="font-medium">No hay gastos en este periodo</p><p className="text-sm mt-1">Haz clic en "Agregar Gasto" para registrar uno</p></div>
                 ) : (
@@ -700,10 +622,7 @@ export default function AdminPage() {
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0"><TrendingDown size={16} className="text-red-500"/></div>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-brand-navy text-sm">{g.proveedor || g.categoria}</span>
-                              <span className="text-xs bg-gray-100 text-brand-gray-mid px-2 py-0.5 rounded-full">{g.categoria}</span>
-                            </div>
+                            <div className="flex items-center gap-2"><span className="font-medium text-brand-navy text-sm">{g.proveedor || g.categoria}</span><span className="text-xs bg-gray-100 text-brand-gray-mid px-2 py-0.5 rounded-full">{g.categoria}</span></div>
                             <p className="text-xs text-brand-gray-mid">{new Date(g.fecha + 'T12:00:00').toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'})}{g.nota && <span> · {g.nota}</span>}</p>
                           </div>
                         </div>
@@ -718,25 +637,18 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* INVENTARIO */}
             {finanzasTab === 'inventario' && (
               <div>
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="font-heading font-bold text-brand-navy text-lg">Inventario y Margenes</h3>
                   <p className="text-xs text-brand-gray-mid">Haz clic en el costo o stock para editarlo</p>
                 </div>
-
-                {/* Alertas stock bajo */}
                 {productos.filter(p => p.activo && (p.stock ?? 0) <= 5).length > 0 && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-5 flex items-start gap-3">
                     <AlertTriangle size={18} className="text-yellow-500 flex-shrink-0 mt-0.5"/>
-                    <div>
-                      <p className="font-semibold text-yellow-700 text-sm">Stock bajo en {productos.filter(p=>p.activo&&(p.stock??0)<=5).length} producto(s)</p>
-                      <p className="text-xs text-yellow-600 mt-0.5">{productos.filter(p=>p.activo&&(p.stock??0)<=5).map(p=>p.nombre).join(', ')}</p>
-                    </div>
+                    <div><p className="font-semibold text-yellow-700 text-sm">Stock bajo en {productos.filter(p=>p.activo&&(p.stock??0)<=5).length} producto(s)</p><p className="text-xs text-yellow-600 mt-0.5">{productos.filter(p=>p.activo&&(p.stock??0)<=5).map(p=>p.nombre).join(', ')}</p></div>
                   </div>
                 )}
-
                 <div className="card overflow-x-auto">
                   <table className="w-full text-sm min-w-[900px]">
                     <thead>
@@ -746,126 +658,36 @@ export default function AdminPage() {
                         <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Costo</th>
                         <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Precio venta</th>
                         <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Ganancia/u</th>
-                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">
-                          <span className="block">Margen s/costo</span>
-                          <span className="text-[10px] font-normal text-brand-gray-mid">(ganancia ÷ costo)</span>
-                        </th>
-                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">
-                          <span className="block">Margen s/precio</span>
-                          <span className="text-[10px] font-normal text-brand-gray-mid">(ganancia ÷ precio)</span>
-                        </th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid"><span className="block">Margen s/costo</span><span className="text-[10px] font-normal">(ganancia ÷ costo)</span></th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid"><span className="block">Margen s/precio</span><span className="text-[10px] font-normal">(ganancia ÷ precio)</span></th>
                       </tr>
                     </thead>
                     <tbody>
                       {productos.filter(p => p.activo).map(p => {
-                        const costo = p.costo || 0
-                        const precio = p.precio || 0
-                        const ganancia = precio - costo
+                        const costo = p.costo || 0; const precio = p.precio || 0; const ganancia = precio - costo
                         const margenSCosto = costo > 0 ? (ganancia / costo * 100) : 0
                         const margenSPrecio = precio > 0 ? (ganancia / precio * 100) : 0
-                        const stockBajo = (p.stock ?? 0) <= 5
-                        const tieneCosto = costo > 0
-
+                        const stockBajo = (p.stock ?? 0) <= 5; const tieneCosto = costo > 0
                         const colorSCosto = margenSCosto >= 50 ? 'bg-green-100 text-green-700' : margenSCosto >= 20 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
                         const colorSPrecio = margenSPrecio >= 30 ? 'bg-green-100 text-green-700' : margenSPrecio >= 10 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
-
                         return (
                           <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                            {/* Producto */}
-                            <td className="py-3 px-3">
-                              <div className="flex items-center gap-2">
-                                {p.imagen_url
-                                  ? <img src={p.imagen_url} alt={p.nombre} className="w-9 h-9 rounded-lg object-contain bg-gray-100 flex-shrink-0"/>
-                                  : <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0"><Package size={14} className="text-gray-400"/></div>
-                                }
-                                <div>
-                                  <p className="font-semibold text-brand-navy">{p.nombre}</p>
-                                  <p className="text-xs text-brand-gray-mid">{p.categoria} · {p.unidad}</p>
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* Stock */}
-                            <td className="py-3 px-3 text-center">
-                              {editandoStock === p.id ? (
-                                <div className="flex items-center gap-1 justify-center">
-                                  <input value={stockTemp} onChange={e=>setStockTemp(e.target.value)} type="number" className="w-20 border border-brand-orange rounded-lg px-2 py-1 text-sm text-center focus:outline-none" autoFocus onKeyDown={e=>e.key==='Enter'&&guardarStock(p.id)}/>
-                                  <button onClick={()=>guardarStock(p.id)} className="text-green-500 hover:text-green-700"><Save size={14}/></button>
-                                  <button onClick={()=>setEditandoStock(null)} className="text-brand-gray-mid hover:text-brand-navy"><X size={14}/></button>
-                                </div>
-                              ) : (
-                                <button onClick={()=>{setEditandoStock(p.id);setStockTemp(String(p.stock??0))}} className={`font-bold px-3 py-1 rounded-lg text-sm cursor-pointer hover:opacity-80 transition-opacity ${stockBajo?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>
-                                  {p.stock ?? 0}{stockBajo && ' ⚠️'}
-                                </button>
-                              )}
-                            </td>
-
-                            {/* Costo */}
-                            <td className="py-3 px-3 text-right">
-                              {editandoCosto === p.id ? (
-                                <div className="flex items-center gap-1 justify-end">
-                                  <input value={costoTemp} onChange={e=>setCostoTemp(e.target.value)} type="number" step="0.01" className="w-24 border border-brand-orange rounded-lg px-2 py-1 text-sm text-right focus:outline-none" autoFocus onKeyDown={e=>e.key==='Enter'&&guardarCosto(p.id)}/>
-                                  <button onClick={()=>guardarCosto(p.id)} className="text-green-500 hover:text-green-700"><Save size={14}/></button>
-                                  <button onClick={()=>setEditandoCosto(null)} className="text-brand-gray-mid hover:text-brand-navy"><X size={14}/></button>
-                                </div>
-                              ) : (
-                                <button onClick={()=>{setEditandoCosto(p.id);setCostoTemp(String(p.costo??0))}} className="font-medium text-brand-gray-dark hover:text-brand-navy cursor-pointer hover:bg-gray-100 px-2 py-1 rounded-lg transition-colors">
-                                  {tieneCosto ? `$${costo.toFixed(2)}` : <span className="text-brand-orange text-xs italic font-semibold">+ Agregar</span>}
-                                </button>
-                              )}
-                            </td>
-
-                            {/* Precio venta */}
+                            <td className="py-3 px-3"><div className="flex items-center gap-2">{p.imagen_url?<img src={p.imagen_url} alt={p.nombre} className="w-9 h-9 rounded-lg object-contain bg-gray-100 flex-shrink-0"/>:<div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0"><Package size={14} className="text-gray-400"/></div>}<div><p className="font-semibold text-brand-navy">{p.nombre}</p><p className="text-xs text-brand-gray-mid">{p.categoria} · {p.unidad}</p></div></div></td>
+                            <td className="py-3 px-3 text-center">{editandoStock===p.id?(<div className="flex items-center gap-1 justify-center"><input value={stockTemp} onChange={e=>setStockTemp(e.target.value)} type="number" className="w-20 border border-brand-orange rounded-lg px-2 py-1 text-sm text-center focus:outline-none" autoFocus onKeyDown={e=>e.key==='Enter'&&guardarStock(p.id)}/><button onClick={()=>guardarStock(p.id)} className="text-green-500 hover:text-green-700"><Save size={14}/></button><button onClick={()=>setEditandoStock(null)} className="text-brand-gray-mid hover:text-brand-navy"><X size={14}/></button></div>):(<button onClick={()=>{setEditandoStock(p.id);setStockTemp(String(p.stock??0))}} className={`font-bold px-3 py-1 rounded-lg text-sm cursor-pointer hover:opacity-80 ${stockBajo?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>{p.stock??0}{stockBajo&&' ⚠️'}</button>)}</td>
+                            <td className="py-3 px-3 text-right">{editandoCosto===p.id?(<div className="flex items-center gap-1 justify-end"><input value={costoTemp} onChange={e=>setCostoTemp(e.target.value)} type="number" step="0.01" className="w-24 border border-brand-orange rounded-lg px-2 py-1 text-sm text-right focus:outline-none" autoFocus onKeyDown={e=>e.key==='Enter'&&guardarCosto(p.id)}/><button onClick={()=>guardarCosto(p.id)} className="text-green-500 hover:text-green-700"><Save size={14}/></button><button onClick={()=>setEditandoCosto(null)} className="text-brand-gray-mid hover:text-brand-navy"><X size={14}/></button></div>):(<button onClick={()=>{setEditandoCosto(p.id);setCostoTemp(String(p.costo??0))}} className="font-medium text-brand-gray-dark hover:text-brand-navy cursor-pointer hover:bg-gray-100 px-2 py-1 rounded-lg transition-colors">{tieneCosto?`$${costo.toFixed(2)}`:<span className="text-brand-orange text-xs italic font-semibold">+ Agregar</span>}</button>)}</td>
                             <td className="py-3 px-3 text-right font-semibold text-brand-navy">${precio.toFixed(2)}</td>
-
-                            {/* Ganancia por unidad */}
-                            <td className="py-3 px-3 text-right">
-                              {tieneCosto
-                                ? <span className={`font-bold ${ganancia >= 0 ? 'text-green-600' : 'text-red-500'}`}>${ganancia.toFixed(2)}</span>
-                                : <span className="text-brand-gray-mid text-xs">—</span>
-                              }
-                            </td>
-
-                            {/* Margen sobre costo */}
-                            <td className="py-3 px-3 text-right">
-                              {tieneCosto
-                                ? <span className={`font-bold text-xs px-2 py-1 rounded-full ${colorSCosto}`}>{margenSCosto.toFixed(1)}%</span>
-                                : <span className="text-brand-gray-mid text-xs">—</span>
-                              }
-                            </td>
-
-                            {/* Margen sobre precio */}
-                            <td className="py-3 px-3 text-right">
-                              {tieneCosto
-                                ? <span className={`font-bold text-xs px-2 py-1 rounded-full ${colorSPrecio}`}>{margenSPrecio.toFixed(1)}%</span>
-                                : <span className="text-brand-gray-mid text-xs">—</span>
-                              }
-                            </td>
+                            <td className="py-3 px-3 text-right">{tieneCosto?<span className={`font-bold ${ganancia>=0?'text-green-600':'text-red-500'}`}>${ganancia.toFixed(2)}</span>:<span className="text-brand-gray-mid text-xs">—</span>}</td>
+                            <td className="py-3 px-3 text-right">{tieneCosto?<span className={`font-bold text-xs px-2 py-1 rounded-full ${colorSCosto}`}>{margenSCosto.toFixed(1)}%</span>:<span className="text-brand-gray-mid text-xs">—</span>}</td>
+                            <td className="py-3 px-3 text-right">{tieneCosto?<span className={`font-bold text-xs px-2 py-1 rounded-full ${colorSPrecio}`}>{margenSPrecio.toFixed(1)}%</span>:<span className="text-brand-gray-mid text-xs">—</span>}</td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
                 </div>
-
-                {/* Leyenda */}
                 <div className="mt-4 grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                    <p className="text-xs font-semibold text-brand-gray-dark mb-2">Margen sobre costo (markup)</p>
-                    <div className="flex gap-3 text-xs text-brand-gray-mid">
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-200 inline-block"/> ≥50% bueno</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-200 inline-block"/> 20–50% medio</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-200 inline-block"/> &lt;20% bajo</span>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                    <p className="text-xs font-semibold text-brand-gray-dark mb-2">Margen sobre precio (margen bruto)</p>
-                    <div className="flex gap-3 text-xs text-brand-gray-mid">
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-200 inline-block"/> ≥30% bueno</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-200 inline-block"/> 10–30% medio</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-200 inline-block"/> &lt;10% bajo</span>
-                    </div>
-                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-100"><p className="text-xs font-semibold text-brand-gray-dark mb-2">Margen sobre costo (markup)</p><div className="flex gap-3 text-xs text-brand-gray-mid"><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-200 inline-block"/> ≥50% bueno</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-200 inline-block"/> 20–50% medio</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-200 inline-block"/> &lt;20% bajo</span></div></div>
+                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-100"><p className="text-xs font-semibold text-brand-gray-dark mb-2">Margen sobre precio (margen bruto)</p><div className="flex gap-3 text-xs text-brand-gray-mid"><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-200 inline-block"/> ≥30% bueno</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-200 inline-block"/> 10–30% medio</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-200 inline-block"/> &lt;10% bajo</span></div></div>
                 </div>
               </div>
             )}
@@ -882,7 +704,6 @@ export default function AdminPage() {
                 <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors"><Download size={15}/> Exportar CSV</button>
               </div>
             </div>
-
             {showFormUsuario && (
               <div className="card border-2 border-brand-orange/30 mb-4">
                 <h3 className="font-heading font-bold text-brand-navy text-lg mb-4 flex items-center gap-2"><UserPlus size={18} className="text-brand-orange"/> Crear Nuevo Usuario</h3>
@@ -906,7 +727,6 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-
             {clientes.map(c => {
               const pedidosCliente = getPedidosCliente(c.id)
               const ultimoPedido = pedidosCliente[0]
@@ -975,15 +795,7 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
-            {seleccionados.length>0&&(
-              <div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between">
-                <span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span>
-                <div className="flex gap-3">
-                  <button onClick={imprimirOrdenes} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">Imprimir Ordenes</button>
-                  <button onClick={()=>setSeleccionados([])} className="text-sm text-blue-300 hover:text-white">Cancelar</button>
-                </div>
-              </div>
-            )}
+            {seleccionados.length>0&&(<div className="bg-brand-navy text-white px-6 py-3 rounded-xl mb-6 flex items-center justify-between"><span className="text-sm font-medium">{seleccionados.length} pedido(s) seleccionado(s)</span><div className="flex gap-3"><button onClick={imprimirOrdenes} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">Imprimir Ordenes</button><button onClick={()=>setSeleccionados([])} className="text-sm text-blue-300 hover:text-white">Cancelar</button></div></div>)}
             {pedidosFiltrados.length===0&&<div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos en este periodo</p></div>}
             {GRUPOS.map(grupo=>{
               const pedidosGrupo=pedidosFiltrados.filter(p=>grupo.key.includes(p.estado))
@@ -991,16 +803,10 @@ export default function AdminPage() {
               const totalGrupo=pedidosGrupo.reduce((sum,p)=>sum+(p.total||0),0)
               return(
                 <div key={grupo.label} className={`mb-8 border-2 ${grupo.color} rounded-2xl p-5`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-heading font-bold text-brand-navy text-lg flex items-center gap-2">{grupo.label}<span className="text-sm font-normal text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{pedidosGrupo.length}</span></h2>
-                    <span className="font-heading font-bold text-brand-orange">Subtotal: ${totalGrupo.toFixed(2)}</span>
-                  </div>
+                  <div className="flex items-center justify-between mb-4"><h2 className="font-heading font-bold text-brand-navy text-lg flex items-center gap-2">{grupo.label}<span className="text-sm font-normal text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{pedidosGrupo.length}</span></h2><span className="font-heading font-bold text-brand-orange">Subtotal: ${totalGrupo.toFixed(2)}</span></div>
                   <div className="space-y-3">
                     {pedidosGrupo.map(ped=>{
-                      const cliente=getCliente(ped.cliente_id)
-                      const seleccionado=seleccionados.includes(ped.id)
-                      const subtotal=(ped.total||0)-(ped.fuel_surcharge||0)
-                      const invoiceExistente=invoices.find(inv=>inv.pedido_id===ped.id)
+                      const cliente=getCliente(ped.cliente_id); const seleccionado=seleccionados.includes(ped.id); const subtotal=(ped.total||0)-(ped.fuel_surcharge||0); const invoiceExistente=invoices.find(inv=>inv.pedido_id===ped.id)
                       return(
                         <div key={ped.id} className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-all ${seleccionado?'border-brand-orange':'border-transparent'}`}>
                           <div className="flex items-start gap-3">
@@ -1011,14 +817,8 @@ export default function AdminPage() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
                                   <select value={ped.estado} onChange={e=>cambiarEstado(ped.id,e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>{ESTADOS.map(e=><option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase()+e.replace('_',' ').slice(1)}</option>)}</select>
-                                  <button onClick={()=>generarInvoice(ped)} disabled={generandoInvoice===ped.id} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${invoiceExistente?'bg-green-100 text-green-700 hover:bg-green-200':'bg-brand-navy text-white hover:bg-brand-navy/80'}`}>
-                                    <Receipt size={13}/> {generandoInvoice===ped.id?'Generando...':(invoiceExistente?invoiceExistente.numero:'Invoice')}
-                                  </button>
-                                  {invoiceExistente&&(
-                                    <a href={`/es/invoice/${invoiceExistente.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-200">
-                                      <Eye size={13}/> Ver
-                                    </a>
-                                  )}
+                                  <button onClick={()=>generarInvoice(ped)} disabled={generandoInvoice===ped.id} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${invoiceExistente?'bg-green-100 text-green-700 hover:bg-green-200':'bg-brand-navy text-white hover:bg-brand-navy/80'}`}><Receipt size={13}/> {generandoInvoice===ped.id?'Generando...':(invoiceExistente?invoiceExistente.numero:'Invoice')}</button>
+                                  {invoiceExistente&&(<a href={`/es/invoice/${invoiceExistente.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"><Eye size={13}/> Ver</a>)}
                                   <button onClick={()=>eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={15}/></button>
                                 </div>
                               </div>
@@ -1029,15 +829,10 @@ export default function AdminPage() {
                                 <div><span className="text-brand-gray-mid">EIN:</span> <span className="font-medium text-brand-navy">{cliente?.ein||'—'}</span></div>
                                 <div><span className="text-brand-gray-mid">Email:</span> <span className="font-medium text-brand-navy">{cliente?.email||'—'}</span></div>
                                 <div><span className="text-brand-gray-mid">Direccion:</span> <span className="font-medium text-brand-navy">{cliente?.direccion||'—'}</span></div>
-                                <div className="col-span-2 flex items-center justify-between mt-1 pt-1 border-t border-blue-100">
-                                  <div><span className="text-brand-gray-mid">Metodo de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago||'—'}</span></div>
-                                  {ped.comprobante_url&&<a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600"><FileText size={11}/> Ver comprobante</a>}
-                                </div>
+                                <div className="col-span-2 flex items-center justify-between mt-1 pt-1 border-t border-blue-100"><div><span className="text-brand-gray-mid">Metodo de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago||'—'}</span></div>{ped.comprobante_url&&<a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600"><FileText size={11}/> Ver comprobante</a>}</div>
                               </div>
                               <div className="border-t pt-2 space-y-1">
-                                {ped.pedido_items?.map((item:any)=>(
-                                  <div key={item.id} className="flex justify-between text-sm"><span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span><span className="font-medium text-brand-navy">${(item.precio_unitario*item.cantidad).toFixed(2)}</span></div>
-                                ))}
+                                {ped.pedido_items?.map((item:any)=>(<div key={item.id} className="flex justify-between text-sm"><span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span><span className="font-medium text-brand-navy">${(item.precio_unitario*item.cantidad).toFixed(2)}</span></div>))}
                                 <div className="flex justify-between text-xs text-brand-gray-mid border-t pt-1 mt-1"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
                                 <div className="flex justify-between text-xs text-brand-gray-mid"><span>Fuel Surcharge</span><span>${(ped.fuel_surcharge||0).toFixed(2)}</span></div>
                                 <div className="flex justify-between text-sm font-bold text-brand-navy border-t pt-1"><span>Total</span><span>${ped.total?.toFixed(2)}</span></div>
@@ -1057,37 +852,12 @@ export default function AdminPage() {
         {/* INVOICES */}
         {tab === 'invoices' && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-heading font-bold text-brand-navy text-xl">Invoices - {invoices.length}</h2>
-              <a href="/es/invoice/nuevo" className="btn-primary flex items-center gap-2"><Receipt size={15}/> Nueva Invoice</a>
-            </div>
-            {invoices.length===0?(
-              <div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados</p></div>
-            ):(
+            <div className="flex items-center justify-between mb-6"><h2 className="font-heading font-bold text-brand-navy text-xl">Invoices - {invoices.length}</h2><a href="/es/invoice/nuevo" className="btn-primary flex items-center gap-2"><Receipt size={15}/> Nueva Invoice</a></div>
+            {invoices.length===0?(<div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados</p></div>):(
               <div className="space-y-3">
                 {invoices.map(inv=>{
                   const cliente = clientes.find(c=>c.id===inv.cliente_id)
-                  return(
-                    <div key={inv.id} className="card flex items-center justify-between flex-wrap gap-3">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-brand-navy rounded-xl flex items-center justify-center flex-shrink-0"><Receipt size={18} className="text-brand-orange"/></div>
-                        <div>
-                          <p className="font-heading font-bold text-brand-navy">{inv.numero}</p>
-                          <p className="text-xs text-brand-gray-mid">{cliente?.nombre||'—'} · {cliente?.negocio||'—'}</p>
-                          <p className="text-xs text-brand-gray-mid">{new Date(inv.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'})}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-heading font-bold text-brand-orange">${inv.total?.toFixed(2)}</p>
-                          <p className="text-xs text-brand-gray-mid">{inv.metodo_pago}</p>
-                        </div>
-                        <a href={`/es/invoice/${inv.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80">
-                          <Eye size={15}/> Ver Invoice
-                        </a>
-                      </div>
-                    </div>
-                  )
+                  return(<div key={inv.id} className="card flex items-center justify-between flex-wrap gap-3"><div className="flex items-center gap-4"><div className="w-10 h-10 bg-brand-navy rounded-xl flex items-center justify-center flex-shrink-0"><Receipt size={18} className="text-brand-orange"/></div><div><p className="font-heading font-bold text-brand-navy">{inv.numero}</p><p className="text-xs text-brand-gray-mid">{cliente?.nombre||'—'} · {cliente?.negocio||'—'}</p><p className="text-xs text-brand-gray-mid">{new Date(inv.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'})}</p></div></div><div className="flex items-center gap-3"><div className="text-right"><p className="font-heading font-bold text-brand-orange">${inv.total?.toFixed(2)}</p><p className="text-xs text-brand-gray-mid">{inv.metodo_pago}</p></div><a href={`/es/invoice/${inv.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80"><Eye size={15}/> Ver Invoice</a></div></div>)
                 })}
               </div>
             )}
@@ -1098,83 +868,26 @@ export default function AdminPage() {
         {tab === 'rutas' && (
           <div>
             <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-              <div>
-                <h2 className="font-heading font-bold text-brand-navy text-xl">Optimizacion de Rutas</h2>
-                <p className="text-brand-gray-mid text-sm mt-1">Selecciona los pedidos del dia y calcula la ruta mas eficiente</p>
-              </div>
+              <div><h2 className="font-heading font-bold text-brand-navy text-xl">Optimizacion de Rutas</h2><p className="text-brand-gray-mid text-sm mt-1">Selecciona los pedidos del dia y calcula la ruta mas eficiente</p></div>
               <div className="flex gap-3 flex-wrap">
-                {rutaOptimizada.length>0&&(
-                  <>
-                    <button onClick={abrirEnGoogleMaps} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">Abrir en Google Maps</button>
-                    <button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">Imprimir Ruta</button>
-                  </>
-                )}
+                {rutaOptimizada.length>0&&(<><button onClick={abrirEnGoogleMaps} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">Abrir en Google Maps</button><button onClick={imprimirRuta} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors">Imprimir Ruta</button></>)}
                 <button onClick={optimizarRuta} disabled={optimizando||pedidosRuta.length===0} className="btn-primary flex items-center gap-2"><Map size={16}/> {optimizando?'Calculando...':'Optimizar Ruta'}</button>
               </div>
             </div>
             {errorRuta&&<div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorRuta}</div>}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">
-                  Pedidos Activos
-                  <span className="text-xs font-normal text-brand-gray-mid bg-gray-100 px-2 py-0.5 rounded-full">{pedidosParaRuta.length}</span>
-                  {pedidosRuta.length>0&&<span className="text-xs font-normal text-brand-orange bg-orange-50 px-2 py-0.5 rounded-full">{pedidosRuta.length} seleccionados</span>}
-                </h3>
-                <div className="flex gap-2 mb-3">
-                  <button onClick={()=>setPedidosRuta(pedidosParaRuta.map(p=>p.id))} className="text-xs text-brand-orange hover:underline">Seleccionar todos</button>
-                  <span className="text-brand-gray-mid text-xs">·</span>
-                  <button onClick={()=>setPedidosRuta([])} className="text-xs text-brand-gray-mid hover:underline">Limpiar</button>
-                </div>
+                <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">Pedidos Activos<span className="text-xs font-normal text-brand-gray-mid bg-gray-100 px-2 py-0.5 rounded-full">{pedidosParaRuta.length}</span>{pedidosRuta.length>0&&<span className="text-xs font-normal text-brand-orange bg-orange-50 px-2 py-0.5 rounded-full">{pedidosRuta.length} seleccionados</span>}</h3>
+                <div className="flex gap-2 mb-3"><button onClick={()=>setPedidosRuta(pedidosParaRuta.map(p=>p.id))} className="text-xs text-brand-orange hover:underline">Seleccionar todos</button><span className="text-brand-gray-mid text-xs">·</span><button onClick={()=>setPedidosRuta([])} className="text-xs text-brand-gray-mid hover:underline">Limpiar</button></div>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {pedidosParaRuta.length===0?(
-                    <div className="card text-center py-8 text-brand-gray-mid"><p>No hay pedidos activos para entregar</p></div>
-                  ):(
-                    pedidosParaRuta.map(ped=>{
-                      const cliente=getCliente(ped.cliente_id)
-                      const enRuta=pedidosRuta.includes(ped.id)
-                      return(
-                        <div key={ped.id} onClick={()=>togglePedidoRuta(ped.id)} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${enRuta?'border-brand-orange bg-orange-50':'border-gray-100 bg-white hover:border-gray-300'}`}>
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${enRuta?'bg-brand-orange border-brand-orange':'border-gray-300'}`}>{enRuta&&<span className="text-white text-xs font-bold">✓</span>}</div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-brand-navy text-sm truncate">{cliente?.negocio||cliente?.nombre||'—'}</p>
-                            <p className="text-xs text-brand-gray-mid truncate">📍 {cliente?.direccion||'Sin direccion'}</p>
-                            <p className="text-xs text-brand-gray-mid">#{ped.id.slice(0,8).toUpperCase()} · ${ped.total?.toFixed(2)}</p>
-                          </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${estadoColor[ped.estado]}`}>{ped.estado.replace('_',' ')}</span>
-                        </div>
-                      )
-                    })
+                  {pedidosParaRuta.length===0?(<div className="card text-center py-8 text-brand-gray-mid"><p>No hay pedidos activos para entregar</p></div>):(
+                    pedidosParaRuta.map(ped=>{const cliente=getCliente(ped.cliente_id); const enRuta=pedidosRuta.includes(ped.id); return(<div key={ped.id} onClick={()=>togglePedidoRuta(ped.id)} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${enRuta?'border-brand-orange bg-orange-50':'border-gray-100 bg-white hover:border-gray-300'}`}><div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${enRuta?'bg-brand-orange border-brand-orange':'border-gray-300'}`}>{enRuta&&<span className="text-white text-xs font-bold">✓</span>}</div><div className="flex-1 min-w-0"><p className="font-medium text-brand-navy text-sm truncate">{cliente?.negocio||cliente?.nombre||'—'}</p><p className="text-xs text-brand-gray-mid truncate">📍 {cliente?.direccion||'Sin direccion'}</p><p className="text-xs text-brand-gray-mid">#{ped.id.slice(0,8).toUpperCase()} · ${ped.total?.toFixed(2)}</p></div><span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${estadoColor[ped.estado]}`}>{ped.estado.replace('_',' ')}</span></div>)})
                   )}
                 </div>
               </div>
               <div>
-                {rutaOptimizada.length>0&&(
-                  <div className="mb-4">
-                    <h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">Ruta Optima<span className="text-xs font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{rutaOptimizada.length} paradas</span></h3>
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg"><div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div><div><p className="font-medium text-brand-navy text-sm">Origen - Bood Supply</p><p className="text-xs text-brand-gray-mid">2900 N Richmond St, Chicago</p></div></div>
-                      {rutaOptimizada.map((parada,idx)=>(
-                        <div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-100">
-                          <div className="w-7 h-7 bg-brand-orange rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{idx+1}</div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-brand-navy text-sm truncate">{parada.negocio||parada.nombre}</p>
-                            <p className="text-xs text-brand-gray-mid truncate">📍 {parada.direccion}</p>
-                            <p className="text-xs text-brand-gray-mid">📞 {parada.telefono} · 💳 {parada.metodo_pago} · ${parada.total?.toFixed(2)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{height:'400px'}}>
-                  {rutaOptimizada.length>0?(
-                    <MapaRutas key={rutaKey} paradas={rutaOptimizada}/>
-                  ):(
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand-gray-mid">
-                      <div className="text-center"><Map size={40} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Selecciona pedidos y optimiza la ruta</p></div>
-                    </div>
-                  )}
-                </div>
+                {rutaOptimizada.length>0&&(<div className="mb-4"><h3 className="font-heading font-semibold text-brand-navy mb-3 flex items-center gap-2">Ruta Optima<span className="text-xs font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{rutaOptimizada.length} paradas</span></h3><div className="space-y-2 mb-4"><div className="flex items-center gap-3 p-2 bg-brand-navy/5 rounded-lg"><div className="w-7 h-7 bg-brand-navy rounded-full flex items-center justify-center text-white text-xs">🏭</div><div><p className="font-medium text-brand-navy text-sm">Origen - Bood Supply</p><p className="text-xs text-brand-gray-mid">2900 N Richmond St, Chicago</p></div></div>{rutaOptimizada.map((parada,idx)=>(<div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-100"><div className="w-7 h-7 bg-brand-orange rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{idx+1}</div><div className="flex-1 min-w-0"><p className="font-medium text-brand-navy text-sm truncate">{parada.negocio||parada.nombre}</p><p className="text-xs text-brand-gray-mid truncate">📍 {parada.direccion}</p><p className="text-xs text-brand-gray-mid">📞 {parada.telefono} · 💳 {parada.metodo_pago} · ${parada.total?.toFixed(2)}</p></div></div>))}</div></div>)}
+                <div className="w-full rounded-2xl border border-gray-200 overflow-hidden" style={{height:'400px'}}>{rutaOptimizada.length>0?(<MapaRutas key={rutaKey} paradas={rutaOptimizada}/>):(<div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand-gray-mid"><div className="text-center"><Map size={40} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Selecciona pedidos y optimiza la ruta</p></div></div>)}</div>
               </div>
             </div>
           </div>
@@ -1189,18 +902,9 @@ export default function AdminPage() {
               <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Asunto *</label><input value={mensajeAsunto} onChange={e=>setMensajeAsunto(e.target.value)} placeholder="Asunto del mensaje" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
               <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Mensaje *</label><textarea value={mensajeCuerpo} onChange={e=>setMensajeCuerpo(e.target.value)} placeholder="Escribe tu mensaje aqui..." rows={6} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange resize-none"/></div>
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-brand-gray-dark">Destinatarios *</label>
-                  <button onClick={()=>setDestinatarios(clientes.filter(c=>c.aprobado).map(c=>c.email))} className="text-xs text-brand-orange hover:underline">Seleccionar todos los aprobados</button>
-                </div>
+                <div className="flex items-center justify-between mb-2"><label className="block text-sm font-medium text-brand-gray-dark">Destinatarios *</label><button onClick={()=>setDestinatarios(clientes.filter(c=>c.aprobado).map(c=>c.email))} className="text-xs text-brand-orange hover:underline">Seleccionar todos los aprobados</button></div>
                 <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
-                  {clientes.map(c=>(
-                    <div key={c.id} onClick={()=>toggleDestinatario(c.email)} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 border-b last:border-0 ${destinatarios.includes(c.email)?'bg-blue-50':''}`}>
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${destinatarios.includes(c.email)?'bg-brand-orange border-brand-orange':'border-gray-300'}`}>{destinatarios.includes(c.email)&&<span className="text-white text-xs">✓</span>}</div>
-                      <div className="flex-1"><p className="text-sm font-medium text-brand-navy">{c.nombre||c.email}</p><p className="text-xs text-brand-gray-mid">{c.email}</p></div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${c.aprobado?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{c.aprobado?'Aprobado':'Pendiente'}</span>
-                    </div>
-                  ))}
+                  {clientes.map(c=>(<div key={c.id} onClick={()=>toggleDestinatario(c.email)} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 border-b last:border-0 ${destinatarios.includes(c.email)?'bg-blue-50':''}`}><div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${destinatarios.includes(c.email)?'bg-brand-orange border-brand-orange':'border-gray-300'}`}>{destinatarios.includes(c.email)&&<span className="text-white text-xs">✓</span>}</div><div className="flex-1"><p className="text-sm font-medium text-brand-navy">{c.nombre||c.email}</p><p className="text-xs text-brand-gray-mid">{c.email}</p></div><span className={`text-xs px-2 py-0.5 rounded-full ${c.aprobado?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{c.aprobado?'Aprobado':'Pendiente'}</span></div>))}
                 </div>
                 {destinatarios.length>0&&<p className="text-xs text-brand-gray-mid mt-1">{destinatarios.length} destinatario(s) seleccionado(s)</p>}
               </div>
@@ -1212,10 +916,7 @@ export default function AdminPage() {
         {/* PRODUCTOS */}
         {tab === 'productos' && (
           <>
-            <div className="flex items-center justify-between mb-6">
-              <p className="text-brand-gray-mid text-sm">{productos.length} productos · {productos.filter(p=>p.activo).length} activos</p>
-              <button onClick={()=>setShowFormProducto(!showFormProducto)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Agregar Producto</button>
-            </div>
+            <div className="flex items-center justify-between mb-6"><p className="text-brand-gray-mid text-sm">{productos.length} productos · {productos.filter(p=>p.activo).length} activos</p><button onClick={()=>setShowFormProducto(!showFormProducto)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Agregar Producto</button></div>
             {showFormProducto&&(
               <div className="card mb-6 border-2 border-brand-orange/30">
                 <h2 className="font-heading font-bold text-brand-navy text-lg mb-5">Nuevo Producto</h2>
@@ -1227,10 +928,7 @@ export default function AdminPage() {
                   <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripcion</label><input value={formProducto.descripcion} onChange={e=>setFormProducto({...formProducto,descripcion:e.target.value})} placeholder="Descripcion breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e=>setImagenProducto(e.target.files?.[0]||null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer"/>{imagenProducto&&<p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}</div></div>
                 </div>
-                <div className="flex gap-3 mt-5">
-                  <button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">{guardando?'Guardando y traduciendo...':<><Plus size={16}/> Guardar</>}</button>
-                  <button onClick={()=>setShowFormProducto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
-                </div>
+                <div className="flex gap-3 mt-5"><button onClick={agregarProducto} disabled={guardando} className="btn-primary flex items-center gap-2">{guardando?'Guardando y traduciendo...':<><Plus size={16}/> Guardar</>}</button><button onClick={()=>setShowFormProducto(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button></div>
               </div>
             )}
             <div className="space-y-6">
@@ -1265,10 +963,7 @@ export default function AdminPage() {
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Unidad</label><input value={formEditProducto.unidad} onChange={e=>setFormEditProducto({...formEditProducto,unidad:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoria</label><select value={formEditProducto.categoria} onChange={e=>setFormEditProducto({...formEditProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
                               </div>
-                              <div className="flex gap-3 mt-4">
-                                <button onClick={()=>guardarProducto(p.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"><Save size={14}/> {guardando?'Guardando...':'Guardar'}</button>
-                                <button onClick={()=>setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid hover:text-brand-navy"><X size={14}/> Cancelar</button>
-                              </div>
+                              <div className="flex gap-3 mt-4"><button onClick={()=>guardarProducto(p.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"><Save size={14}/> {guardando?'Guardando...':'Guardar'}</button><button onClick={()=>setEditandoProducto(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-4 py-2 rounded-lg text-brand-gray-mid hover:text-brand-navy"><X size={14}/> Cancelar</button></div>
                             </div>
                           )}
                         </div>
@@ -1284,39 +979,15 @@ export default function AdminPage() {
         {/* CATEGORIAS */}
         {tab === 'categorias' && (
           <div className="card">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-heading font-bold text-brand-navy text-xl">Categorias</h2>
-              <button onClick={()=>setShowFormCategoria(!showFormCategoria)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Nueva Categoria</button>
-            </div>
-            {showFormCategoria&&(
-              <div className="border-2 border-brand-orange/30 rounded-xl p-4 mb-6">
-                <label className="block text-sm font-medium text-brand-gray-dark mb-2">Nombre *</label>
-                <div className="flex gap-3">
-                  <input value={nuevaCategoria} onChange={e=>setNuevaCategoria(e.target.value)} placeholder="Ej: Empaques Especiales" className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e=>e.key==='Enter'&&agregarCategoria()}/>
-                  <button onClick={agregarCategoria} className="btn-primary flex items-center gap-2"><Plus size={16}/> Agregar</button>
-                  <button onClick={()=>setShowFormCategoria(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button>
-                </div>
-              </div>
-            )}
-            {categorias.length===0?(
-              <div className="text-center py-12 text-brand-gray-mid"><Tag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay categorias aun</p></div>
-            ):(
+            <div className="flex items-center justify-between mb-6"><h2 className="font-heading font-bold text-brand-navy text-xl">Categorias</h2><button onClick={()=>setShowFormCategoria(!showFormCategoria)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Nueva Categoria</button></div>
+            {showFormCategoria&&(<div className="border-2 border-brand-orange/30 rounded-xl p-4 mb-6"><label className="block text-sm font-medium text-brand-gray-dark mb-2">Nombre *</label><div className="flex gap-3"><input value={nuevaCategoria} onChange={e=>setNuevaCategoria(e.target.value)} placeholder="Ej: Empaques Especiales" className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e=>e.key==='Enter'&&agregarCategoria()}/><button onClick={agregarCategoria} className="btn-primary flex items-center gap-2"><Plus size={16}/> Agregar</button><button onClick={()=>setShowFormCategoria(false)} className="px-4 py-2 text-sm text-brand-gray-mid hover:text-brand-navy">Cancelar</button></div></div>)}
+            {categorias.length===0?(<div className="text-center py-12 text-brand-gray-mid"><Tag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay categorias aun</p></div>):(
               <div className="space-y-2">
                 {categorias.map(cat=>(
                   <div key={cat}>
                     <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-                      <div className="flex items-center gap-3 flex-1">
-                        <Tag size={16} className="text-brand-orange"/>
-                        {editandoCategoria===cat?<input value={categoriaEditNombre} onChange={e=>setCategoriaEditNombre(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e=>e.key==='Enter'&&guardarCategoria(cat)} autoFocus/>:<span className="font-medium text-brand-navy">{cat}</span>}
-                        <span className="text-xs text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{productos.filter(p=>p.categoria===cat).length} productos</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {editandoCategoria===cat?(
-                          <><button onClick={()=>guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={13}/> {guardando?'...':'Guardar'}</button><button onClick={()=>setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid"><X size={15}/></button></>
-                        ):(
-                          <><button onClick={()=>{setEditandoCategoria(cat);setCategoriaEditNombre(cat)}} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button><button onClick={()=>eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button></>
-                        )}
-                      </div>
+                      <div className="flex items-center gap-3 flex-1"><Tag size={16} className="text-brand-orange"/>{editandoCategoria===cat?<input value={categoriaEditNombre} onChange={e=>setCategoriaEditNombre(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-brand-orange" onKeyDown={e=>e.key==='Enter'&&guardarCategoria(cat)} autoFocus/>:<span className="font-medium text-brand-navy">{cat}</span>}<span className="text-xs text-brand-gray-mid bg-white px-2 py-0.5 rounded-full border">{productos.filter(p=>p.categoria===cat).length} productos</span></div>
+                      <div className="flex items-center gap-1">{editandoCategoria===cat?(<><button onClick={()=>guardarCategoria(cat)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={13}/> {guardando?'...':'Guardar'}</button><button onClick={()=>setEditandoCategoria(null)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-brand-gray-mid"><X size={15}/></button></>):(<><button onClick={()=>{setEditandoCategoria(cat);setCategoriaEditNombre(cat)}} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button><button onClick={()=>eliminarCategoria(cat)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors text-red-400"><Trash2 size={15}/></button></>)}</div>
                     </div>
                   </div>
                 ))}
