@@ -725,8 +725,9 @@ export default function AdminPage() {
                   <h3 className="font-heading font-bold text-brand-navy text-lg">Inventario y Margenes</h3>
                   <p className="text-xs text-brand-gray-mid">Haz clic en el costo o stock para editarlo</p>
                 </div>
+
                 {/* Alertas stock bajo */}
-                {productos.filter(p => p.activo && (p.stock ?? 0) <= 5 && (p.stock ?? 0) >= 0).length > 0 && (
+                {productos.filter(p => p.activo && (p.stock ?? 0) <= 5).length > 0 && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-5 flex items-start gap-3">
                     <AlertTriangle size={18} className="text-yellow-500 flex-shrink-0 mt-0.5"/>
                     <div>
@@ -735,36 +736,56 @@ export default function AdminPage() {
                     </div>
                   </div>
                 )}
+
                 <div className="card overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm min-w-[900px]">
                     <thead>
-                      <tr className="border-b border-gray-100">
+                      <tr className="border-b-2 border-gray-100">
                         <th className="text-left py-3 px-3 text-xs font-semibold text-brand-gray-mid">Producto</th>
                         <th className="text-center py-3 px-3 text-xs font-semibold text-brand-gray-mid">Stock</th>
                         <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Costo</th>
-                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Precio</th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Precio venta</th>
                         <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Ganancia/u</th>
-                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">Margen %</th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">
+                          <span className="block">Margen s/costo</span>
+                          <span className="text-[10px] font-normal text-brand-gray-mid">(ganancia ÷ costo)</span>
+                        </th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-brand-gray-mid">
+                          <span className="block">Margen s/precio</span>
+                          <span className="text-[10px] font-normal text-brand-gray-mid">(ganancia ÷ precio)</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {productos.filter(p=>p.activo).map(p => {
+                      {productos.filter(p => p.activo).map(p => {
                         const costo = p.costo || 0
                         const precio = p.precio || 0
                         const ganancia = precio - costo
-                        const margen = precio > 0 ? (ganancia / precio * 100) : 0
+                        const margenSCosto = costo > 0 ? (ganancia / costo * 100) : 0
+                        const margenSPrecio = precio > 0 ? (ganancia / precio * 100) : 0
                         const stockBajo = (p.stock ?? 0) <= 5
+                        const tieneCosto = costo > 0
+
+                        const colorSCosto = margenSCosto >= 50 ? 'bg-green-100 text-green-700' : margenSCosto >= 20 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
+                        const colorSPrecio = margenSPrecio >= 30 ? 'bg-green-100 text-green-700' : margenSPrecio >= 10 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
+
                         return (
                           <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                            {/* Producto */}
                             <td className="py-3 px-3">
                               <div className="flex items-center gap-2">
-                                {p.imagen_url && <img src={p.imagen_url} alt={p.nombre} className="w-8 h-8 rounded-lg object-contain bg-gray-100 flex-shrink-0"/>}
+                                {p.imagen_url
+                                  ? <img src={p.imagen_url} alt={p.nombre} className="w-9 h-9 rounded-lg object-contain bg-gray-100 flex-shrink-0"/>
+                                  : <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0"><Package size={14} className="text-gray-400"/></div>
+                                }
                                 <div>
-                                  <p className="font-medium text-brand-navy">{p.nombre}</p>
+                                  <p className="font-semibold text-brand-navy">{p.nombre}</p>
                                   <p className="text-xs text-brand-gray-mid">{p.categoria} · {p.unidad}</p>
                                 </div>
                               </div>
                             </td>
+
+                            {/* Stock */}
                             <td className="py-3 px-3 text-center">
                               {editandoStock === p.id ? (
                                 <div className="flex items-center gap-1 justify-center">
@@ -774,10 +795,12 @@ export default function AdminPage() {
                                 </div>
                               ) : (
                                 <button onClick={()=>{setEditandoStock(p.id);setStockTemp(String(p.stock??0))}} className={`font-bold px-3 py-1 rounded-lg text-sm cursor-pointer hover:opacity-80 transition-opacity ${stockBajo?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>
-                                  {p.stock ?? 0} {stockBajo && '⚠️'}
+                                  {p.stock ?? 0}{stockBajo && ' ⚠️'}
                                 </button>
                               )}
                             </td>
+
+                            {/* Costo */}
                             <td className="py-3 px-3 text-right">
                               {editandoCosto === p.id ? (
                                 <div className="flex items-center gap-1 justify-end">
@@ -787,20 +810,36 @@ export default function AdminPage() {
                                 </div>
                               ) : (
                                 <button onClick={()=>{setEditandoCosto(p.id);setCostoTemp(String(p.costo??0))}} className="font-medium text-brand-gray-dark hover:text-brand-navy cursor-pointer hover:bg-gray-100 px-2 py-1 rounded-lg transition-colors">
-                                  {costo > 0 ? `$${costo.toFixed(2)}` : <span className="text-brand-gray-mid text-xs italic">Agregar</span>}
+                                  {tieneCosto ? `$${costo.toFixed(2)}` : <span className="text-brand-orange text-xs italic font-semibold">+ Agregar</span>}
                                 </button>
                               )}
                             </td>
-                            <td className="py-3 px-3 text-right font-medium text-brand-navy">${precio.toFixed(2)}</td>
+
+                            {/* Precio venta */}
+                            <td className="py-3 px-3 text-right font-semibold text-brand-navy">${precio.toFixed(2)}</td>
+
+                            {/* Ganancia por unidad */}
                             <td className="py-3 px-3 text-right">
-                              {costo > 0 ? (
-                                <span className={`font-bold ${ganancia >= 0 ? 'text-green-600' : 'text-red-500'}`}>${ganancia.toFixed(2)}</span>
-                              ) : <span className="text-brand-gray-mid text-xs">—</span>}
+                              {tieneCosto
+                                ? <span className={`font-bold ${ganancia >= 0 ? 'text-green-600' : 'text-red-500'}`}>${ganancia.toFixed(2)}</span>
+                                : <span className="text-brand-gray-mid text-xs">—</span>
+                              }
                             </td>
+
+                            {/* Margen sobre costo */}
                             <td className="py-3 px-3 text-right">
-                              {costo > 0 ? (
-                                <span className={`font-bold text-sm px-2 py-0.5 rounded-full ${margen >= 30 ? 'bg-green-100 text-green-700' : margen >= 10 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'}`}>{margen.toFixed(1)}%</span>
-                              ) : <span className="text-brand-gray-mid text-xs">—</span>}
+                              {tieneCosto
+                                ? <span className={`font-bold text-xs px-2 py-1 rounded-full ${colorSCosto}`}>{margenSCosto.toFixed(1)}%</span>
+                                : <span className="text-brand-gray-mid text-xs">—</span>
+                              }
+                            </td>
+
+                            {/* Margen sobre precio */}
+                            <td className="py-3 px-3 text-right">
+                              {tieneCosto
+                                ? <span className={`font-bold text-xs px-2 py-1 rounded-full ${colorSPrecio}`}>{margenSPrecio.toFixed(1)}%</span>
+                                : <span className="text-brand-gray-mid text-xs">—</span>
+                              }
                             </td>
                           </tr>
                         )
@@ -808,10 +847,25 @@ export default function AdminPage() {
                     </tbody>
                   </table>
                 </div>
-                <div className="flex gap-3 mt-3 text-xs text-brand-gray-mid">
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-100 inline-block"/>&ge;30% buen margen</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-100 inline-block"/>10–30% margen medio</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-100 inline-block"/>&lt;10% margen bajo</span>
+
+                {/* Leyenda */}
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <p className="text-xs font-semibold text-brand-gray-dark mb-2">Margen sobre costo (markup)</p>
+                    <div className="flex gap-3 text-xs text-brand-gray-mid">
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-200 inline-block"/> ≥50% bueno</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-200 inline-block"/> 20–50% medio</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-200 inline-block"/> &lt;20% bajo</span>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <p className="text-xs font-semibold text-brand-gray-dark mb-2">Margen sobre precio (margen bruto)</p>
+                    <div className="flex gap-3 text-xs text-brand-gray-mid">
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-200 inline-block"/> ≥30% bueno</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-200 inline-block"/> 10–30% medio</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-200 inline-block"/> &lt;10% bajo</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
