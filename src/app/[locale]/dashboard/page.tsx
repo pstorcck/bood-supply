@@ -209,6 +209,7 @@ export default function DashboardPage() {
   }
 
   function agregarAlCarrito(producto: any) {
+    if ((producto.stock ?? -1) === 0) return // bloquear sin stock
     setCarrito(prev => {
       const existe = prev.find(i => i.id === producto.id)
       if (existe) return prev.map(i => i.id === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i)
