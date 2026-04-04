@@ -224,8 +224,8 @@ export default function AdminPage() {
 
   const gastosFinanzas = gastos.filter(g => {
     if (!fechaFinDesde && !fechaFinHasta) return true
-    const fecha = new Date(g.fecha)
-    if (fechaFinDesde && fecha < new Date(fechaFinDesde)) return false
+    const fecha = new Date(g.fecha + 'T12:00:00')
+    if (fechaFinDesde && fecha < new Date(fechaFinDesde + 'T00:00:00')) return false
     if (fechaFinHasta && fecha > new Date(fechaFinHasta + 'T23:59:59')) return false
     return true
   })
