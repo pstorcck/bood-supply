@@ -5,9 +5,10 @@ import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, Ch
 import MapaRutas from '@/components/MapaRutas'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
-const ESTADOS = ['pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
+const ESTADOS = ['esperando_stock', 'pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
 
 const GRUPOS = [
+  { key: ['esperando_stock'], label: '⏱ Esperando Stock (48hrs)', color: 'border-yellow-400 bg-yellow-50' },
   { key: ['pendiente'], label: '📥 Recibidos', color: 'border-yellow-300 bg-yellow-50' },
   { key: ['confirmado', 'en_preparacion'], label: '⏳ En Proceso', color: 'border-blue-300 bg-blue-50' },
   { key: ['despachado'], label: '🚚 Despachados', color: 'border-orange-300 bg-orange-50' },
