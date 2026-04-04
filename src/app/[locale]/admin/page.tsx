@@ -240,7 +240,7 @@ export default function AdminPage() {
     total: gastosFinanzas.filter(g => g.categoria === cat).reduce((sum, g) => sum + (g.monto || 0), 0)
   })).filter(c => c.total > 0).sort((a, b) => b.total - a.total)
 
-  // ── Gastos via API route ─────────────────────────────────────────────────────
+  // ── Gastos via API route v2 ─────────────────────────────────────────────────────
   async function guardarGasto() {
     if (!formGasto.monto || !formGasto.fecha) return alert('Monto y fecha son requeridos')
     setGuardandoGasto(true)
