@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, LogOut, Package, ShoppingBag, Users, Search, X, UserPlus, Receipt, Eye } from 'lucide-react'
+import { Plus, LogOut, Package, ShoppingBag, Users, Search, X, UserPlus, Receipt, Eye, AlertTriangle } from 'lucide-react'
 
 export default function VendedorPage() {
   const [user, setUser] = useState<any>(null)
@@ -102,15 +102,24 @@ export default function VendedorPage() {
   }
 
   function agregarAlCarrito(producto: any) {
+    // Bloquear si stock es 0
+    if ((producto.stock ?? -1) === 0) return
     setCarrito(prev => {
       const existe = prev.find(i => i.id === producto.id)
-      if (existe) return prev.map(i => i.id === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i)
+      if (existe) {
+        // No permitir agregar más del stock disponible
+        if (producto.stock !== null && producto.stock !== undefined && existe.cantidad >= producto.stock) return prev
+        return prev.map(i => i.id === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i)
+      }
       return [...prev, { ...producto, cantidad: 1 }]
     })
   }
 
   function cambiarCantidad(id: string, cantidad: number) {
     if (cantidad <= 0) return setCarrito(prev => prev.filter(i => i.id !== id))
+    const producto = productos.find(p => p.id === id)
+    // No permitir más del stock disponible
+    if (producto?.stock !== null && producto?.stock !== undefined && cantidad > producto.stock) return
     setCarrito(prev => prev.map(i => i.id === id ? { ...i, cantidad } : i))
   }
 
@@ -121,6 +130,13 @@ export default function VendedorPage() {
   async function enviarPedido() {
     if (!clienteSeleccionado) return alert('Selecciona un cliente')
     if (carrito.length === 0) return alert('Agrega productos al carrito')
+
+    // Validar stock antes de enviar
+    const sinStock = carrito.filter(item => (item.stock ?? -1) === 0)
+    if (sinStock.length > 0) {
+      return alert(`Sin stock: ${sinStock.map(i => i.nombre).join(', ')}. Retíralos del carrito antes de enviar.`)
+    }
+
     setEnviando(true)
     try {
       const { data: pedido, error } = await supabase.from('pedidos').insert({
@@ -165,6 +181,9 @@ export default function VendedorPage() {
     cancelado: 'bg-red-100 text-red-700',
   }
 
+  // Productos con stock 0 en el carrito
+  const itemsSinStock = carrito.filter(i => (i.stock ?? -1) === 0)
+
   if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
 
   return (
@@ -192,6 +211,7 @@ export default function VendedorPage() {
         {tab === 'nuevo_pedido' && (
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
+              {/* Cliente */}
               <div className="card">
                 <h2 className="font-heading font-bold text-brand-navy mb-3 flex items-center gap-2"><Users size={18}/> Cliente</h2>
                 {clienteSeleccionado ? (
@@ -221,6 +241,7 @@ export default function VendedorPage() {
                 )}
               </div>
 
+              {/* Productos */}
               <div className="card">
                 <h2 className="font-heading font-bold text-brand-navy mb-3 flex items-center gap-2"><Package size={18}/> Productos</h2>
                 <div className="relative mb-3">
@@ -233,15 +254,37 @@ export default function VendedorPage() {
                   ))}
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                  {productosFiltrados.map(p=>{
-                    const enCarrito = carrito.find(i=>i.id===p.id)
-                    return(
-                      <div key={p.id} onClick={()=>agregarAlCarrito(p)} className={`relative border-2 rounded-xl p-3 cursor-pointer transition-all hover:border-brand-orange ${enCarrito?'border-brand-orange bg-orange-50':'border-gray-100 bg-white'}`}>
-                        {p.imagen_url&&<img src={p.imagen_url} alt={p.nombre} className="w-full h-20 object-contain mb-2 rounded-lg"/>}
+                  {productosFiltrados.map(p => {
+                    const enCarrito = carrito.find(i => i.id === p.id)
+                    const sinStock = (p.stock ?? -1) === 0
+                    const stockBajo = !sinStock && p.stock !== null && p.stock !== undefined && p.stock <= 5
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => agregarAlCarrito(p)}
+                        className={`relative border-2 rounded-xl p-3 transition-all ${
+                          sinStock
+                            ? 'border-red-200 bg-red-50 cursor-not-allowed opacity-70'
+                            : enCarrito
+                            ? 'border-brand-orange bg-orange-50 cursor-pointer'
+                            : 'border-gray-100 bg-white cursor-pointer hover:border-brand-orange'
+                        }`}
+                      >
+                        {p.imagen_url && <img src={p.imagen_url} alt={p.nombre} className="w-full h-20 object-contain mb-2 rounded-lg"/>}
                         <p className="font-medium text-brand-navy text-xs leading-tight">{p.nombre}</p>
                         <p className="text-brand-orange font-bold text-sm mt-1">${p.precio}</p>
                         <p className="text-xs text-brand-gray-mid">{p.unidad}</p>
-                        {enCarrito&&<div className="absolute top-2 right-2 bg-brand-orange text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">{enCarrito.cantidad}</div>}
+                        {sinStock && (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-red-50/80">
+                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg">OUT OF STOCK</span>
+                          </div>
+                        )}
+                        {stockBajo && !sinStock && (
+                          <p className="text-xs text-yellow-600 font-medium mt-1">⚠️ Solo {p.stock} disponibles</p>
+                        )}
+                        {enCarrito && !sinStock && (
+                          <div className="absolute top-2 right-2 bg-brand-orange text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">{enCarrito.cantidad}</div>
+                        )}
                       </div>
                     )
                   })}
@@ -249,38 +292,67 @@ export default function VendedorPage() {
               </div>
             </div>
 
+            {/* Carrito */}
             <div className="card h-fit sticky top-24">
-              <h2 className="font-heading font-bold text-brand-navy mb-4 flex items-center gap-2"><ShoppingBag size={18}/> Carrito {carrito.length>0&&<span className="bg-brand-orange text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{carrito.reduce((s,i)=>s+i.cantidad,0)}</span>}</h2>
-              {carrito.length===0?(
-                <div className="text-center py-8 text-brand-gray-mid"><ShoppingBag size={32} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Carrito vacio</p></div>
-              ):(
-                <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-                  {carrito.map(item=>(
-                    <div key={item.id} className="flex items-center gap-2">
-                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-brand-navy truncate">{item.nombre}</p><p className="text-xs text-brand-gray-mid">${item.precio} c/u</p></div>
-                      <div className="flex items-center gap-1">
-                        <button onClick={()=>cambiarCantidad(item.id,item.cantidad-1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-brand-navy flex items-center justify-center text-sm font-bold">-</button>
-                        <span className="w-6 text-center text-sm font-medium">{item.cantidad}</span>
-                        <button onClick={()=>cambiarCantidad(item.id,item.cantidad+1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-brand-navy flex items-center justify-center text-sm font-bold">+</button>
-                      </div>
-                      <span className="text-sm font-bold text-brand-navy w-14 text-right">${(item.precio*item.cantidad).toFixed(2)}</span>
-                    </div>
-                  ))}
+              <h2 className="font-heading font-bold text-brand-navy mb-4 flex items-center gap-2">
+                <ShoppingBag size={18}/> Carrito
+                {carrito.length > 0 && <span className="bg-brand-orange text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{carrito.reduce((s,i)=>s+i.cantidad,0)}</span>}
+              </h2>
+
+              {/* Alerta out of stock en carrito */}
+              {itemsSinStock.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3 flex items-start gap-2">
+                  <AlertTriangle size={15} className="text-red-500 flex-shrink-0 mt-0.5"/>
+                  <p className="text-xs text-red-600 font-medium">Sin stock: {itemsSinStock.map(i=>i.nombre).join(', ')}. Retíralos para poder enviar.</p>
                 </div>
               )}
+
+              {carrito.length === 0 ? (
+                <div className="text-center py-8 text-brand-gray-mid"><ShoppingBag size={32} className="mx-auto mb-2 opacity-25"/><p className="text-sm">Carrito vacío</p></div>
+              ) : (
+                <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
+                  {carrito.map(item => {
+                    const sinStock = (item.stock ?? -1) === 0
+                    return (
+                      <div key={item.id} className={`flex items-center gap-2 ${sinStock ? 'opacity-60' : ''}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-brand-navy truncate">{item.nombre}</p>
+                          <p className="text-xs text-brand-gray-mid">${item.precio} c/u</p>
+                          {sinStock && <p className="text-xs text-red-500 font-medium">Sin stock</p>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={()=>cambiarCantidad(item.id, item.cantidad-1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-brand-navy flex items-center justify-center text-sm font-bold">-</button>
+                          <span className="w-6 text-center text-sm font-medium">{item.cantidad}</span>
+                          <button onClick={()=>cambiarCantidad(item.id, item.cantidad+1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-brand-navy flex items-center justify-center text-sm font-bold">+</button>
+                        </div>
+                        <span className="text-sm font-bold text-brand-navy w-14 text-right">${(item.precio*item.cantidad).toFixed(2)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               <div className="border-t pt-3 space-y-1 text-sm mb-4">
                 <div className="flex justify-between text-brand-gray-mid"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
-                {taxQuimicos>0&&<div className="flex justify-between text-brand-gray-mid"><span>Tax Quimicos (10.25%)</span><span>${taxQuimicos.toFixed(2)}</span></div>}
+                {taxQuimicos > 0 && <div className="flex justify-between text-brand-gray-mid"><span>Tax Quimicos (10.25%)</span><span>${taxQuimicos.toFixed(2)}</span></div>}
                 <div className="flex justify-between text-brand-gray-mid"><span>Fuel Surcharge</span><span>${FUEL_SURCHARGE.toFixed(2)}</span></div>
                 <div className="flex justify-between font-bold text-brand-navy text-base border-t pt-2"><span>Total</span><span>${total.toFixed(2)}</span></div>
               </div>
+
               <div className="mb-4">
                 <label className="block text-xs font-medium text-brand-gray-dark mb-1">Metodo de pago</label>
                 <select value={metodoPago} onChange={e=>setMetodoPago(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">
-                  {['Efectivo','Zelle','Tarjeta de credito','Cheque'].map(m=><option key={m} value={m}>{m}</option>)}
+                  {['Efectivo', 'Zelle', 'Cheque'].map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
-              <button onClick={enviarPedido} disabled={enviando||carrito.length===0||!clienteSeleccionado} className="btn-primary w-full">{enviando?'Enviando...':'Enviar Pedido'}</button>
+
+              <button
+                onClick={enviarPedido}
+                disabled={enviando || carrito.length === 0 || !clienteSeleccionado || itemsSinStock.length > 0}
+                className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {enviando ? 'Enviando...' : itemsSinStock.length > 0 ? 'Retira productos sin stock' : 'Enviar Pedido'}
+              </button>
             </div>
           </div>
         )}
@@ -289,11 +361,11 @@ export default function VendedorPage() {
         {tab === 'mis_pedidos' && (
           <div className="space-y-3">
             <h2 className="font-heading font-bold text-brand-navy text-xl mb-4">Pedidos - {pedidos.length}</h2>
-            {pedidos.length===0&&<div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos aun</p></div>}
-            {pedidos.map(ped=>{
-              const cliente = clientes.find(c=>c.id===ped.cliente_id)
-              const invoiceExistente = invoices.find(inv=>inv.pedido_id===ped.id)
-              return(
+            {pedidos.length === 0 && <div className="card text-center py-12 text-brand-gray-mid"><ShoppingBag size={40} className="mx-auto mb-3 opacity-25"/><p>No hay pedidos aun</p></div>}
+            {pedidos.map(ped => {
+              const cliente = clientes.find(c => c.id === ped.cliente_id)
+              const invoiceExistente = invoices.find(inv => inv.pedido_id === ped.id)
+              return (
                 <div key={ped.id} className="card">
                   <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
                     <div>
@@ -307,7 +379,7 @@ export default function VendedorPage() {
                       <button onClick={()=>generarInvoice(ped)} disabled={generandoInvoice===ped.id} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${invoiceExistente?'bg-green-100 text-green-700 hover:bg-green-200':'bg-brand-navy text-white hover:bg-brand-navy/80'}`}>
                         <Receipt size={13}/> {generandoInvoice===ped.id?'Generando...':(invoiceExistente?invoiceExistente.numero:'Invoice')}
                       </button>
-                      {invoiceExistente&&(
+                      {invoiceExistente && (
                         <a href={`/es/invoice/${invoiceExistente.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-200">
                           <Eye size={13}/> Ver
                         </a>
@@ -315,8 +387,11 @@ export default function VendedorPage() {
                     </div>
                   </div>
                   <div className="border-t pt-3 space-y-1">
-                    {ped.pedido_items?.map((item:any)=>(
-                      <div key={item.id} className="flex justify-between text-sm"><span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span><span className="font-medium text-brand-navy">${(item.precio_unitario*item.cantidad).toFixed(2)}</span></div>
+                    {ped.pedido_items?.map((item:any) => (
+                      <div key={item.id} className="flex justify-between text-sm">
+                        <span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span>
+                        <span className="font-medium text-brand-navy">${(item.precio_unitario*item.cantidad).toFixed(2)}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -332,13 +407,13 @@ export default function VendedorPage() {
               <h2 className="font-heading font-bold text-brand-navy text-xl">Invoices - {invoices.length}</h2>
               <a href="/es/invoice/nuevo" className="btn-primary flex items-center gap-2"><Receipt size={15}/> Nueva Invoice</a>
             </div>
-            {invoices.length===0?(
+            {invoices.length === 0 ? (
               <div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados</p></div>
-            ):(
+            ) : (
               <div className="space-y-3">
-                {invoices.map(inv=>{
-                  const cliente = clientes.find(c=>c.id===inv.cliente_id)
-                  return(
+                {invoices.map(inv => {
+                  const cliente = clientes.find(c => c.id === inv.cliente_id)
+                  return (
                     <div key={inv.id} className="card flex items-center justify-between flex-wrap gap-3">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-brand-navy rounded-xl flex items-center justify-center flex-shrink-0"><Receipt size={18} className="text-brand-orange"/></div>
@@ -372,11 +447,10 @@ export default function VendedorPage() {
               <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes - {clientes.length}</h2>
               <button onClick={()=>setShowFormCliente(!showFormCliente)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600"><UserPlus size={15}/> Nuevo Cliente</button>
             </div>
-
-            {showFormCliente&&(
+            {showFormCliente && (
               <div className="card border-2 border-brand-orange/30 mb-4">
                 <h3 className="font-heading font-bold text-brand-navy text-lg mb-4">Nuevo Cliente</h3>
-                {errorCliente&&<div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorCliente}</div>}
+                {errorCliente && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorCliente}</div>}
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre *</label><input value={formCliente.nombre} onChange={e=>setFormCliente({...formCliente,nombre:e.target.value})} placeholder="Nombre completo" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Email *</label><input value={formCliente.email} onChange={e=>setFormCliente({...formCliente,email:e.target.value})} placeholder="correo@email.com" type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
@@ -391,8 +465,7 @@ export default function VendedorPage() {
                 </div>
               </div>
             )}
-
-            {clientes.map(c=>(
+            {clientes.map(c => (
               <div key={c.id} className="card">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-brand-navy flex items-center justify-center text-white font-bold text-sm flex-shrink-0">{(c.nombre||'?')[0].toUpperCase()}</div>
