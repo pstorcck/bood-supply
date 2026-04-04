@@ -87,6 +87,24 @@ export default function BodegaPage() {
     setActualizando(pedidoId)
     await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', pedidoId)
     await cargarPedidos()
+    // Notificar al cliente por email
+    const ped = pedidos.find(p => p.id === pedidoId)
+    const cliente = ped ? clientes.find(c => c.id === ped.cliente_id) : null
+    if (cliente?.email && ['confirmado','en_preparacion','despachado','entregado'].includes(nuevoEstado)) {
+      fetch('/api/notificar-estado', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pedido_id: pedidoId,
+          pedido_numero: null,
+          estado: nuevoEstado,
+          cliente_email: cliente.email,
+          cliente_nombre: cliente.nombre,
+          items: ped?.pedido_items?.map((i: any) => ({ nombre: i.productos?.nombre, cantidad: i.cantidad, subtotal: (i.precio_unitario * i.cantidad).toFixed(2) })),
+          total: ped?.total?.toFixed(2)
+        })
+      }).catch(console.error)
+    }
     setActualizando(null)
   }
 

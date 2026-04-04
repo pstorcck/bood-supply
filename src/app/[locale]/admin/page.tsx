@@ -320,7 +320,27 @@ export default function AdminPage() {
   }
 
   async function cambiarEstado(id: string, estado: string) {
-    await supabase.from('pedidos').update({ estado }).eq('id', id); await cargarPedidos()
+    await supabase.from('pedidos').update({ estado }).eq('id', id)
+    await cargarPedidos()
+    // Notificar al cliente por email
+    const ped = pedidos.find(p => p.id === id)
+    const cliente = ped ? getCliente(ped.cliente_id) : null
+    if (cliente?.email && ['confirmado','en_preparacion','despachado','entregado'].includes(estado)) {
+      const invoice = invoices.find(inv => inv.pedido_id === id)
+      fetch('/api/notificar-estado', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pedido_id: id,
+          pedido_numero: invoice?.numero || null,
+          estado,
+          cliente_email: cliente.email,
+          cliente_nombre: cliente.nombre,
+          items: ped?.pedido_items?.map((i: any) => ({ nombre: i.productos?.nombre, cantidad: i.cantidad, subtotal: (i.precio_unitario * i.cantidad).toFixed(2) })),
+          total: ped?.total?.toFixed(2)
+        })
+      }).catch(console.error)
+    }
   }
 
   async function eliminarPedido(id: string) {
