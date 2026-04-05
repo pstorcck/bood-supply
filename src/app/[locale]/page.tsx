@@ -84,28 +84,20 @@ const TEXTS = {
 
 const PRODUCTS = {
   es: [
-    { name: 'Vasos Desechables', emoji: '🥤', desc: 'Vasos transparentes 8oz, 12oz, 16oz y 32oz' },
-    { name: 'Platos Desechables', emoji: '🍽️', desc: 'Platos de carton y foam en diferentes tamanos' },
-    { name: 'Cubiertos', emoji: '🍴', desc: 'Tenedores, cuchillos, cucharas y sets completos' },
-    { name: 'Bolsas y Contenedores', emoji: '🛍️', desc: 'Bolsas de papel, plastico y contenedores con tapa' },
-    { name: 'Servilletas', emoji: '🗒️', desc: 'Servilletas de papel blancas en paquetes grandes' },
-    { name: 'Papel para Bano', emoji: '🧻', desc: 'Papel higienico y papel toalla para tu negocio' },
-    { name: 'Papel', emoji: '📄', desc: 'Papel encerado y papel para envolver alimentos' },
-    { name: 'Palillos', emoji: '🪥', desc: 'Palillos de dientes y palillos removedores' },
-    { name: 'Grocery', emoji: '🛒', desc: 'Productos de abarrotes y alimentos no perecederos' },
+    { name: 'Foam Containers, Cups and Lids', emoji: '🥤', desc: 'Vasos, platos y tapas foam para llevar' },
+    { name: 'Bolsas, Cubiertos y papel', emoji: '🛍️', desc: 'Bolsas, cubiertos y papel para tu negocio' },
+    { name: 'Aluminio', emoji: '🍽️', desc: 'Charolas y papel aluminio para cocina' },
+    { name: 'Especies para cocina', emoji: '🌶️', desc: 'Especias y condimentos a granel' },
     { name: 'Quimicos y Limpieza', emoji: '🧴', desc: 'Productos de limpieza e higiene para tu negocio' },
+    { name: 'Guantes', emoji: '🧤', desc: 'Guantes desechables para manejo de alimentos' },
   ],
   en: [
-    { name: 'Disposable Cups', emoji: '🥤', desc: 'Clear cups 8oz, 12oz, 16oz and 32oz' },
-    { name: 'Disposable Plates', emoji: '🍽️', desc: 'Cardboard and foam plates in different sizes' },
-    { name: 'Cutlery', emoji: '🍴', desc: 'Forks, knives, spoons and complete sets' },
-    { name: 'Bags & Containers', emoji: '🛍️', desc: 'Paper bags, plastic bags and lidded containers' },
-    { name: 'Napkins', emoji: '🗒️', desc: 'White paper napkins in large packages' },
-    { name: 'Bathroom Paper', emoji: '🧻', desc: 'Toilet paper and paper towels for your business' },
-    { name: 'Paper', emoji: '📄', desc: 'Wax paper and food wrapping paper' },
-    { name: 'Toothpicks', emoji: '🪥', desc: 'Toothpicks and cocktail picks' },
-    { name: 'Grocery', emoji: '🛒', desc: 'Grocery products and non-perishable foods' },
+    { name: 'Foam Containers, Cups and Lids', emoji: '🥤', desc: 'Cups, plates and foam lids to go' },
+    { name: 'Bags, Cutlery and Paper', emoji: '🛍️', desc: 'Bags, cutlery and paper for your business' },
+    { name: 'Aluminum', emoji: '🍽️', desc: 'Aluminum trays and foil for cooking' },
+    { name: 'Cooking Spices', emoji: '🌶️', desc: 'Spices and condiments in bulk' },
     { name: 'Chemicals & Cleaning', emoji: '🧴', desc: 'Cleaning and hygiene products for your business' },
+    { name: 'Gloves', emoji: '🧤', desc: 'Disposable gloves for food handling' },
   ]
 }
 
