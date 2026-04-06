@@ -41,7 +41,7 @@ function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices' | 'finanzas'>('clientes')
+  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices' | 'finanzas' | 'analytics'>('clientes')
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
@@ -98,6 +98,9 @@ export default function AdminPage() {
   const [stockTemp, setStockTemp] = useState('')
   const [costoTemp, setCostoTemp] = useState('')
 
+  const [analyticsData, setAnalyticsData] = useState<any>(null)
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false)
+  const [errorAnalytics, setErrorAnalytics] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
@@ -320,6 +323,18 @@ export default function AdminPage() {
     await cargarClientes(); setAprobando(null)
   }
 
+  async function cargarAnalytics() {
+    setLoadingAnalytics(true)
+    setErrorAnalytics('')
+    try {
+      const res = await fetch('/api/analytics')
+      const data = await res.json()
+      if (data.error) { setErrorAnalytics(data.error); setLoadingAnalytics(false); return }
+      setAnalyticsData(data)
+    } catch(e: any) { setErrorAnalytics(e.message) }
+    setLoadingAnalytics(false)
+  }
+
   async function cambiarEstado(id: string, estado: string) {
     await supabase.from('pedidos').update({ estado }).eq('id', id)
     await cargarPedidos()
@@ -536,6 +551,7 @@ export default function AdminPage() {
             {key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},
             {key:'invoices',label:'Invoices',icon:Receipt,badge:0},
             {key:'finanzas',label:'Finanzas',icon:BarChart2,badge:0},
+            {key:'analytics',label:'Analytics',icon:TrendingUp,badge:0},
             {key:'rutas',label:'Rutas',icon:Map,badge:0},
             {key:'mensajes',label:'Mensajes',icon:Mail,badge:0},
             {key:'productos',label:'Productos',icon:Package,badge:0},
@@ -718,7 +734,212 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* CLIENTES */}
+        {/* ANALYTICS */}
+        {tab === 'analytics' && (
+          <div>
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+              <div>
+                <h2 className="font-heading font-bold text-brand-navy text-xl">Analytics — Bood Supply</h2>
+                <p className="text-brand-gray-mid text-sm mt-1">Datos de los últimos 30 días de boodsupply.com</p>
+              </div>
+              <button onClick={cargarAnalytics} disabled={loadingAnalytics} className="btn-primary flex items-center gap-2">
+                {loadingAnalytics ? 'Cargando...' : '🔄 Actualizar datos'}
+              </button>
+            </div>
+
+            {errorAnalytics && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorAnalytics}</div>}
+
+            {!analyticsData && !loadingAnalytics && (
+              <div className="card text-center py-16 text-brand-gray-mid">
+                <TrendingUp size={48} className="mx-auto mb-3 opacity-20"/>
+                <p className="font-medium text-lg">Dashboard de Analytics</p>
+                <p className="text-sm mt-2 mb-6">Haz clic en "Actualizar datos" para cargar las métricas de Google Analytics</p>
+                <button onClick={cargarAnalytics} className="btn-primary">Cargar Analytics</button>
+              </div>
+            )}
+
+            {loadingAnalytics && (
+              <div className="card text-center py-16 text-brand-gray-mid">
+                <div className="animate-spin w-10 h-10 border-4 border-brand-orange border-t-transparent rounded-full mx-auto mb-4"/>
+                <p className="font-medium">Cargando datos de Google Analytics...</p>
+              </div>
+            )}
+
+            {analyticsData && !loadingAnalytics && (() => {
+              // Parse sesiones generales
+              const ses = analyticsData.sesionesData?.rows?.[0]
+              const sesPrev = analyticsData.sesionesData?.rows?.[1]
+              const usuarios = parseInt(ses?.metricValues?.[0]?.value || '0')
+              const sesiones = parseInt(ses?.metricValues?.[1]?.value || '0')
+              const vistas = parseInt(ses?.metricValues?.[2]?.value || '0')
+              const bounceRate = parseFloat(ses?.metricValues?.[3]?.value || '0')
+              const avgDuration = parseFloat(ses?.metricValues?.[4]?.value || '0')
+              const nuevos = parseInt(ses?.metricValues?.[5]?.value || '0')
+              const usuariosPrev = parseInt(sesPrev?.metricValues?.[0]?.value || '0')
+              const pct = usuariosPrev > 0 ? Math.round((usuarios - usuariosPrev) / usuariosPrev * 100) : 0
+
+              // Realtime
+              const realtimeUsers = analyticsData.realtimeData?.rows?.reduce((sum: number, r: any) => sum + parseInt(r.metricValues?.[0]?.value || '0'), 0) || 0
+
+              // Dispositivos
+              const dispositivos = analyticsData.dispositivosData?.rows?.map((r: any) => ({
+                tipo: r.dimensionValues?.[0]?.value,
+                usuarios: parseInt(r.metricValues?.[0]?.value || '0')
+              })) || []
+              const totalDisp = dispositivos.reduce((s: number, d: any) => s + d.usuarios, 0)
+
+              // Páginas
+              const paginas = analyticsData.paginasData?.rows?.slice(0, 8).map((r: any) => ({
+                path: r.dimensionValues?.[0]?.value,
+                vistas: parseInt(r.metricValues?.[0]?.value || '0')
+              })) || []
+              const maxVistas = paginas[0]?.vistas || 1
+
+              // Países
+              const paises = analyticsData.paisesData?.rows?.slice(0, 6).map((r: any) => ({
+                pais: r.dimensionValues?.[0]?.value,
+                usuarios: parseInt(r.metricValues?.[0]?.value || '0')
+              })) || []
+
+              // Canales
+              const canales = analyticsData.canalesData?.rows?.map((r: any) => ({
+                canal: r.dimensionValues?.[0]?.value,
+                sesiones: parseInt(r.metricValues?.[0]?.value || '0')
+              })) || []
+              const totalCanales = canales.reduce((s: number, c: any) => s + c.sesiones, 0)
+
+              // Tendencia diaria
+              const tendencia = analyticsData.usuariosData?.rows?.slice(-14).map((r: any) => ({
+                fecha: r.dimensionValues?.[0]?.value?.slice(4),
+                usuarios: parseInt(r.metricValues?.[0]?.value || '0'),
+                vistas: parseInt(r.metricValues?.[2]?.value || '0')
+              })) || []
+              const maxTend = Math.max(...tendencia.map((t: any) => t.vistas), 1)
+
+              return (
+                <div className="space-y-6">
+                  {/* KPIs */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="card border-l-4 border-l-green-400">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-brand-gray-mid font-medium">Usuarios activos</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pct >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{pct >= 0 ? '+' : ''}{pct}%</span>
+                      </div>
+                      <div className="font-heading font-bold text-2xl text-green-600">{usuarios.toLocaleString()}</div>
+                      <div className="text-xs text-brand-gray-mid mt-1">últimos 30 días</div>
+                    </div>
+                    <div className="card border-l-4 border-l-blue-400">
+                      <div className="text-xs text-brand-gray-mid font-medium mb-1">Sesiones</div>
+                      <div className="font-heading font-bold text-2xl text-blue-600">{sesiones.toLocaleString()}</div>
+                      <div className="text-xs text-brand-gray-mid mt-1">Bounce: {(bounceRate * 100).toFixed(0)}%</div>
+                    </div>
+                    <div className="card border-l-4 border-l-brand-orange">
+                      <div className="text-xs text-brand-gray-mid font-medium mb-1">Vistas de página</div>
+                      <div className="font-heading font-bold text-2xl text-brand-orange">{vistas.toLocaleString()}</div>
+                      <div className="text-xs text-brand-gray-mid mt-1">{nuevos.toLocaleString()} nuevos usuarios</div>
+                    </div>
+                    <div className="card border-l-4 border-l-brand-navy">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-brand-gray-mid font-medium">En tiempo real</span>
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"/>
+                      </div>
+                      <div className="font-heading font-bold text-2xl text-brand-navy">{realtimeUsers}</div>
+                      <div className="text-xs text-brand-gray-mid mt-1">usuarios ahora</div>
+                    </div>
+                  </div>
+
+                  {/* Tendencia + Dispositivos */}
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div className="card md:col-span-2">
+                      <h3 className="font-heading font-semibold text-brand-navy mb-4">Vistas por día (últimas 2 semanas)</h3>
+                      <div className="flex items-end gap-1 h-32">
+                        {tendencia.map((t: any, i: number) => (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <div
+                              className="w-full bg-brand-orange rounded-t hover:opacity-80 transition-opacity"
+                              style={{ height: `${(t.vistas / maxTend) * 100}%`, minHeight: t.vistas > 0 ? '4px' : '2px' }}
+                              title={`${t.fecha}: ${t.vistas} vistas`}
+                            />
+                            <span className="text-[9px] text-brand-gray-mid">{t.fecha?.slice(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="card">
+                      <h3 className="font-heading font-semibold text-brand-navy mb-4">Dispositivos</h3>
+                      <div className="space-y-3">
+                        {dispositivos.map((d: any) => (
+                          <div key={d.tipo}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-brand-gray-dark capitalize">{d.tipo === 'desktop' ? '🖥️ Desktop' : d.tipo === 'mobile' ? '📱 Móvil' : '📱 Tablet'}</span>
+                              <span className="font-bold text-brand-navy">{d.usuarios} ({totalDisp > 0 ? Math.round(d.usuarios/totalDisp*100) : 0}%)</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-2">
+                              <div className="bg-brand-navy h-2 rounded-full" style={{ width: `${totalDisp > 0 ? (d.usuarios/totalDisp*100) : 0}%` }}/>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="text-xs text-brand-gray-mid">Duración promedio</div>
+                        <div className="font-heading font-bold text-brand-navy">{Math.floor(avgDuration/60)}m {Math.floor(avgDuration%60)}s</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Páginas + Países + Canales */}
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div className="card">
+                      <h3 className="font-heading font-semibold text-brand-navy mb-4">Páginas más vistas</h3>
+                      <div className="space-y-2">
+                        {paginas.map((p: any, i: number) => (
+                          <div key={i}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-brand-gray-dark truncate max-w-[140px]" title={p.path}>{p.path}</span>
+                              <span className="font-bold text-brand-navy ml-1">{p.vistas}</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-1.5">
+                              <div className="bg-brand-orange h-1.5 rounded-full" style={{ width: `${(p.vistas/maxVistas*100)}%` }}/>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="card">
+                      <h3 className="font-heading font-semibold text-brand-navy mb-4">Países</h3>
+                      <div className="space-y-2">
+                        {paises.map((p: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
+                            <span className="text-sm text-brand-gray-dark">{p.pais}</span>
+                            <span className="font-bold text-brand-navy text-sm">{p.usuarios}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="card">
+                      <h3 className="font-heading font-semibold text-brand-navy mb-4">Canales de tráfico</h3>
+                      <div className="space-y-2">
+                        {canales.map((c: any, i: number) => (
+                          <div key={i}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-brand-gray-dark truncate max-w-[140px]">{c.canal || 'Direct'}</span>
+                              <span className="font-bold text-brand-navy">{c.sesiones}</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-1.5">
+                              <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${totalCanales > 0 ? (c.sesiones/totalCanales*100) : 0}%` }}/>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* CLIENTES */}}
         {tab === 'clientes' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
