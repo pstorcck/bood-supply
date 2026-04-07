@@ -343,6 +343,34 @@ export default function AdminPage() {
     const cliente = ped ? getCliente(ped.cliente_id) : null
     if (cliente?.email && ['confirmado','en_preparacion','despachado','entregado'].includes(estado)) {
       const invoice = invoices.find(inv => inv.pedido_id === id)
+      // Verificar si algún precio cambió
+      const itemsConPrecio = ped?.pedido_items || []
+      const preciosCambiados = itemsConPrecio.filter((item: any) => {
+        const precioActual = item.productos?.precio
+        const precioOriginal = item.precio_unitario
+        return precioActual && precioOriginal && Math.abs(precioActual - precioOriginal) > 0.01
+      })
+      if (preciosCambiados.length > 0) {
+        const listaPrecios = preciosCambiados.map((item: any) =>
+          `${item.productos?.nombre}: $${item.precio_unitario} → $${item.productos?.precio}`
+        ).join(', ')
+        fetch('/api/notificar-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo: 'pedido_nuevo',
+            datos: {
+              pedido_id: pedidoId + ' ⚠️ PRECIOS CAMBIADOS: ' + listaPrecios,
+              cliente_nombre: ped?.clientes?.nombre || '',
+              negocio: ped?.clientes?.negocio || '',
+              telefono: ped?.clientes?.telefono || '',
+              metodo_pago: ped?.metodo_pago || '',
+              total: ped?.total || 0,
+              items: []
+            }
+          })
+        })
+      }
       fetch('/api/notificar-estado', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
