@@ -55,8 +55,6 @@ export async function POST(req: NextRequest) {
       `
     }
 
-    const apiKey = process.env.RESEND_API_KEY || 're_UvyofaqK_6EZ3SmXkDrs99YbqZkRWYjnZ'
-    console.log('RESEND KEY:', apiKey.slice(0,15))
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
