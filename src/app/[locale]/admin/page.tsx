@@ -153,6 +153,11 @@ export default function AdminPage() {
     await cargarInvoices()
   }
 
+  async function marcarAnulado(invId: string, anulado: boolean) {
+    await supabase.from('invoices').update({ anulado }).eq('id', invId)
+    await cargarInvoices()
+  }
+
   async function generarInvoice(ped: any) {
     setGenerandoInvoice(ped.id)
     try {
@@ -1198,7 +1203,7 @@ export default function AdminPage() {
                     const diasCredito = inv.dias_credito || 30
                     const vencido = !inv.pagado && diasDesde > diasCredito
                     const porVencer = !inv.pagado && diasDesde >= diasCredito - 5 && !vencido
-                    return(<div key={inv.id} className={`card flex flex-col gap-3 border-l-4 ${inv.pagado ? 'border-green-400' : vencido ? 'border-red-400' : porVencer ? 'border-yellow-400' : 'border-brand-navy'}`}>
+                    return(<div key={inv.id} className="card flex flex-col gap-3" style={{borderLeft: `4px solid ${inv.anulado ? '#9ca3af' : inv.pagado ? '#4ade80' : vencido ? '#f87171' : porVencer ? '#facc15' : '#0F2B5B'}`, opacity: inv.anulado ? 0.6 : 1}}>
                       <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-4">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${inv.pagado ? 'bg-green-100' : vencido ? 'bg-red-100' : 'bg-brand-navy'}`}>
@@ -1207,7 +1212,8 @@ export default function AdminPage() {
                           <div>
                             <div className="flex items-center gap-2">
                               <p className="font-heading font-bold text-brand-navy">{inv.numero}</p>
-                              {inv.pagado && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Pagado</span>}
+                              {inv.anulado && <span className="text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full font-medium line-through">VOID</span>}
+                              {!inv.anulado && inv.pagado && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Pagado</span>}
                               {vencido && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">⚠ Vencido {diasDesde - diasCredito}d</span>}
                               {porVencer && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">⏰ Vence pronto</span>}
                               {!inv.pagado && !vencido && !porVencer && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Día {diasDesde}/{diasCredito}</span>}
@@ -1224,11 +1230,19 @@ export default function AdminPage() {
                           </div>
                           <div className="flex flex-col gap-1.5">
                             <a href={`/es/invoice/${inv.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80"><Eye size={15}/> Ver</a>
+                            {!inv.anulado && (
+                              <button
+                                onClick={() => marcarPagado(inv.id, !inv.pagado)}
+                                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${inv.pagado ? 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                              >
+                                {inv.pagado ? '↩ Desmarcar' : '✓ Marcar pagado'}
+                              </button>
+                            )}
                             <button
-                              onClick={() => marcarPagado(inv.id, !inv.pagado)}
-                              className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${inv.pagado ? 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                              onClick={() => marcarAnulado(inv.id, !inv.anulado)}
+                              className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${inv.anulado ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
                             >
-                              {inv.pagado ? '↩ Desmarcar' : '✓ Marcar pagado'}
+                              {inv.anulado ? '↩ Reactivar' : '✕ VOID'}
                             </button>
                           </div>
                         </div>
