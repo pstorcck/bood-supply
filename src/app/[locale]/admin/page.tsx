@@ -145,6 +145,14 @@ export default function AdminPage() {
     setInvoices(data || [])
   }
 
+  async function marcarPagado(invId: string, pagado: boolean) {
+    await supabase.from('invoices').update({
+      pagado,
+      fecha_pago: pagado ? new Date().toISOString() : null
+    }).eq('id', invId)
+    await cargarInvoices()
+  }
+
   async function generarInvoice(ped: any) {
     setGenerandoInvoice(ped.id)
     try {
@@ -1186,7 +1194,46 @@ export default function AdminPage() {
               <div className="space-y-3">
                 {invoices.map(inv=>{
                   const cliente = clientes.find(c=>c.id===inv.cliente_id)
-                  return(<div key={inv.id} className="card flex items-center justify-between flex-wrap gap-3"><div className="flex items-center gap-4"><div className="w-10 h-10 bg-brand-navy rounded-xl flex items-center justify-center flex-shrink-0"><Receipt size={18} className="text-brand-orange"/></div><div><p className="font-heading font-bold text-brand-navy">{inv.numero}</p><p className="text-xs text-brand-gray-mid">{cliente?.nombre||'—'} · {cliente?.negocio||'—'}</p><p className="text-xs text-brand-gray-mid">{new Date(inv.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'})}</p></div></div><div className="flex items-center gap-3"><div className="text-right"><p className="font-heading font-bold text-brand-orange">${inv.total?.toFixed(2)}</p><p className="text-xs text-brand-gray-mid">{inv.metodo_pago}</p></div><a href={`/es/invoice/${inv.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80"><Eye size={15}/> Ver Invoice</a></div></div>)
+                  const diasDesde = Math.floor((Date.now() - new Date(inv.created_at).getTime()) / (1000*60*60*24))
+                    const diasCredito = inv.dias_credito || 30
+                    const vencido = !inv.pagado && diasDesde > diasCredito
+                    const porVencer = !inv.pagado && diasDesde >= diasCredito - 5 && !vencido
+                    return(<div key={inv.id} className={`card flex flex-col gap-3 border-l-4 ${inv.pagado ? 'border-green-400' : vencido ? 'border-red-400' : porVencer ? 'border-yellow-400' : 'border-brand-navy'}`}>
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${inv.pagado ? 'bg-green-100' : vencido ? 'bg-red-100' : 'bg-brand-navy'}`}>
+                            <Receipt size={18} className={inv.pagado ? 'text-green-600' : vencido ? 'text-red-600' : 'text-brand-orange'}/>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-heading font-bold text-brand-navy">{inv.numero}</p>
+                              {inv.pagado && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Pagado</span>}
+                              {vencido && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">⚠ Vencido {diasDesde - diasCredito}d</span>}
+                              {porVencer && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">⏰ Vence pronto</span>}
+                              {!inv.pagado && !vencido && !porVencer && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Día {diasDesde}/{diasCredito}</span>}
+                            </div>
+                            <p className="text-xs text-brand-gray-mid">{cliente?.negocio || cliente?.nombre || '—'}</p>
+                            <p className="text-xs text-brand-gray-mid">{new Date(inv.created_at).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'})}</p>
+                            {inv.pagado && inv.fecha_pago && <p className="text-xs text-green-600">Pagado: {new Date(inv.fecha_pago).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'})}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="font-heading font-bold text-brand-orange">${inv.total?.toFixed(2)}</p>
+                            <p className="text-xs text-brand-gray-mid">{inv.metodo_pago}</p>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <a href={`/es/invoice/${inv.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80"><Eye size={15}/> Ver</a>
+                            <button
+                              onClick={() => marcarPagado(inv.id, !inv.pagado)}
+                              className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${inv.pagado ? 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                            >
+                              {inv.pagado ? '↩ Desmarcar' : '✓ Marcar pagado'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>)
                 })}
               </div>
             )}
