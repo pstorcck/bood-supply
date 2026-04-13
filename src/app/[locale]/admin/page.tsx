@@ -51,8 +51,6 @@ export default function AdminPage() {
   const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
   const [fuelOverride, setFuelOverride] = useState<Record<string, number>>({})
   const [showContabilidad, setShowContabilidad] = useState<string | null>(null)
-  const [fuelOverride, setFuelOverride] = useState<Record<string, number>>({})
-  const [showContabilidad, setShowContabilidad] = useState<string | null>(null)
   const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [editandoCliente, setEditandoCliente] = useState<string | null>(null)
   const [formCliente, setFormCliente] = useState<any>({})
