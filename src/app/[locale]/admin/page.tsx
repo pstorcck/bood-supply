@@ -49,6 +49,10 @@ export default function AdminPage() {
   const [invoices, setInvoices] = useState<any[]>([])
   const [gastos, setGastos] = useState<any[]>([])
   const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
+  const [fuelOverride, setFuelOverride] = useState<Record<string, number>>({})
+  const [showContabilidad, setShowContabilidad] = useState<string | null>(null)
+  const [fuelOverride, setFuelOverride] = useState<Record<string, number>>({})
+  const [showContabilidad, setShowContabilidad] = useState<string | null>(null)
   const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [editandoCliente, setEditandoCliente] = useState<string | null>(null)
   const [formCliente, setFormCliente] = useState<any>({})
@@ -147,7 +151,7 @@ export default function AdminPage() {
     setGenerandoInvoice(ped.id)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const res = await fetch('/api/crear-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pedido_id: ped.id, cliente_id: ped.cliente_id, creado_por: user?.id }) })
+      const res = await fetch('/api/crear-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pedido_id: ped.id, cliente_id: ped.cliente_id, creado_por: user?.id || null, fuel_override: fuelOverride[ped.id] }) })
       const data = await res.json()
       if (data.error) { alert('Error: ' + data.error); return }
       await cargarInvoices()
@@ -1090,7 +1094,61 @@ export default function AdminPage() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-heading font-bold text-brand-orange text-lg">${ped.total?.toFixed(2)}</span>
                                   <select value={ped.estado} onChange={e=>cambiarEstado(ped.id,e.target.value)} className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none ${estadoColor[ped.estado]}`}>{ESTADOS.map(e=><option key={e} value={e}>{e.replace('_',' ').charAt(0).toUpperCase()+e.replace('_',' ').slice(1)}</option>)}</select>
-                                  <button onClick={()=>generarInvoice(ped)} disabled={generandoInvoice===ped.id} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${invoiceExistente?'bg-green-100 text-green-700 hover:bg-green-200':'bg-brand-navy text-white hover:bg-brand-navy/80'}`}><Receipt size={13}/> {generandoInvoice===ped.id?'Generando...':(invoiceExistente?invoiceExistente.numero:'Invoice')}</button>
+                                  <div className="flex flex-col gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-brand-gray-mid">Fuel $</span>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="5.00"
+                                        value={fuelOverride[ped.id] ?? ''}
+                                        onChange={e => setFuelOverride((prev: any) => ({ ...prev, [ped.id]: parseFloat(e.target.value) || 0 }))}
+                                        className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs text-brand-navy"
+                                      />
+                                    </div>
+                                    <button onClick={()=>generarInvoice(ped)} disabled={generandoInvoice===ped.id} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${invoiceExistente?'bg-green-100 text-green-700 hover:bg-green-200':'bg-brand-navy text-white hover:bg-brand-navy/80'}`}><Receipt size={13}/> {generandoInvoice===ped.id?'Generando...':(invoiceExistente?invoiceExistente.numero:'Invoice')}</button>
+                                    <button
+                                      onClick={() => setShowContabilidad((prev: any) => prev === ped.id ? null : ped.id)}
+                                      className="text-xs text-brand-navy underline hover:text-brand-orange transition-colors text-left"
+                                    >
+                                      {showContabilidad === ped.id ? 'Ocultar contabilidad' : '📊 Contabilidad'}
+                                    </button>
+                                    {showContabilidad === ped.id && (() => {
+                                      const subtotal = ped.pedido_items?.reduce((s: number, i: any) => s + i.precio_unitario * i.cantidad, 0) || 0
+                                      const fuel = fuelOverride[ped.id] ?? ped.fuel_surcharge ?? 5
+                                      const total = subtotal + fuel
+                                      const costoEst = subtotal * 0.72
+                                      const ganancia = subtotal - costoEst
+                                      const margen = subtotal > 0 ? (ganancia / subtotal * 100).toFixed(1) : '0'
+                                      return (
+                                        <div className="mt-1 bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs space-y-1 w-56">
+                                          <p className="font-semibold text-brand-navy mb-1">📊 Contabilidad Interna</p>
+                                          <div className="flex justify-between"><span className="text-brand-gray-mid">Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
+                                          <div className="flex justify-between"><span className="text-brand-gray-mid">Fuel</span><span>${fuel.toFixed(2)}</span></div>
+                                          <div className="flex justify-between font-semibold border-t border-blue-200 pt-1"><span>Total cobrado</span><span className="text-brand-navy">${total.toFixed(2)}</span></div>
+                                          <div className="flex justify-between mt-1"><span className="text-brand-gray-mid">Costo est. (72%)</span><span className="text-red-500">${costoEst.toFixed(2)}</span></div>
+                                          <div className="flex justify-between"><span className="text-brand-gray-mid">Ganancia bruta</span><span className="text-green-600 font-semibold">${ganancia.toFixed(2)}</span></div>
+                                          <div className="flex justify-between"><span className="text-brand-gray-mid">Margen</span><span className={parseFloat(margen) >= 20 ? 'text-green-600' : 'text-yellow-600'}>{margen}%</span></div>
+                                          <div className="mt-2 pt-2 border-t border-blue-200">
+                                            <p className="text-brand-gray-mid mb-1">Gastos extras</p>
+                                            <input
+                                              type="number"
+                                              placeholder="gasolina, taxes..."
+                                              className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs mb-1"
+                                              onChange={e => {
+                                                const gastos = parseFloat(e.target.value) || 0
+                                                const neta = ganancia - gastos
+                                                const el = document.getElementById('neta-' + ped.id)
+                                                if (el) el.textContent = 'Ganancia neta: $' + neta.toFixed(2)
+                                              }}
+                                            />
+                                            <p id={'neta-' + ped.id} className="text-green-700 font-semibold">Ganancia neta: ${ganancia.toFixed(2)}</p>
+                                          </div>
+                                        </div>
+                                      )
+                                    })()}
+                                  </div>
                                   {invoiceExistente&&(<a href={`/es/invoice/${invoiceExistente.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"><Eye size={13}/> Ver</a>)}
                                   <button onClick={()=>eliminarPedido(ped.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-400"><Trash2 size={15}/></button>
                                 </div>

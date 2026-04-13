@@ -90,11 +90,10 @@ export default function InvoicePage() {
         <div className="grid2">
           <div className="info-box">
             <div className="section-title">Facturado a</div>
-            <div className="client-name">{cliente?.nombre || '—'}</div>
+            <div className="client-name">{cliente?.negocio || cliente?.nombre || '—'}</div>
             {cliente?.negocio && <div className="info-row"><span className="info-label">Negocio</span><span className="info-value">{cliente.negocio}</span></div>}
             {cliente?.direccion && <div className="info-row"><span className="info-label">Direccion</span><span className="info-value">{cliente.direccion}</span></div>}
             {cliente?.telefono && <div className="info-row"><span className="info-label">Tel</span><span className="info-value">{cliente.telefono}</span></div>}
-            {cliente?.ein && <div className="info-row"><span className="info-label">EIN</span><span className="info-value">{cliente.ein}</span></div>}
             {cliente?.email && <div className="info-row"><span className="info-label">Email</span><span className="info-value">{cliente.email}</span></div>}
           </div>
           <div className="info-box">

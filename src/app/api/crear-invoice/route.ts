@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { pedido_id, cliente_id, creado_por } = await req.json()
+    const { pedido_id, cliente_id, creado_por, fuel_override } = await req.json()
 
     const { data: pedido, error: pedidoError } = await supabase
       .from('pedidos')
@@ -40,13 +40,13 @@ export async function POST(req: NextRequest) {
     const tax = pedido.pedido_items
       .filter((i: any) => i.productos?.categoria === 'Quimicos y Limpieza')
       .reduce((sum: number, i: any) => sum + i.precio_unitario * i.cantidad * 0.1025, 0)
-    const fuel = pedido.fuel_surcharge || 5
+    const fuel = fuel_override !== undefined && fuel_override !== null ? parseFloat(fuel_override) : (pedido.fuel_surcharge || 5)
 
     const { data: invoice, error: invError } = await supabase.from('invoices').insert({
       numero,
       pedido_id,
       cliente_id,
-      creado_por,
+      creado_por: creado_por || null,
       total: pedido.total,
       subtotal,
       tax,
