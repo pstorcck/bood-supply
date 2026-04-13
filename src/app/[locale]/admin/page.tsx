@@ -1116,7 +1116,7 @@ export default function AdminPage() {
                                       const subtotal = ped.pedido_items?.reduce((s: number, i: any) => s + i.precio_unitario * i.cantidad, 0) || 0
                                       const fuel = fuelOverride[ped.id] ?? ped.fuel_surcharge ?? 5
                                       const total = subtotal + fuel
-                                      const costoEst = subtotal * 0.72
+                                      const costoEst = ped.pedido_items?.reduce((s: number, i: any) => s + (i.productos?.costo || i.precio_unitario * 0.72) * i.cantidad, 0) || 0
                                       const ganancia = subtotal - costoEst
                                       const margen = subtotal > 0 ? (ganancia / subtotal * 100).toFixed(1) : '0'
                                       return (
