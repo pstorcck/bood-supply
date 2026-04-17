@@ -109,7 +109,6 @@ export default function InvoicePage() {
         <table>
           <thead>
             <tr>
-              <th>#</th>
               <th>Descripcion</th>
               <th>Precio Unit.</th>
               <th>Cant.</th>
@@ -119,13 +118,18 @@ export default function InvoicePage() {
           <tbody>
             {items?.map((item: any, idx: number) => (
               <tr key={idx}>
-                <td>{idx + 1}</td>
+                <td>—</td>
                 <td>{item.descripcion || item.productos?.nombre || '—'}</td>
                 <td>${Number(item.precio_unitario).toFixed(2)}</td>
                 <td>{item.cantidad}</td>
                 <td>${(Number(item.precio_unitario) * Number(item.cantidad)).toFixed(2)}</td>
               </tr>
             ))}
+            <tr style={{borderTop:'2px solid #E2E8F0',background:'#F7FAFC'}}>
+              <td colSpan={3} style={{textAlign:'right',fontSize:'9px',color:'#718096',paddingRight:'8px'}}>Total líneas: {items?.length || 0} &nbsp;|&nbsp; Total cajas: {items?.reduce((s: number, i: any) => s + Number(i.cantidad), 0) || 0}</td>
+              <td style={{fontSize:'9px',color:'#718096'}}></td>
+              <td style={{fontSize:'9px',color:'#718096'}}></td>
+            </tr>
           </tbody>
         </table>
 

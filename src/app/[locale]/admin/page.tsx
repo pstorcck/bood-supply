@@ -54,6 +54,9 @@ export default function AdminPage() {
   const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [editandoCliente, setEditandoCliente] = useState<string | null>(null)
   const [formCliente, setFormCliente] = useState<any>({})
+  const [archivoEditTax, setArchivoEditTax] = useState<File | null>(null)
+  const [archivoEditId, setArchivoEditId] = useState<File | null>(null)
+  const [archivoEditCrt, setArchivoEditCrt] = useState<File | null>(null)
   const [showFormProducto, setShowFormProducto] = useState(false)
   const [showFormCategoria, setShowFormCategoria] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -252,7 +255,17 @@ export default function AdminPage() {
     return true
   })
 
-  const totalIngresos = pedidosFinanzas.reduce((sum, p) => sum + (p.total || 0), 0)
+  const invoicesFinanzas = invoices.filter(inv => {
+    if (inv.anulado) return false
+    const fecha = new Date(inv.created_at)
+    if (fechaFinDesde && fecha < new Date(fechaFinDesde + 'T00:00:00')) return false
+    if (fechaFinHasta && fecha > new Date(fechaFinHasta + 'T23:59:59')) return false
+    return true
+  })
+  const totalInvoicesSinPedido = invoicesFinanzas
+    .filter(inv => !pedidosFinanzas.find((p: any) => p.id === inv.pedido_id))
+    .reduce((sum, inv) => sum + (inv.total || 0), 0)
+  const totalIngresos = pedidosFinanzas.reduce((sum, p) => sum + (p.total || 0), 0) + totalInvoicesSinPedido
   const totalEgresos = gastosFinanzas.reduce((sum, g) => sum + (g.monto || 0), 0)
   const resultado = totalIngresos - totalEgresos
   const margenPct = totalIngresos > 0 ? (resultado / totalIngresos * 100) : 0
@@ -425,7 +438,12 @@ export default function AdminPage() {
 
   async function guardarCliente(id: string) {
     setGuardando(true)
-    await supabase.from('profiles').update(formCliente).eq('id', id)
+    let extraUpdates: any = {}
+    if (archivoEditTax) { const ext = archivoEditTax.name.split('.').pop(); const { error: ue } = await supabase.storage.from('documentos').upload(`sales-tax/${id}.${ext}`, archivoEditTax, { upsert: true }); if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`sales-tax/${id}.${ext}`); extraUpdates.sales_tax_url = ud.publicUrl } }
+    if (archivoEditId) { const ext = archivoEditId.name.split('.').pop(); const { error: ue } = await supabase.storage.from('documentos').upload(`ids/${id}.${ext}`, archivoEditId, { upsert: true }); if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`ids/${id}.${ext}`); extraUpdates.id_foto_url = ud.publicUrl } }
+    if (archivoEditCrt) { const ext = archivoEditCrt.name.split('.').pop(); const { error: ue } = await supabase.storage.from('documentos').upload(`crt61/${id}.${ext}`, archivoEditCrt, { upsert: true }); if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`crt61/${id}.${ext}`); extraUpdates.crt61_url = ud.publicUrl } }
+    await supabase.from('profiles').update({ ...formCliente, ...extraUpdates }).eq('id', id)
+    setArchivoEditTax(null); setArchivoEditId(null); setArchivoEditCrt(null)
     await cargarClientes(); setEditandoCliente(null); setGuardando(false)
   }
 
@@ -1055,6 +1073,14 @@ export default function AdminPage() {
                         <div key={key}><label className="block text-xs font-medium text-brand-gray-dark mb-1">{label}</label><input value={formCliente[key]||''} onChange={e=>setFormCliente({...formCliente,[key]:e.target.value})} placeholder={ph} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                       ))}
                       <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formCliente.direccion||''} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Direccion del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                      <div className="col-span-2 border-t pt-3 mt-1">
+                        <p className="text-xs font-semibold text-brand-navy mb-2">📎 Documentos</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div><label className="block text-xs text-brand-gray-mid mb-1">Sales Tax Permit</label><input type="file" accept="image/*,.pdf" onChange={e=>setArchivoEditTax(e.target.files?.[0]||null)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1"/></div>
+                          <div><label className="block text-xs text-brand-gray-mid mb-1">ID / Identificacion</label><input type="file" accept="image/*,.pdf" onChange={e=>setArchivoEditId(e.target.files?.[0]||null)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1"/></div>
+                          <div><label className="block text-xs text-brand-gray-mid mb-1">CRT-61 Firmado</label><input type="file" accept="image/*,.pdf" onChange={e=>setArchivoEditCrt(e.target.files?.[0]||null)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1"/></div>
+                        </div>
+                      </div>
                     </div>
                   ):(
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs mt-3 border-t pt-3">
