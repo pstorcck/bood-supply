@@ -49,6 +49,9 @@ export default function AdminPage() {
   const [invoices, setInvoices] = useState<any[]>([])
   const [gastos, setGastos] = useState<any[]>([])
   const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
+  const [filtroInvEstado, setFiltroInvEstado] = useState<'todos'|'pagados'|'pendientes'|'vencidos'|'void'>('todos')
+  const [filtroInvDesde, setFiltroInvDesde] = useState('')
+  const [filtroInvHasta, setFiltroInvHasta] = useState('')
   const [fuelOverride, setFuelOverride] = useState<Record<string, number>>({})
   const [showContabilidad, setShowContabilidad] = useState<string | null>(null)
   const [seleccionados, setSeleccionados] = useState<string[]>([])
@@ -265,6 +268,19 @@ export default function AdminPage() {
   const totalInvoicesSinPedido = invoicesFinanzas
     .filter(inv => !pedidosFinanzas.find((p: any) => p.id === inv.pedido_id))
     .reduce((sum, inv) => sum + (inv.total || 0), 0)
+  const invoicesFiltrados = invoices.filter(inv => {
+    const diasDesde = Math.floor((Date.now() - new Date(inv.created_at).getTime()) / (1000*60*60*24))
+    const diasCredito = inv.dias_credito || 30
+    const vencido = !inv.pagado && !inv.anulado && diasDesde > diasCredito
+    if (filtroInvEstado === 'pagados' && !inv.pagado) return false
+    if (filtroInvEstado === 'pendientes' && (inv.pagado || inv.anulado || vencido)) return false
+    if (filtroInvEstado === 'vencidos' && !vencido) return false
+    if (filtroInvEstado === 'void' && !inv.anulado) return false
+    if (filtroInvDesde && new Date(inv.created_at) < new Date(filtroInvDesde + 'T00:00:00')) return false
+    if (filtroInvHasta && new Date(inv.created_at) > new Date(filtroInvHasta + 'T23:59:59')) return false
+    return true
+  })
+
   const totalIngresos = pedidosFinanzas.reduce((sum, p) => sum + (p.total || 0), 0) + totalInvoicesSinPedido
   const totalEgresos = gastosFinanzas.reduce((sum, g) => sum + (g.monto || 0), 0)
   const resultado = totalIngresos - totalEgresos
@@ -1220,10 +1236,54 @@ export default function AdminPage() {
         {/* INVOICES */}
         {tab === 'invoices' && (
           <div>
-            <div className="flex items-center justify-between mb-6"><h2 className="font-heading font-bold text-brand-navy text-xl">Invoices - {invoices.length}</h2><a href="/es/invoice/nuevo" className="btn-primary flex items-center gap-2"><Receipt size={15}/> Nueva Invoice</a></div>
+            <div className="flex flex-col gap-4 mb-6">
+            <div className="flex items-center justify-between">
+              <h2 className="font-heading font-bold text-brand-navy text-xl">Invoices - {invoices.length}</h2>
+              <a href="/es/invoice/nuevo" className="btn-primary flex items-center gap-2"><Receipt size={15}/> Nueva Invoice</a>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-wrap gap-3 items-end">
+              <div>
+                <label className="block text-xs text-brand-gray-mid mb-1">Estado</label>
+                <select value={filtroInvEstado} onChange={e=>setFiltroInvEstado(e.target.value as any)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-brand-navy focus:outline-none focus:border-brand-orange">
+                  <option value="todos">Todos</option>
+                  <option value="pagados">✓ Pagados</option>
+                  <option value="pendientes">⏳ Pendientes</option>
+                  <option value="vencidos">⚠ Vencidos</option>
+                  <option value="void">✕ VOID</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-brand-gray-mid mb-1">Desde</label>
+                <input type="date" value={filtroInvDesde} onChange={e=>setFiltroInvDesde(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/>
+              </div>
+              <div>
+                <label className="block text-xs text-brand-gray-mid mb-1">Hasta</label>
+                <input type="date" value={filtroInvHasta} onChange={e=>setFiltroInvHasta(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/>
+              </div>
+              <button onClick={()=>{setFiltroInvEstado('todos');setFiltroInvDesde('');setFiltroInvHasta('')}} className="text-xs text-brand-gray-mid hover:text-brand-orange underline">Limpiar</button>
+              <button onClick={()=>{
+                const filtered = invoicesFiltrados
+                const csv = ['Numero,Cliente,Negocio,Total,Metodo Pago,Estado,Fecha,Fecha Pago']
+                filtered.forEach(inv=>{
+                  const cl = clientes.find(c=>c.id===inv.cliente_id)
+                  const estado = inv.anulado?'VOID':inv.pagado?'Pagado':'Pendiente'
+                  csv.push(`${inv.numero},"${cl?.nombre||''}","${cl?.negocio||''}",${inv.total},${inv.metodo_pago||''},${estado},${new Date(inv.created_at).toLocaleDateString('es-MX')},${inv.fecha_pago?new Date(inv.fecha_pago).toLocaleDateString('es-MX'):''}`)
+                })
+                const blob = new Blob([csv.join('\n')],{type:'text/csv'})
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a'); a.href=url; a.download=`invoices-reporte-${new Date().toISOString().slice(0,10)}.csv`; a.click()
+              }} className="flex items-center gap-1 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80">
+                ↓ Exportar CSV
+              </button>
+              <div className="ml-auto text-right">
+                <p className="text-xs text-brand-gray-mid">Total filtrado</p>
+                <p className="font-heading font-bold text-brand-orange text-lg">${invoicesFiltrados.reduce((s,i)=>s+(i.total||0),0).toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
             {invoices.length===0?(<div className="card text-center py-12 text-brand-gray-mid"><Receipt size={40} className="mx-auto mb-3 opacity-25"/><p>No hay invoices generados</p></div>):(
               <div className="space-y-3">
-                {invoices.map(inv=>{
+                {invoicesFiltrados.map(inv=>{
                   const cliente = clientes.find(c=>c.id===inv.cliente_id)
                   const diasDesde = Math.floor((Date.now() - new Date(inv.created_at).getTime()) / (1000*60*60*24))
                     const diasCredito = inv.dias_credito || 30
