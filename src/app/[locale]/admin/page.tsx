@@ -50,6 +50,13 @@ export default function AdminPage() {
   const [gastos, setGastos] = useState<any[]>([])
   const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
   const [filtroInvEstado, setFiltroInvEstado] = useState<'todos'|'pagados'|'pendientes'|'vencidos'|'void'>('todos')
+  const [showNuevoPedido, setShowNuevoPedido] = useState(false)
+  const [npCliente, setNpCliente] = useState('')
+  const [npItems, setNpItems] = useState<{producto_id:string,nombre:string,precio:number,costo:number,cantidad:number,stock:number}[]>([])
+  const [npExtras, setNpExtras] = useState<{nombre:string,precio:number,cantidad:number}[]>([])
+  const [npFuel, setNpFuel] = useState(5)
+  const [npMetodo, setNpMetodo] = useState('Efectivo')
+  const [npCreando, setNpCreando] = useState(false)
   const [filtroInvDesde, setFiltroInvDesde] = useState('')
   const [filtroInvHasta, setFiltroInvHasta] = useState('')
   const [fuelOverride, setFuelOverride] = useState<Record<string, number>>({})
@@ -163,6 +170,62 @@ export default function AdminPage() {
     const { data: items } = await supabase.from('pedido_items').select('precio_unitario, cantidad').eq('id', itemId)
     await cargarPedidos()
     return true
+  }
+
+  async function crearPedidoAdmin() {
+    if (!npCliente) { alert('Selecciona un cliente'); return }
+    if (npItems.length === 0 && npExtras.length === 0) { alert('Agrega al menos un producto'); return }
+    setNpCreando(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const itemsSubtotal = npItems.reduce((s, i) => s + i.precio * i.cantidad, 0)
+      const extrasSubtotal = npExtras.reduce((s, i) => s + i.precio * i.cantidad, 0)
+      const total = itemsSubtotal + extrasSubtotal + npFuel
+
+      const { data: pedido } = await supabase.from('pedidos').insert({
+        cliente_id: npCliente,
+        total,
+        fuel_surcharge: npFuel,
+        metodo_pago: npMetodo,
+        estado: 'en_preparacion',
+        creado_por_admin: true
+      }).select().single()
+
+      if (!pedido) { alert('Error creando pedido'); setNpCreando(false); return }
+
+      // Insertar items del catálogo
+      if (npItems.length > 0) {
+        await supabase.from('pedido_items').insert(
+          npItems.map(i => ({ pedido_id: pedido.id, producto_id: i.producto_id, cantidad: i.cantidad, precio_unitario: i.precio }))
+        )
+        // Rebajar stock
+        for (const item of npItems) {
+          const nuevoStock = Math.max(0, (item.stock ?? 0) - item.cantidad)
+          await supabase.from('productos').update({ stock: nuevoStock }).eq('id', item.producto_id)
+        }
+      }
+
+      // Insertar extras (sin producto_id)
+      if (npExtras.length > 0) {
+        await supabase.from('pedido_items').insert(
+          npExtras.map(i => ({ pedido_id: pedido.id, cantidad: i.cantidad, precio_unitario: i.precio, descripcion: i.nombre }))
+        )
+      }
+
+      // Generar invoice directo
+      await fetch('/api/crear-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedido_id: pedido.id, cliente_id: npCliente, creado_por: user?.id || null, fuel_override: npFuel })
+      })
+
+      await cargarPedidos()
+      await cargarInvoices()
+      setShowNuevoPedido(false)
+      setNpCliente(''); setNpItems([]); setNpExtras([]); setNpFuel(5); setNpMetodo('Efectivo')
+      alert('✅ Pedido e invoice creados correctamente')
+    } catch(e: any) { alert('Error: ' + e.message) }
+    setNpCreando(false)
   }
 
   async function marcarPagado(invId: string, pagado: boolean) {
@@ -1518,5 +1581,92 @@ export default function AdminPage() {
         )}
       </div>
     </div>
+
+      {/* MODAL NUEVO PEDIDO */}
+      {showNuevoPedido && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e=>{if(e.target===e.currentTarget)setShowNuevoPedido(false)}}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-heading font-bold text-brand-navy text-xl">🛒 Nuevo Pedido</h2>
+              <button onClick={()=>setShowNuevoPedido(false)} className="text-brand-gray-mid hover:text-brand-navy">✕</button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-brand-navy mb-1">Cliente *</label>
+                <select value={npCliente} onChange={e=>setNpCliente(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange">
+                  <option value="">Seleccionar cliente...</option>
+                  {clientes.filter(c=>c.aprobado).map(c=><option key={c.id} value={c.id}>{c.negocio||c.nombre} — {c.nombre}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-brand-navy mb-1">Método de Pago</label>
+                <select value={npMetodo} onChange={e=>setNpMetodo(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange">
+                  {['Efectivo','Cheque','Zelle','Tarjeta de crédito'].map(m=><option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-brand-navy">Productos del catálogo</label>
+                  <select onChange={e=>{
+                    const p = productos.find(p=>p.id===e.target.value)
+                    if(p && !npItems.find(i=>i.producto_id===p.id)) setNpItems(prev=>[...prev,{producto_id:p.id,nombre:p.nombre,precio:p.precio,costo:p.costo||0,cantidad:1,stock:p.stock??0}])
+                    e.target.value=''
+                  }} className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-brand-orange">
+                    <option value="">+ Agregar producto</option>
+                    {productos.filter(p=>p.activo!==false).map(p=><option key={p.id} value={p.id}>{p.nombre} — ${p.precio}</option>)}
+                  </select>
+                </div>
+                {npItems.length > 0 && (
+                  <div className="space-y-1 border border-gray-100 rounded-xl p-2">
+                    {npItems.map((item,i)=>(
+                      <div key={item.producto_id} className="flex items-center gap-2 text-sm">
+                        <span className="flex-1 text-brand-gray-dark">{item.nombre}</span>
+                        <span className="text-xs text-brand-gray-mid">${item.precio}</span>
+                        <input type="number" min={1} value={item.cantidad} onChange={e=>setNpItems(prev=>prev.map((x,j)=>j===i?{...x,cantidad:parseInt(e.target.value)||1}:x))} className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs text-center"/>
+                        <span className="text-xs font-semibold text-brand-orange">${(item.precio*item.cantidad).toFixed(2)}</span>
+                        <button onClick={()=>setNpItems(prev=>prev.filter((_,j)=>j!==i))} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-brand-navy">Extras (tomates, cilantro, etc.)</label>
+                  <button onClick={()=>setNpExtras(prev=>[...prev,{nombre:'',precio:0,cantidad:1}])} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg">+ Agregar extra</button>
+                </div>
+                {npExtras.map((ex,i)=>(
+                  <div key={i} className="flex items-center gap-2 mb-1">
+                    <input placeholder="Descripción" value={ex.nombre} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,nombre:e.target.value}:x))} className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                    <span className="text-xs text-brand-gray-mid">$</span>
+                    <input type="number" placeholder="0.00" value={ex.precio||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,precio:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                    <input type="number" min={1} value={ex.cantidad} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,cantidad:parseInt(e.target.value)||1}:x))} className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-xs text-center"/>
+                    <button onClick={()=>setNpExtras(prev=>prev.filter((_,j)=>j!==i))} className="text-red-400 text-xs">✕</button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-semibold text-brand-navy">Fuel Surcharge $</label>
+                <input type="number" step="0.01" min={0} value={npFuel} onChange={e=>setNpFuel(parseFloat(e.target.value)||0)} className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/>
+              </div>
+
+              <div className="bg-brand-navy/5 rounded-xl p-3 text-sm">
+                <div className="flex justify-between"><span className="text-brand-gray-mid">Productos</span><span>${(npItems.reduce((s,i)=>s+i.precio*i.cantidad,0)+npExtras.reduce((s,i)=>s+i.precio*i.cantidad,0)).toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className="text-brand-gray-mid">Fuel</span><span>${npFuel.toFixed(2)}</span></div>
+                <div className="flex justify-between font-bold text-brand-navy border-t pt-1 mt-1"><span>Total</span><span>${(npItems.reduce((s,i)=>s+i.precio*i.cantidad,0)+npExtras.reduce((s,i)=>s+i.precio*i.cantidad,0)+npFuel).toFixed(2)}</span></div>
+              </div>
+
+              <button onClick={crearPedidoAdmin} disabled={npCreando} className="w-full btn-primary py-3 text-base font-bold disabled:opacity-50">
+                {npCreando ? 'Creando...' : '✅ Crear Pedido y Generar Invoice'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
   )
 }
