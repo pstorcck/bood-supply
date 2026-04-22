@@ -1191,6 +1191,7 @@ export default function AdminPage() {
         {/* PEDIDOS */}
         {tab === 'pedidos' && (
           <div>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-heading font-bold text-brand-navy text-xl">Pedidos</h2><button onClick={()=>setShowNuevoPedido(true)} className="btn-primary flex items-center gap-2"><ShoppingCart size={15}/> Nuevo Pedido</button></div>
             <div className="card mb-6">
               <div className="flex flex-wrap items-end gap-4">
                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Desde</label><input type="date" value={fechaDesde} onChange={e=>setFechaDesde(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
