@@ -188,7 +188,7 @@ export default function AdminPage() {
         fuel_surcharge: npFuel,
         metodo_pago: npMetodo,
         estado: 'en_preparacion',
-        creado_por_admin: true
+
       }).select().single()
 
       if (!pedido) { alert('Error creando pedido'); setNpCreando(false); return }
@@ -208,7 +208,7 @@ export default function AdminPage() {
       // Insertar extras (sin producto_id)
       if (npExtras.length > 0) {
         await supabase.from('pedido_items').insert(
-          npExtras.map(i => ({ pedido_id: pedido.id, cantidad: i.cantidad, precio_unitario: i.precio, descripcion: i.nombre }))
+          npExtras.map(i => ({ pedido_id: pedido.id, producto_id: null, cantidad: i.cantidad, precio_unitario: i.precio }))
         )
       }
 
