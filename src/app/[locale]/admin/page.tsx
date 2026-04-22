@@ -1579,9 +1579,6 @@ export default function AdminPage() {
             )}
           </div>
         )}
-      </div>
-    </div>
-
       {/* MODAL NUEVO PEDIDO */}
       {showNuevoPedido && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e=>{if(e.target===e.currentTarget)setShowNuevoPedido(false)}}>
@@ -1668,5 +1665,7 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+      </div>
+    </div>
   )
 }
