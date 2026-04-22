@@ -262,6 +262,14 @@ export default function DashboardPage() {
     }).select().single()
     if (pedido) {
       await supabase.from('pedido_items').insert(carrito.map(i => ({ pedido_id: pedido.id, producto_id: i.id, cantidad: i.cantidad, precio_unitario: i.precio })))
+      // Rebajar stock de cada producto
+      for (const item of carrito) {
+        const stockActual = item.stock ?? 0
+        if (stockActual > 0) {
+          const nuevoStock = Math.max(0, stockActual - item.cantidad)
+          await supabase.from('productos').update({ stock: nuevoStock }).eq('id', item.id)
+        }
+      }
       try {
         await fetch('/api/notificar-admin', {
           method: 'POST',
