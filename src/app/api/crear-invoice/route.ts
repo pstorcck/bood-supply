@@ -59,6 +59,15 @@ export async function POST(req: NextRequest) {
 
     if (invError) return NextResponse.json({ error: invError.message }, { status: 400 })
 
+    // Rebajar stock de productos
+    for (const item of pedido.pedido_items) {
+      if (item.productos?.id) {
+        const stockActual = item.productos.stock ?? 0
+        const nuevoStock = Math.max(0, stockActual - item.cantidad)
+        await supabase.from('productos').update({ stock: nuevoStock }).eq('id', item.productos.id)
+      }
+    }
+
     return NextResponse.json({ invoice })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

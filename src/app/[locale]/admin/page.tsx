@@ -53,6 +53,7 @@ export default function AdminPage() {
   const [filtroInvDesde, setFiltroInvDesde] = useState('')
   const [filtroInvHasta, setFiltroInvHasta] = useState('')
   const [fuelOverride, setFuelOverride] = useState<Record<string, number>>({})
+  const [preciosEditados, setPreciosEditados] = useState<Record<string, number>>({})
   const [showContabilidad, setShowContabilidad] = useState<string | null>(null)
   const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [editandoCliente, setEditandoCliente] = useState<string | null>(null)
@@ -149,6 +150,19 @@ export default function AdminPage() {
   async function cargarInvoices() {
     const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false })
     setInvoices(data || [])
+  }
+
+  async function actualizarPrecioItem(itemId: string, nuevoPrecio: number, costoMinimo: number, esAdmin: boolean) {
+    if (!esAdmin && nuevoPrecio < costoMinimo) {
+      alert(`⚠️ No puedes poner un precio menor al costo ($${costoMinimo.toFixed(2)})`)
+      return false
+    }
+    if (nuevoPrecio < 0) return false
+    await supabase.from('pedido_items').update({ precio_unitario: nuevoPrecio }).eq('id', itemId)
+    // Recalcular total del pedido
+    const { data: items } = await supabase.from('pedido_items').select('precio_unitario, cantidad').eq('id', itemId)
+    await cargarPedidos()
+    return true
   }
 
   async function marcarPagado(invId: string, pagado: boolean) {
@@ -1216,7 +1230,38 @@ export default function AdminPage() {
                                 <div className="col-span-2 flex items-center justify-between mt-1 pt-1 border-t border-blue-100"><div><span className="text-brand-gray-mid">Metodo de pago:</span> <span className="font-medium text-brand-navy">{ped.metodo_pago||'—'}</span></div>{ped.comprobante_url&&<a href={ped.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600"><FileText size={11}/> Ver comprobante</a>}</div>
                               </div>
                               <div className="border-t pt-2 space-y-1">
-                                {ped.pedido_items?.map((item:any)=>(<div key={item.id} className="flex justify-between text-sm"><span className="text-brand-gray-dark">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span><span className="font-medium text-brand-navy">${(item.precio_unitario*item.cantidad).toFixed(2)}</span></div>))}
+                                {ped.pedido_items?.map((item:any)=>{
+                                  const costoMin = item.productos?.costo || 0
+                                  const precioActual = preciosEditados[item.id] ?? item.precio_unitario
+                                  const puedeEditar = !invoiceExistente
+                                  return (
+                                    <div key={item.id} className="flex items-center justify-between text-sm gap-2">
+                                      <span className="text-brand-gray-dark flex-1">{item.productos?.nombre} <span className="text-brand-gray-mid">x{item.cantidad}</span></span>
+                                      {puedeEditar ? (
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-xs text-brand-gray-mid">$</span>
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            min={esAdmin ? 0 : costoMin}
+                                            value={preciosEditados[item.id] ?? item.precio_unitario}
+                                            onChange={e => setPreciosEditados(prev => ({...prev, [item.id]: parseFloat(e.target.value) || 0}))}
+                                            onBlur={async e => {
+                                              const nuevo = parseFloat(e.target.value) || 0
+                                              const ok = await actualizarPrecioItem(item.id, nuevo, costoMin, esAdmin)
+                                              if (!ok) setPreciosEditados(prev => ({...prev, [item.id]: item.precio_unitario}))
+                                            }}
+                                            className={`w-20 border rounded-lg px-2 py-0.5 text-xs text-right ${!esAdmin && precioActual < costoMin ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
+                                          />
+                                          <span className="font-medium text-brand-navy text-xs">${(precioActual*item.cantidad).toFixed(2)}</span>
+                                          {costoMin > 0 && <span className="text-xs text-brand-gray-mid">min ${costoMin.toFixed(2)}</span>}
+                                        </div>
+                                      ) : (
+                                        <span className="font-medium text-brand-navy">${(item.precio_unitario*item.cantidad).toFixed(2)}</span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
                                 <div className="flex justify-between text-xs text-brand-gray-mid border-t pt-1 mt-1"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
                                 <div className="flex justify-between text-xs text-brand-gray-mid"><span>Fuel Surcharge</span><span>${(ped.fuel_surcharge||0).toFixed(2)}</span></div>
                                 <div className="flex justify-between text-sm font-bold text-brand-navy border-t pt-1"><span>Total</span><span>${ped.total?.toFixed(2)}</span></div>
