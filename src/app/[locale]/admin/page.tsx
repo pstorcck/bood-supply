@@ -159,8 +159,8 @@ export default function AdminPage() {
     setInvoices(data || [])
   }
 
-  async function actualizarPrecioItem(itemId: string, nuevoPrecio: number, costoMinimo: number, esAdmin: boolean) {
-    if (!esAdmin && nuevoPrecio < costoMinimo) {
+  async function actualizarPrecioItem(itemId: string, nuevoPrecio: number, costoMinimo: number, isAdminUser: boolean) {
+    if (!isAdminUser && nuevoPrecio < costoMinimo) {
       alert(`⚠️ No puedes poner un precio menor al costo ($${costoMinimo.toFixed(2)})`)
       return false
     }
