@@ -208,7 +208,7 @@ export default function AdminPage() {
       // Insertar extras (sin producto_id)
       if (npExtras.length > 0) {
         await supabase.from('pedido_items').insert(
-          npExtras.map(i => ({ pedido_id: pedido.id, producto_id: null, cantidad: i.cantidad, precio_unitario: i.precio }))
+          npExtras.map(i => ({ pedido_id: pedido.id, producto_id: null, cantidad: i.cantidad, precio_unitario: i.precio, descripcion: i.nombre }))
         )
       }
 
@@ -223,6 +223,7 @@ export default function AdminPage() {
       await cargarInvoices()
       setShowNuevoPedido(false)
       setNpCliente(''); setNpItems([]); setNpExtras([]); setNpFuel(5); setNpMetodo('Efectivo')
+      setTab('pedidos')
       alert('✅ Pedido e invoice creados correctamente')
     } catch(e: any) { alert('Error: ' + e.message) }
     setNpCreando(false)
