@@ -119,7 +119,7 @@ export default function InvoicePage() {
             {items?.map((item: any, idx: number) => (
               <tr key={idx}>
                 <td>—</td>
-                <td>{item.descripcion || item.productos?.nombre || '—'}</td>
+                <td>{item.descripcion || item.descripcion_en || item.productos?.nombre || item.productos?.descripcion || '—'}</td>
                 <td>${Number(item.precio_unitario).toFixed(2)}</td>
                 <td>{item.cantidad}</td>
                 <td>${(Number(item.precio_unitario) * Number(item.cantidad)).toFixed(2)}</td>
