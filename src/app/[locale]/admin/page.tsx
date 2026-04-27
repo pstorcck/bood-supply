@@ -1606,9 +1606,27 @@ export default function AdminPage() {
                 {npItems.length > 0 && (
                   <div className="space-y-1 border border-gray-100 rounded-xl p-2">
                     {npItems.map((item,i)=>(
-                      <div key={item.producto_id} className="flex items-center gap-2 text-sm">
+                      <div key={item.producto_id} className="flex items-center gap-2 text-sm flex-wrap">
                         <span className="flex-1 text-brand-gray-dark">{item.nombre}</span>
-                        <span className="text-xs text-brand-gray-mid">${item.precio}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-brand-gray-mid">$</span>
+                          <input
+                            type="number" step="0.01"
+                            min={item.costo || 0}
+                            value={item.precio}
+                            onChange={e => {
+                              const nuevo = parseFloat(e.target.value) || 0
+                              if (nuevo < (item.costo || 0)) {
+                                e.target.style.borderColor = '#f87171'
+                              } else {
+                                e.target.style.borderColor = ''
+                                setNpItems(prev => prev.map((x,j) => j===i ? {...x, precio: nuevo} : x))
+                              }
+                            }}
+                            className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs text-right"
+                          />
+                          {item.costo > 0 && <span className="text-xs text-brand-gray-mid">min ${item.costo.toFixed(2)}</span>}
+                        </div>
                         <input type="number" min={1} value={item.cantidad} onChange={e=>setNpItems(prev=>prev.map((x,j)=>j===i?{...x,cantidad:parseInt(e.target.value)||1}:x))} className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs text-center"/>
                         <span className="text-xs font-semibold text-brand-orange">${(item.precio*item.cantidad).toFixed(2)}</span>
                         <button onClick={()=>setNpItems(prev=>prev.filter((_,j)=>j!==i))} className="text-red-400 hover:text-red-600 text-xs">✕</button>
