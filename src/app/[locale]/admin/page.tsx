@@ -1307,7 +1307,7 @@ export default function AdminPage() {
                                           <input
                                             type="number"
                                             step="0.01"
-                                            min={esAdmin ? 0 : costoMin}
+                                            min={0}
                                             value={preciosEditados[item.id] ?? item.precio_unitario}
                                             onChange={e => setPreciosEditados(prev => ({...prev, [item.id]: parseFloat(e.target.value) || 0}))}
                                             onBlur={async e => {
