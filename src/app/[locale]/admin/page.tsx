@@ -212,6 +212,9 @@ export default function AdminPage() {
         )
       }
 
+      // Esperar que Supabase procese los items antes de generar invoice
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       // Generar invoice directo
       await fetch('/api/crear-invoice', {
         method: 'POST',
