@@ -1093,7 +1093,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* CLIENTES */}}
+        {/* CLIENTES */}
         {tab === 'clientes' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
