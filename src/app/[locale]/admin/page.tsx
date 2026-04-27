@@ -1312,10 +1312,10 @@ export default function AdminPage() {
                                             onChange={e => setPreciosEditados(prev => ({...prev, [item.id]: parseFloat(e.target.value) || 0}))}
                                             onBlur={async e => {
                                               const nuevo = parseFloat(e.target.value) || 0
-                                              const ok = await actualizarPrecioItem(item.id, nuevo, costoMin, esAdmin)
+                                              const ok = await actualizarPrecioItem(item.id, nuevo, costoMin, true)
                                               if (!ok) setPreciosEditados(prev => ({...prev, [item.id]: item.precio_unitario}))
                                             }}
-                                            className={`w-20 border rounded-lg px-2 py-0.5 text-xs text-right ${!esAdmin && precioActual < costoMin ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
+                                            className={`w-20 border rounded-lg px-2 py-0.5 text-xs text-right ${'border-gray-200'}`}
                                           />
                                           <span className="font-medium text-brand-navy text-xs">${(precioActual*item.cantidad).toFixed(2)}</span>
                                           {costoMin > 0 && <span className="text-xs text-brand-gray-mid">min ${costoMin.toFixed(2)}</span>}
@@ -1670,3 +1670,4 @@ export default function AdminPage() {
     </div>
   )
 }
+// redeploy Sun Apr 26 19:24:10 CST 2026
