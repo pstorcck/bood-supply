@@ -182,38 +182,21 @@ export default function AdminPage() {
       const extrasSubtotal = npExtras.reduce((s, i) => s + i.precio * i.cantidad, 0)
       const total = itemsSubtotal + extrasSubtotal + npFuel
 
-      const { data: pedido } = await supabase.from('pedidos').insert({
-        cliente_id: npCliente,
-        total,
-        fuel_surcharge: npFuel,
-        metodo_pago: npMetodo,
-        estado: 'en_preparacion',
-
-      }).select().single()
-
-      if (!pedido) { alert('Error creando pedido'); setNpCreando(false); return }
-
-      // Insertar items del catálogo
-      if (npItems.length > 0) {
-        await supabase.from('pedido_items').insert(
-          npItems.map(i => ({ pedido_id: pedido.id, producto_id: i.producto_id, cantidad: i.cantidad, precio_unitario: i.precio }))
-        )
-        // Rebajar stock
-        for (const item of npItems) {
-          const nuevoStock = Math.max(0, (item.stock ?? 0) - item.cantidad)
-          await supabase.from('productos').update({ stock: nuevoStock }).eq('id', item.producto_id)
-        }
-      }
-
-      // Insertar extras (sin producto_id)
-      if (npExtras.length > 0) {
-        await supabase.from('pedido_items').insert(
-          npExtras.map(i => ({ pedido_id: pedido.id, producto_id: null, cantidad: i.cantidad, precio_unitario: i.precio, descripcion: i.nombre }))
-        )
-      }
-
-      // Esperar que Supabase procese los items antes de generar invoice
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Usar API route con service role para evitar problemas de RLS
+      const resPedido = await fetch('/api/crear-pedido', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente_id: npCliente,
+          total,
+          fuel_surcharge: npFuel,
+          metodo_pago: npMetodo,
+          items: npItems,
+          extras: npExtras
+        })
+      })
+      const { pedido, error: pedidoError } = await resPedido.json()
+      if (pedidoError || !pedido) { alert('Error: ' + (pedidoError || 'Error creando pedido')); setNpCreando(false); return }
 
       // Generar invoice directo
       await fetch('/api/crear-invoice', {
