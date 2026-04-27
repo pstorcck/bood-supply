@@ -224,7 +224,6 @@ export default function AdminPage() {
       setShowNuevoPedido(false)
       setNpCliente(''); setNpItems([]); setNpExtras([]); setNpFuel(5); setNpMetodo('Efectivo')
       setTab('pedidos')
-      alert('✅ Pedido e invoice creados correctamente')
     } catch(e: any) { alert('Error: ' + e.message) }
     setNpCreando(false)
   }
