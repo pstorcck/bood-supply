@@ -55,6 +55,8 @@ export default function AdminPage() {
   const [showNuevoPedido, setShowNuevoPedido] = useState(false)
   const [npCliente, setNpCliente] = useState('')
   const [npItems, setNpItems] = useState<{producto_id:string,nombre:string,precio:number,costo:number,cantidad:number,stock:number}[]>([])
+  const [npBusqueda, setNpBusqueda] = useState('')
+  const [npHistorial, setNpHistorial] = useState<any[]>([])
   const [npExtras, setNpExtras] = useState<{nombre:string,precio:number,cantidad:number}[]>([])
   const [npFuel, setNpFuel] = useState(5)
   const [npMetodo, setNpMetodo] = useState('Efectivo')
@@ -1585,7 +1587,28 @@ export default function AdminPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-brand-navy mb-1">Cliente *</label>
-                <select value={npCliente} onChange={e=>setNpCliente(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange">
+                <select value={npCliente} onChange={async e=>{
+                    setNpCliente(e.target.value)
+                    if (e.target.value) {
+                      const { data } = await supabase.from('pedido_items')
+                        .select('descripcion, precio_unitario, producto_id, productos(nombre)')
+                        .eq('pedidos.cliente_id', e.target.value)
+                        .limit(20)
+                      // Get last items from pedidos of this client
+                      const { data: pedidos } = await supabase.from('pedidos')
+                        .select('pedido_items(descripcion, precio_unitario, producto_id, productos(nombre))')
+                        .eq('cliente_id', e.target.value)
+                        .order('created_at', { ascending: false })
+                        .limit(5)
+                      const todosItems = pedidos?.flatMap((p:any) => p.pedido_items || []) || []
+                      const unicos = todosItems.filter((item:any, idx:number, arr:any[]) =>
+                        arr.findIndex(x => (x.producto_id || x.descripcion) === (item.producto_id || item.descripcion)) === idx
+                      ).slice(0, 8)
+                      setNpHistorial(unicos)
+                    } else {
+                      setNpHistorial([])
+                    }
+                  }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange">
                   <option value="">Seleccionar cliente...</option>
                   {clientes.filter(c=>c.aprobado).map(c=><option key={c.id} value={c.id}>{c.negocio||c.nombre} — {c.nombre}</option>)}
                 </select>
@@ -1601,14 +1624,31 @@ export default function AdminPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold text-brand-navy">Productos del catálogo</label>
-                  <select onChange={e=>{
-                    const p = productos.find(p=>p.id===e.target.value)
-                    if(p && !npItems.find(i=>i.producto_id===p.id)) setNpItems(prev=>[...prev,{producto_id:p.id,nombre:p.nombre,precio:p.precio,costo:p.costo||0,cantidad:1,stock:p.stock??0}])
-                    e.target.value=''
-                  }} className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-brand-orange">
-                    <option value="">+ Agregar producto</option>
-                    {productos.filter(p=>p.activo!==false).map(p=><option key={p.id} value={p.id}>{p.nombre} — ${p.precio}</option>)}
-                  </select>
+                  <div className="flex flex-col gap-1">
+                    <input
+                      type="text"
+                      placeholder="🔍 Buscar producto..."
+                      value={npBusqueda}
+                      onChange={e=>setNpBusqueda(e.target.value)}
+                      className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-brand-orange w-full"
+                    />
+                    {npBusqueda && (
+                      <div className="border border-gray-200 rounded-lg bg-white shadow-sm max-h-40 overflow-y-auto">
+                        {productos.filter(p=>p.activo!==false && p.nombre.toLowerCase().includes(npBusqueda.toLowerCase())).slice(0,10).map(p=>(
+                          <div key={p.id} onClick={()=>{
+                            if(!npItems.find(i=>i.producto_id===p.id)) setNpItems(prev=>[...prev,{producto_id:p.id,nombre:p.nombre,precio:p.precio,costo:p.costo||0,cantidad:1,stock:p.stock??0}])
+                            setNpBusqueda('')
+                          }} className="px-3 py-1.5 text-xs hover:bg-brand-orange/10 cursor-pointer flex justify-between items-center">
+                            <span>{p.nombre}</span>
+                            <span className="text-brand-orange font-semibold ml-2">${p.precio}</span>
+                          </div>
+                        ))}
+                        {productos.filter(p=>p.activo!==false && p.nombre.toLowerCase().includes(npBusqueda.toLowerCase())).length === 0 && (
+                          <div className="px-3 py-2 text-xs text-brand-gray-mid">Sin resultados</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {npItems.length > 0 && (
                   <div className="space-y-1 border border-gray-100 rounded-xl p-2">
@@ -1658,6 +1698,27 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+
+              {npHistorial.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-brand-navy mb-1">📋 Últimos productos de este cliente</p>
+                  <div className="flex flex-wrap gap-1">
+                    {npHistorial.map((item:any, i:number) => (
+                      <button key={i} onClick={()=>{
+                        const nombre = item.productos?.nombre || item.descripcion
+                        const prod = productos.find(p=>p.id===item.producto_id)
+                        if (prod && !npItems.find(x=>x.producto_id===prod.id)) {
+                          setNpItems(prev=>[...prev,{producto_id:prod.id,nombre:prod.nombre,precio:prod.precio,costo:prod.costo||0,cantidad:1,stock:prod.stock??0}])
+                        } else if (!item.producto_id && nombre && !npExtras.find(x=>x.nombre===nombre)) {
+                          setNpExtras(prev=>[...prev,{nombre, precio:item.precio_unitario||0, cantidad:1}])
+                        }
+                      }} className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg transition-colors">
+                        {item.productos?.nombre || item.descripcion || '—'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-3">
                 <label className="text-xs font-semibold text-brand-navy">Fuel Surcharge $</label>
