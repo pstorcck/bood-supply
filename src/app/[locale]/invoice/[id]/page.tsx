@@ -23,7 +23,7 @@ export default function InvoicePage() {
 
   const cliente = invoice.datos_cliente
   const items = invoice.datos_items
-  const fecha = new Date(invoice.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })
+  const fecha = new Date(invoice.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
   return (
     <>
@@ -37,35 +37,35 @@ export default function InvoicePage() {
         .logo-section { display:flex; align-items:center; gap:10px }
         .company-name { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:#0F2B5B }
         .company-name span { color:#F47B20 }
-        .company-info { font-size:9px; color:#718096; margin-top:2px; line-height:1.4 }
+        .company-info { font-size:9px; color:#2D3748; margin-top:2px; line-height:1.4 }
         .invoice-number { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; color:#0F2B5B; text-align:right }
-        .invoice-date { font-size:10px; color:#718096; text-align:right; margin-top:2px }
+        .invoice-date { font-size:10px; color:#2D3748; text-align:right; margin-top:2px }
         .badge { background:#F47B20; color:white; font-size:8px; font-weight:600; padding:2px 8px; border-radius:20px; display:inline-block; margin-top:4px; letter-spacing:1px; text-transform:uppercase }
         .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px }
         .info-box { background:#F7FAFC; border-radius:6px; padding:8px 10px; border:1px solid #E2E8F0 }
         .info-row { display:flex; gap:6px; align-items:baseline; padding:1px 0 }
-        .info-label { font-size:8px; color:#A0AEC0; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; min-width:52px }
+        .info-label { font-size:8px; color:#4A5568; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; min-width:52px }
         .info-value { font-size:10px; font-weight:500; color:#2D3748 }
         .client-name { font-size:13px; font-weight:600; color:#0F2B5B; margin-bottom:4px }
-        .section-title { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:#A0AEC0; margin-bottom:5px }
+        .section-title { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:#2D3748; margin-bottom:5px }
         table { width:100%; border-collapse:collapse }
         thead tr { background:#0F2B5B; color:white }
         thead th { padding:5px 8px; text-align:left; font-size:9px; font-weight:600 }
         thead th:last-child { text-align:right }
         tbody tr { border-bottom:1px solid #EDF2F7 }
         tbody tr:nth-child(even) { background:#F7FAFC }
-        tbody td { padding:4px 8px; font-size:10px }
+        tbody td { padding:4px 8px; font-size:10px; color:#1A202C }
         tbody td:last-child { text-align:right; font-weight:500 }
         .totals { margin-left:auto; width:220px; margin-top:10px }
-        .total-row { display:flex; justify-content:space-between; padding:3px 0; font-size:10px; color:#4A5568; border-bottom:1px solid #EDF2F7 }
+        .total-row { display:flex; justify-content:space-between; padding:3px 0; font-size:10px; color:#1A202C; border-bottom:1px solid #EDF2F7 }
         .grand { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; color:#0F2B5B; border-top:2px solid #0F2B5B; border-bottom:none; padding-top:6px; margin-top:2px }
         .grand span:last-child { color:#F47B20 }
-        .footer { margin-top:18px; padding-top:10px; border-top:1px solid #E2E8F0; text-align:center; color:#A0AEC0; font-size:9px; line-height:1.6 }
+        .footer { margin-top:18px; padding-top:10px; border-top:1px solid #E2E8F0; text-align:center; color:#4A5568; font-size:9px; line-height:1.6 }
         .print-btn { position:fixed; bottom:20px; right:20px; background:#F47B20; color:white; border:none; padding:10px 22px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 4px 12px rgba(244,123,32,0.4); font-family:'DM Sans',sans-serif }
-        @media print { .print-btn { display:none } body { background:white } .page { padding:16px } }
+        @media print { .print-btn { display:none } body { background:white; -webkit-print-color-adjust:exact; print-color-adjust:exact } .page { padding:16px } }
       `}</style>
 
-      <button className="print-btn" onClick={() => window.print()}>Imprimir / Guardar PDF</button>
+      <button className="print-btn" onClick={() => window.print()}>Print / Save PDF</button>
 
       <div className="page">
         <div className="header">
@@ -89,29 +89,29 @@ export default function InvoicePage() {
 
         <div className="grid2">
           <div className="info-box">
-            <div className="section-title">Facturado a</div>
+            <div className="section-title">Bill To</div>
             <div className="client-name">{cliente?.negocio || cliente?.nombre || '—'}</div>
-            {cliente?.negocio && <div className="info-row"><span className="info-label">Negocio</span><span className="info-value">{cliente.negocio}</span></div>}
-            {cliente?.direccion && <div className="info-row"><span className="info-label">Direccion</span><span className="info-value">{cliente.direccion}</span></div>}
-            {cliente?.telefono && <div className="info-row"><span className="info-label">Tel</span><span className="info-value">{cliente.telefono}</span></div>}
+            {cliente?.negocio && <div className="info-row"><span className="info-label">Business</span><span className="info-value">{cliente.negocio}</span></div>}
+            {cliente?.direccion && <div className="info-row"><span className="info-label">Address</span><span className="info-value">{cliente.direccion}</span></div>}
+            {cliente?.telefono && <div className="info-row"><span className="info-label">Phone</span><span className="info-value">{cliente.telefono}</span></div>}
             {cliente?.email && <div className="info-row"><span className="info-label">Email</span><span className="info-value">{cliente.email}</span></div>}
           </div>
           <div className="info-box">
-            <div className="section-title">Detalles</div>
-            <div className="info-row"><span className="info-label">Invoice</span><span className="info-value" style={{fontWeight:'700',color:'#0F2B5B'}}>{invoice.numero}</span></div>
-            {invoice.pedido_id && <div className="info-row"><span className="info-label">Pedido</span><span className="info-value">#{invoice.pedido_id?.slice(0,8).toUpperCase()}</span></div>}
-            <div className="info-row"><span className="info-label">Fecha</span><span className="info-value">{fecha}</span></div>
-            <div className="info-row"><span className="info-label">Pago</span><span className="info-value">{invoice.metodo_pago || '—'}</span></div>
+            <div className="section-title">Details</div>
+            <div className="info-row"><span className="info-label">Invoice #</span><span className="info-value" style={{fontWeight:'700',color:'#0F2B5B'}}>{invoice.numero}</span></div>
+            {invoice.pedido_id && <div className="info-row"><span className="info-label">Order</span><span className="info-value">#{invoice.pedido_id?.slice(0,8).toUpperCase()}</span></div>}
+            <div className="info-row"><span className="info-label">Date</span><span className="info-value">{fecha}</span></div>
+            <div className="info-row"><span className="info-label">Payment</span><span className="info-value">{invoice.metodo_pago || '—'}</span></div>
           </div>
         </div>
 
-        <div className="section-title">Productos</div>
+        <div className="section-title">Products</div>
         <table>
           <thead>
             <tr>
-              <th>Descripcion</th>
-              <th>Precio Unit.</th>
-              <th>Cant.</th>
+              <th>Description</th>
+              <th>Unit Price</th>
+              <th>Qty</th>
               <th>Total</th>
             </tr>
           </thead>
@@ -125,7 +125,7 @@ export default function InvoicePage() {
               </tr>
             ))}
             <tr style={{borderTop:'2px solid #E2E8F0',background:'#F7FAFC'}}>
-              <td colSpan={2} style={{textAlign:'right',fontSize:'9px',color:'#718096',paddingRight:'8px'}}>Total líneas: {items?.length || 0} &nbsp;|&nbsp; Total cajas: {items?.reduce((s: number, i: any) => s + Number(i.cantidad), 0) || 0}</td>
+              <td colSpan={2} style={{textAlign:'right',fontSize:'9px',color:'#718096',paddingRight:'8px'}}>Lines: {items?.length || 0} &nbsp;|&nbsp; Cases: {items?.reduce((s: number, i: any) => s + Number(i.cantidad), 0) || 0}</td>
               <td style={{fontSize:'9px',color:'#718096'}}></td>
               <td style={{fontSize:'9px',color:'#718096'}}></td>
             </tr>
@@ -142,7 +142,7 @@ export default function InvoicePage() {
         <div className="footer">
           BOOD SUPPLY · 2900 N Richmond St, Chicago, IL 60618<br/>
           Tel: (312) 409-0106 · boodsupplies@gmail.com · www.boodsupply.com<br/>
-          Gracias por su preferencia
+          Thank you for your business
         </div>
       </div>
     </>

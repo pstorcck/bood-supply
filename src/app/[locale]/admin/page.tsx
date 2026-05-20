@@ -5,6 +5,7 @@ import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, Ch
 import MapaRutas from '@/components/MapaRutas'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
+const SALES_ROLES = ['vendedor', 'admin']
 const ESTADOS = ['esperando_stock', 'pendiente', 'confirmado', 'en_preparacion', 'despachado', 'entregado', 'cancelado']
 
 const GRUPOS = [
@@ -42,6 +43,7 @@ export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices' | 'finanzas' | 'analytics'>('clientes')
+  const [perfil, setPerfil] = useState<any>(null)
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
@@ -122,7 +124,12 @@ export default function AdminPage() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user || user.email !== ADMIN_EMAIL) { window.location.href = '/es/login'; return }
+      if (!user) { window.location.href = '/es/login'; return }
+      const { data: perfilData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      setPerfil(perfilData)
+      // Permitir acceso a admin y vendedor
+      if (user.email !== ADMIN_EMAIL && perfilData?.role !== 'vendedor') { window.location.href = '/es/login'; return }
+      if (perfilData?.role === 'vendedor') setTab('pedidos')
       setUser(user)
       await Promise.all([cargarProductos(), cargarPedidos(), cargarClientes(), cargarInvoices()])
       await cargarGastos()
