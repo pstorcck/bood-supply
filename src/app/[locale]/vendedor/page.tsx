@@ -260,10 +260,9 @@ export default function VendedorPage() {
                 <select value={npCliente} onChange={async e=>{
                   setNpCliente(e.target.value)
                   if (e.target.value) {
-                    const { data: peds } = await supabase.from('pedidos').select('pedido_items(descripcion, precio_unitario, producto_id, productos(nombre))').eq('cliente_id', e.target.value).order('created_at', { ascending: false }).limit(5)
-                    const todos = peds?.flatMap((p:any)=>p.pedido_items||[])||[]
-                    const unicos = todos.filter((item:any,idx:number,arr:any[])=>arr.findIndex(x=>(x.producto_id||x.descripcion)===(item.producto_id||item.descripcion))===idx).slice(0,8)
-                    setNpHistorial(unicos)
+                    const res = await fetch('/api/historial-cliente?cliente_id=' + e.target.value)
+                    const { items } = await res.json()
+                    setNpHistorial(items || [])
                   } else { setNpHistorial([]) }
                 }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange">
                   <option value="">Seleccionar cliente...</option>
@@ -503,10 +502,9 @@ export default function VendedorPage() {
                 <select value={npCliente} onChange={async e=>{
                   setNpCliente(e.target.value)
                   if (e.target.value) {
-                    const { data: peds } = await supabase.from('pedidos').select('pedido_items(descripcion, precio_unitario, producto_id, productos(nombre))').eq('cliente_id', e.target.value).order('created_at', { ascending: false }).limit(5)
-                    const todos = peds?.flatMap((p:any)=>p.pedido_items||[])||[]
-                    const unicos = todos.filter((item:any,idx:number,arr:any[])=>arr.findIndex(x=>(x.producto_id||x.descripcion)===(item.producto_id||item.descripcion))===idx).slice(0,8)
-                    setNpHistorial(unicos)
+                    const res = await fetch('/api/historial-cliente?cliente_id=' + e.target.value)
+                    const { items } = await res.json()
+                    setNpHistorial(items || [])
                   }
                 }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange">
                   <option value="">Seleccionar cliente...</option>
