@@ -226,30 +226,59 @@ export default function VendedorPage() {
   if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
 
   return (
-    <div className="min-h-screen bg-brand-gray-light">
+    <div className="min-h-screen flex bg-[#F0F2F5]">
       {pedidoEnviado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">Pedido enviado correctamente</div>}
 
-      <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Vendedor - BOOD SUPPLY</span></div>
-        <div className="flex items-center gap-4">
+      {/* SIDEBAR */}
+      <aside className="w-56 min-h-screen bg-[#0A1F3D] flex flex-col fixed left-0 top-0 bottom-0 z-30">
+        <div className="px-5 py-5 border-b border-white/10">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-brand-orange rounded-lg flex items-center justify-center flex-shrink-0">
+              <Package size={16} className="text-white"/>
+            </div>
+            <div>
+              <div className="font-heading font-bold text-white text-sm tracking-wide">BOOD <span className="text-brand-orange">SUPPLY</span></div>
+              <div className="text-[10px] text-white/30 uppercase tracking-widest mt-0.5">Distribution Platform</div>
+            </div>
+          </div>
+        </div>
+        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+          <div className="text-[9px] text-white/30 uppercase tracking-widest px-2 mb-2">Menu</div>
+          {[
+            {key:'nuevo_pedido',label:'Nuevo Pedido',icon:Plus},
+            {key:'mis_pedidos',label:'Pedidos',icon:ShoppingBag},
+            {key:'invoices',label:'Invoices',icon:Receipt},
+            {key:'clientes',label:'Clientes',icon:Users},
+          ].map(({key,label,icon:Icon})=>(
+            <button key={key} onClick={()=>setTab(key as any)} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5 transition-all text-left ${tab===key?'bg-brand-orange text-white':'text-white/60 hover:bg-white/6 hover:text-white'}`}>
+              <Icon size={15}/><span className="text-[13px] font-medium">{label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="px-4 py-3 border-t border-white/10 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-brand-orange flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            {(user?.email||'V')[0].toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white text-[12px] font-medium truncate">{user?.email?.split('@')[0]}</div>
+            <div className="text-white/35 text-[10px]">Vendedor</div>
+          </div>
+          <button onClick={()=>{supabase.auth.signOut();window.location.href='/es'}} className="text-white/25 hover:text-white/70 transition-colors"><LogOut size={14}/></button>
+        </div>
+      </aside>
+
+      {/* MAIN */}
+      <div className="flex-1 ml-56 min-h-screen flex flex-col">
+        <header className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center justify-between sticky top-0 z-20">
+          <h1 className="font-heading font-bold text-brand-navy text-lg capitalize">{tab.replace('_',' ')}</h1>
           <button onClick={()=>setShowNuevoPedido(true)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-orange/90">
             <ShoppingBag size={16}/> Nuevo Pedido
           </button>
-          <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
-          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white"><LogOut size={16}/> Salir</button>
-        </div>
-      </nav>
-
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex gap-2 flex-wrap mb-8">
-          {[{key:'nuevo_pedido',label:'Nuevo Pedido',icon:Plus},{key:'mis_pedidos',label:'Pedidos',icon:ShoppingBag},{key:'invoices',label:'Invoices',icon:Receipt},{key:'clientes',label:'Clientes',icon:Users}].map(({key,label,icon:Icon})=>(
-            <button key={key} onClick={()=>setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab===key?'bg-brand-navy text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
-              <Icon size={16}/> {label}
-            </button>
-          ))}
-        </div>
+        </header>
+        <div className="flex-1 p-6">
 
         {/* NUEVO PEDIDO */}
+
         {tab === 'nuevo_pedido' && (
           <div className="max-w-2xl mx-auto">
             <div className="card space-y-4">
@@ -601,6 +630,8 @@ export default function VendedorPage() {
           </div>
         </div>
       )}
+      </div>
+        </div>
       </div>
     </div>
   )
