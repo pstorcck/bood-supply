@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map, Receipt, TrendingUp, TrendingDown, DollarSign, BarChart2, AlertTriangle, ShoppingCart} from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map, Receipt, TrendingUp, TrendingDown, DollarSign, BarChart2, AlertTriangle, ShoppingCart, Menu, Search} from 'lucide-react'
 import MapaRutas from '@/components/MapaRutas'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
@@ -28,6 +28,9 @@ const estadoColor: Record<string, string> = {
 
 const CATEGORIAS_GASTO = ['Proveedores', 'Renta', 'Gasolina', 'Sueldos', 'Servicios', 'Mantenimiento', 'Otros']
 
+type AdminTabKey = 'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices' | 'finanzas' | 'analytics'
+type ClienteFiltro = 'todos' | 'aprobados' | 'pendientes'
+
 function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
   const contenido = [headers, ...filas].map(r => r.map(c => `"${(c||'').replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob(['\uFEFF' + contenido], { type: 'text/csv;charset=utf-8;' })
@@ -42,7 +45,10 @@ function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices' | 'finanzas' | 'analytics'>('clientes')
+  const [tab, setTab] = useState<AdminTabKey>('clientes')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [clienteQuery, setClienteQuery] = useState('')
+  const [clienteFiltro, setClienteFiltro] = useState<ClienteFiltro>('todos')
   const [perfil, setPerfil] = useState<any>(null)
   const [productos, setProductos] = useState<any[]>([])
   const [pedidos, setPedidos] = useState<any[]>([])
@@ -476,7 +482,7 @@ export default function AdminPage() {
           body: JSON.stringify({
             tipo: 'pedido_nuevo',
             datos: {
-              pedido_id: pedidoId + ' ⚠️ PRECIOS CAMBIADOS: ' + listaPrecios,
+              pedido_id: id + ' ⚠️ PRECIOS CAMBIADOS: ' + listaPrecios,
               cliente_nombre: ped?.clientes?.nombre || '',
               negocio: ped?.clientes?.negocio || '',
               telefono: ped?.clientes?.telefono || '',
@@ -671,47 +677,152 @@ export default function AdminPage() {
 
   const pendientesAprobacion = clientes.filter(c => !c.aprobado).length
   const pedidosParaRuta = pedidos.filter(p => ['pendiente', 'confirmado', 'en_preparacion'].includes(p.estado))
+  const adminTabs: { key: AdminTabKey; label: string; description: string; icon: typeof Users; badge: number }[] = [
+    { key: 'clientes', label: 'Clientes', description: 'Directorio y aprobaciones', icon: Users, badge: pendientesAprobacion },
+    { key: 'pedidos', label: 'Pedidos', description: 'Ordenes y entregas', icon: ShoppingBag, badge: pedidos.filter(p => p.estado === 'pendiente').length },
+    { key: 'invoices', label: 'Invoices', description: 'Cobros y documentos', icon: Receipt, badge: 0 },
+    { key: 'finanzas', label: 'Finanzas', description: 'Ingresos, gastos e inventario', icon: BarChart2, badge: 0 },
+    { key: 'analytics', label: 'Analytics', description: 'Metricas del sitio', icon: TrendingUp, badge: 0 },
+    { key: 'rutas', label: 'Rutas', description: 'Despacho y paradas', icon: Map, badge: pedidosParaRuta.length },
+    { key: 'mensajes', label: 'Mensajes', description: 'Comunicacion a clientes', icon: Mail, badge: 0 },
+    { key: 'productos', label: 'Productos', description: 'Catalogo y precios', icon: Package, badge: 0 },
+    { key: 'categorias', label: 'Categorias', description: 'Organizacion del catalogo', icon: Tag, badge: 0 },
+  ]
+  const activeTab = adminTabs.find(item => item.key === tab)
+  const statCards = [
+    { label: 'Pedidos totales', value: pedidos.length, icon: ShoppingBag, color: 'text-brand-navy', accent: 'bg-blue-50' },
+    { label: 'Recibidos', value: pedidos.filter(p => p.estado === 'pendiente').length, icon: Receipt, color: 'text-amber-600', accent: 'bg-amber-50' },
+    { label: 'Clientes', value: clientes.length, icon: Users, color: 'text-slate-700', accent: 'bg-slate-100' },
+    { label: 'Total ventas', value: `$${totalVentas.toFixed(2)}`, icon: DollarSign, color: 'text-green-600', accent: 'bg-green-50' },
+  ]
+  const clienteFiltros: { key: ClienteFiltro; label: string }[] = [
+    { key: 'todos', label: 'Todos' },
+    { key: 'aprobados', label: 'Aprobados' },
+    { key: 'pendientes', label: 'Pendientes' },
+  ]
+  const clientesFiltrados = clientes.filter(c => {
+    const query = clienteQuery.trim().toLowerCase()
+    const cumpleBusqueda = !query || [c.nombre, c.negocio, c.email, c.telefono, c.ein, c.direccion]
+      .some(value => String(value || '').toLowerCase().includes(query))
+    const cumpleFiltro =
+      clienteFiltro === 'todos' ||
+      (clienteFiltro === 'aprobados' && c.aprobado) ||
+      (clienteFiltro === 'pendientes' && !c.aprobado)
+    return cumpleBusqueda && cumpleFiltro
+  })
 
   if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
 
   return (
-    <div className="min-h-screen bg-brand-gray-light">
-      {usuarioCreado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">Usuario creado y correo enviado</div>}
+    <div className="min-h-screen bg-[#F5F7FA] text-brand-gray-dark">
+      {usuarioCreado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[70] bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">Usuario creado y correo enviado</div>}
 
-      <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Admin - BOOD SUPPLY</span></div>
-        <div className="flex items-center gap-4">
-          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm">Facebook</a>
-          <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
-          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors"><LogOut size={16}/> Salir</button>
-        </div>
-      </nav>
+      <div
+        className={`fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm transition-opacity lg:hidden ${sidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        onClick={() => setSidebarOpen(false)}
+      />
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[{label:'Pedidos totales',value:pedidos.length,color:'text-brand-navy'},{label:'Recibidos',value:pedidos.filter(p=>p.estado==='pendiente').length,color:'text-yellow-600'},{label:'Clientes',value:clientes.length,color:'text-brand-orange'},{label:'Total ventas',value:`$${totalVentas.toFixed(2)}`,color:'text-green-600'}].map(({label,value,color})=>(
-            <div key={label} className="card text-center py-4"><div className={`font-heading text-2xl font-bold ${color}`}>{value}</div><div className="text-brand-gray-mid text-sm mt-1">{label}</div></div>
-          ))}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-white/10 bg-[#0B2147] text-white shadow-2xl transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between px-5 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
+              <Package size={23} className="text-brand-orange" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-blue-200">Admin</p>
+              <p className="font-heading text-lg font-bold leading-tight">BOOD SUPPLY</p>
+            </div>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} className="rounded-xl p-2 text-blue-100 hover:bg-white/10 lg:hidden" aria-label="Cerrar menu">
+            <X size={18} />
+          </button>
         </div>
 
-        <div className="flex gap-2 flex-wrap mb-8">
-          {[
-            {key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion},
-            {key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},
-            {key:'invoices',label:'Invoices',icon:Receipt,badge:0},
-            {key:'finanzas',label:'Finanzas',icon:BarChart2,badge:0},
-            {key:'analytics',label:'Analytics',icon:TrendingUp,badge:0},
-            {key:'rutas',label:'Rutas',icon:Map,badge:0},
-            {key:'mensajes',label:'Mensajes',icon:Mail,badge:0},
-            {key:'productos',label:'Productos',icon:Package,badge:0},
-            {key:'categorias',label:'Categorias',icon:Tag,badge:0}
-          ].map(({key,label,icon:Icon,badge})=>(
-            <button key={key} onClick={()=>setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab===key?'bg-brand-navy text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
-              <Icon size={16}/> {label}
-              {badge>0&&<span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${tab===key?'bg-white text-brand-navy':'bg-red-500 text-white'}`}>{badge}</span>}
-            </button>
-          ))}
+        <div className="mx-5 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+          <p className="text-xs text-blue-200">Ventas totales</p>
+          <p className="mt-1 font-heading text-2xl font-bold">${totalVentas.toFixed(2)}</p>
+          <div className="mt-3 flex items-center gap-2 text-xs text-blue-100">
+            <span className="rounded-full bg-green-400/15 px-2 py-1 text-green-200">{clientes.length} clientes</span>
+            <span className="rounded-full bg-brand-orange/15 px-2 py-1 text-orange-100">{pedidos.length} pedidos</span>
+          </div>
         </div>
+
+        <nav className="mt-5 flex-1 overflow-y-auto px-3 pb-5">
+          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">Menu</p>
+          <div className="space-y-1.5">
+            {adminTabs.map(({ key, label, description, icon: Icon, badge }) => {
+              const active = tab === key
+              return (
+                <button
+                  key={key}
+                  onClick={() => { setTab(key); setSidebarOpen(false) }}
+                  className={`group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-all ${active ? 'bg-white text-brand-navy shadow-lg shadow-black/10' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`}
+                >
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${active ? 'bg-brand-orange text-white' : 'bg-white/10 text-blue-100 group-hover:bg-white/15'}`}>
+                    <Icon size={18} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{label}</span>
+                    <span className={`block truncate text-xs ${active ? 'text-slate-500' : 'text-blue-200'}`}>{description}</span>
+                  </span>
+                  {badge > 0 && (
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${active ? 'bg-brand-navy text-white' : 'bg-brand-orange text-white'}`}>
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </nav>
+
+        <div className="border-t border-white/10 p-4">
+          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="block rounded-xl px-3 py-2 text-sm text-blue-100 hover:bg-white/10 hover:text-white">Facebook</a>
+          <p className="truncate px-3 py-2 text-sm text-blue-200">{user?.email}</p>
+          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-blue-100 hover:bg-white/10 hover:text-white">
+            <LogOut size={16} /> Salir
+          </button>
+        </div>
+      </aside>
+
+      <div className="lg:pl-72">
+        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur md:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSidebarOpen(true)} className="rounded-xl border border-slate-200 bg-white p-2 text-brand-navy shadow-sm lg:hidden" aria-label="Abrir menu">
+                <Menu size={20} />
+              </button>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-gray-mid">Panel operativo</p>
+                <h1 className="font-heading text-xl font-bold text-brand-navy md:text-2xl">{activeTab?.label || 'Admin'}</h1>
+              </div>
+            </div>
+            <div className="hidden items-center gap-4 md:flex">
+              <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-brand-gray-mid hover:text-brand-navy">Facebook</a>
+              <span className="text-sm text-brand-gray-mid">{user?.email}</span>
+              <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-brand-navy hover:border-brand-orange">
+                <LogOut size={16}/> Salir
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+          <div className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {statCards.map(({ label, value, icon: Icon, color, accent }) => (
+              <div key={label} className="rounded-2xl border border-white bg-white p-4 shadow-sm shadow-slate-200/70">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium text-brand-gray-mid">{label}</p>
+                    <p className={`mt-1 font-heading text-2xl font-bold ${color}`}>{value}</p>
+                  </div>
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${accent}`}>
+                    <Icon size={20} className={color} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
 
         {/* FINANZAS */}
         {tab === 'finanzas' && (
@@ -1090,29 +1201,57 @@ export default function AdminPage() {
 
         {/* CLIENTES */}
         {tab === 'clientes' && (
-          <div className="space-y-3">
-            <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
-              <h2 className="font-heading font-bold text-brand-navy text-xl">Clientes - {clientes.length}{pendientesAprobacion>0&&<span className="ml-2 text-sm font-normal text-red-500">{pendientesAprobacion} pendiente(s)</span>}</h2>
-              <div className="flex gap-2">
-                <button onClick={()=>setShowFormUsuario(!showFormUsuario)} className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"><UserPlus size={15}/> Crear Usuario</button>
-                <button onClick={exportarClientes} className="flex items-center gap-2 bg-white border border-gray-200 text-brand-navy px-4 py-2 rounded-lg text-sm font-medium hover:border-brand-orange transition-colors"><Download size={15}/> Exportar CSV</button>
+          <div className="space-y-4">
+            <div className="rounded-3xl border border-white bg-white p-4 shadow-sm shadow-slate-200/70 md:p-5">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <h2 className="font-heading text-2xl font-bold text-brand-navy">Clientes</h2>
+                  <p className="mt-1 text-sm text-brand-gray-mid">
+                    {clientesFiltrados.length} visibles de {clientes.length}
+                    {pendientesAprobacion > 0 && <span className="ml-2 font-medium text-amber-600">{pendientesAprobacion} pendiente(s)</span>}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative min-w-0 sm:w-80">
+                    <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray-mid" />
+                    <input
+                      value={clienteQuery}
+                      onChange={e => setClienteQuery(e.target.value)}
+                      placeholder="Buscar cliente, negocio, email..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-brand-navy outline-none transition focus:border-brand-orange focus:bg-white"
+                    />
+                  </div>
+                  <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                    {clienteFiltros.map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => setClienteFiltro(key)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${clienteFiltro === key ? 'bg-white text-brand-navy shadow-sm' : 'text-brand-gray-mid hover:text-brand-navy'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={()=>setShowFormUsuario(!showFormUsuario)} className="flex items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"><UserPlus size={15}/> Crear Usuario</button>
+                  <button onClick={exportarClientes} className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-brand-navy hover:border-brand-orange"><Download size={15}/> CSV</button>
+                </div>
               </div>
             </div>
             {showFormUsuario && (
-              <div className="card border-2 border-brand-orange/30 mb-4">
+              <div className="rounded-3xl border border-brand-orange/30 bg-white p-5 shadow-sm shadow-orange-100/60 md:p-6">
                 <h3 className="font-heading font-bold text-brand-navy text-lg mb-4 flex items-center gap-2"><UserPlus size={18} className="text-brand-orange"/> Crear Nuevo Usuario</h3>
                 {errorUsuario && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{errorUsuario}</div>}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Nombre Completo *</label><input value={formUsuario.nombre} onChange={e=>setFormUsuario({...formUsuario,nombre:e.target.value})} placeholder="Nombre completo" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Email *</label><input value={formUsuario.email} onChange={e=>setFormUsuario({...formUsuario,email:e.target.value})} placeholder="correo@email.com" type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Negocio</label><input value={formUsuario.negocio} onChange={e=>setFormUsuario({...formUsuario,negocio:e.target.value})} placeholder="Nombre del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Telefono</label><input value={formUsuario.telefono} onChange={e=>setFormUsuario({...formUsuario,telefono:e.target.value})} placeholder="(312) 000-0000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label><input value={formUsuario.ein} onChange={e=>setFormUsuario({...formUsuario,ein:e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento</label><input value={formUsuario.fecha_nacimiento} onChange={e=>setFormUsuario({...formUsuario,fecha_nacimiento:e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formUsuario.direccion} onChange={e=>setFormUsuario({...formUsuario,direccion:e.target.value})} placeholder="Direccion del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div className="md:col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formUsuario.direccion} onChange={e=>setFormUsuario({...formUsuario,direccion:e.target.value})} placeholder="Direccion del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoTaxUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoTaxUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}</div></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e=>setArchivoIdUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoIdUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}</div></div>
-                  <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoCRTUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoCRTUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
+                  <div className="md:col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoCRTUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoCRTUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
                 </div>
                 <p className="text-xs text-brand-gray-mid mt-3">El usuario recibira un correo con sus credenciales y debera cambiar su contrasena al primer inicio de sesion.</p>
                 <div className="flex gap-3 mt-4">
@@ -1121,49 +1260,56 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-            {clientes.map(c => {
+            {clientesFiltrados.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-brand-gray-mid">
+                <Users size={38} className="mx-auto mb-3 opacity-30" />
+                <p className="font-medium text-brand-navy">No hay clientes con esos filtros</p>
+                <p className="mt-1 text-sm">Prueba cambiando la busqueda o el estado.</p>
+              </div>
+            )}
+            {clientesFiltrados.map(c => {
               const pedidosCliente = getPedidosCliente(c.id)
               const ultimoPedido = pedidosCliente[0]
               const totalGastado = pedidosCliente.filter(p=>p.estado!=='cancelado').reduce((sum,p)=>sum+(p.total||0),0)
               const editando = editandoCliente === c.id
               return (
-                <div key={c.id} className={`card border-l-4 ${c.aprobado?'border-l-green-400':'border-l-yellow-400'}`}>
-                  <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0 ${c.aprobado?'bg-green-500 text-white':'bg-yellow-400 text-white'}`}>{(c.nombre||c.email||'?')[0].toUpperCase()}</div>
+                <div key={c.id} className={`rounded-3xl border bg-white p-4 shadow-sm shadow-slate-200/70 ${c.aprobado?'border-l-4 border-l-green-400':'border-l-4 border-l-amber-400'}`}>
+                  <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl font-heading text-sm font-bold ${c.aprobado?'bg-green-500 text-white':'bg-amber-400 text-white'}`}>{(c.nombre||c.email||'?')[0].toUpperCase()}</div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p className="font-heading font-bold text-brand-navy">{c.nombre||'—'}</p>
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.aprobado?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{c.aprobado?'Aprobado':'Pendiente'}</span>
                           {c.must_change_password&&<span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">Debe cambiar contrasena</span>}
                         </div>
-                        <p className="text-xs text-brand-gray-mid">{c.email}</p>
+                        <p className="truncate text-xs text-brand-gray-mid">{c.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="text-center"><p className="font-heading font-bold text-brand-orange">{pedidosCliente.length}</p><p className="text-xs text-brand-gray-mid">pedidos</p></div>
-                      <div className="text-center"><p className="font-heading font-bold text-green-600">${totalGastado.toFixed(2)}</p><p className="text-xs text-brand-gray-mid">total</p></div>
-                      {!c.aprobado?<button onClick={()=>aprobarCliente(c,true)} disabled={aprobando===c.id} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><CheckCircle size={14}/> {aprobando===c.id?'Aprobando...':'Aprobar'}</button>:<button onClick={()=>aprobarCliente(c,false)} disabled={aprobando===c.id} className="flex items-center gap-1 text-sm bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600"><XCircle size={14}/> Revocar</button>}
-                      {!editando?<button onClick={()=>iniciarEdicionCliente(c)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-dark hover:border-brand-orange"><Pencil size={14}/> Editar</button>:<div className="flex gap-2"><button onClick={()=>guardarCliente(c.id)} disabled={guardando} className="flex items-center gap-1 text-sm bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600"><Save size={14}/> {guardando?'Guardando...':'Guardar'}</button><button onClick={()=>setEditandoCliente(null)} className="flex items-center gap-1 text-sm border border-gray-200 px-3 py-1.5 rounded-lg text-brand-gray-mid"><X size={14}/> Cancelar</button></div>}
-                      <button onClick={()=>eliminarCliente(c.id,c.email)} className="flex items-center gap-1 text-sm border border-red-200 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-50"><Trash2 size={14}/></button>
+                    <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                      <div className="rounded-2xl bg-slate-50 px-3 py-2 text-center"><p className="font-heading font-bold text-brand-orange">{pedidosCliente.length}</p><p className="text-[11px] text-brand-gray-mid">pedidos</p></div>
+                      <div className="rounded-2xl bg-green-50 px-3 py-2 text-center"><p className="font-heading font-bold text-green-600">${totalGastado.toFixed(2)}</p><p className="text-[11px] text-brand-gray-mid">total</p></div>
+                      {!c.aprobado?<button onClick={()=>aprobarCliente(c,true)} disabled={aprobando===c.id} className="flex items-center gap-1 rounded-xl bg-green-500 px-3 py-2 text-sm font-medium text-white hover:bg-green-600"><CheckCircle size={14}/> {aprobando===c.id?'Aprobando...':'Aprobar'}</button>:<button onClick={()=>aprobarCliente(c,false)} disabled={aprobando===c.id} className="flex items-center gap-1 rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white hover:bg-amber-600"><XCircle size={14}/> Revocar</button>}
+                      {!editando?<button onClick={()=>iniciarEdicionCliente(c)} className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-brand-gray-dark hover:border-brand-orange"><Pencil size={14}/> Editar</button>:<div className="flex gap-2"><button onClick={()=>guardarCliente(c.id)} disabled={guardando} className="flex items-center gap-1 rounded-xl bg-green-500 px-3 py-2 text-sm font-medium text-white hover:bg-green-600"><Save size={14}/> {guardando?'Guardando...':'Guardar'}</button><button onClick={()=>setEditandoCliente(null)} className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-brand-gray-mid"><X size={14}/> Cancelar</button></div>}
+                      <button onClick={()=>eliminarCliente(c.id,c.email)} className="flex items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm text-red-400 hover:bg-red-50"><Trash2 size={14}/></button>
                     </div>
                   </div>
                   {(c.sales_tax_url||c.id_foto_url||c.crt61_url)&&(
-                    <div className="flex flex-wrap gap-2 mb-3">
+                    <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-3">
                       {c.sales_tax_url&&<div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex-1 min-w-48"><FileText size={15} className="text-blue-500 flex-shrink-0"/><span className="text-xs text-blue-700 flex-1">Sales Tax Permit</span><a href={c.sales_tax_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600">Ver</a></div>}
                       {c.id_foto_url&&<div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex-1 min-w-48"><FileText size={15} className="text-purple-500 flex-shrink-0"/><span className="text-xs text-purple-700 flex-1">ID / Identificacion</span><a href={c.id_foto_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600">Ver</a></div>}
                       {c.crt61_url&&<div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-100 flex-1 min-w-48"><FileText size={15} className="text-green-500 flex-shrink-0"/><span className="text-xs text-green-700 flex-1">CRT-61 Firmado</span><a href={c.crt61_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">Ver</a></div>}
                     </div>
                   )}
                   {editando?(
-                    <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
+                    <div className="mt-3 grid grid-cols-1 gap-3 border-t pt-3 md:grid-cols-2">
                       {[{key:'nombre',label:'Nombre',ph:'Nombre completo'},{key:'negocio',label:'Negocio',ph:'Nombre del negocio'},{key:'telefono',label:'Telefono',ph:'(312) 000-0000'},{key:'ein',label:'EIN',ph:'XX-XXXXXXX'}].map(({key,label,ph})=>(
                         <div key={key}><label className="block text-xs font-medium text-brand-gray-dark mb-1">{label}</label><input value={formCliente[key]||''} onChange={e=>setFormCliente({...formCliente,[key]:e.target.value})} placeholder={ph} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                       ))}
-                      <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formCliente.direccion||''} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Direccion del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                      <div className="col-span-2 border-t pt-3 mt-1">
+                      <div className="md:col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formCliente.direccion||''} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Direccion del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                      <div className="border-t pt-3 mt-1 md:col-span-2">
                         <p className="text-xs font-semibold text-brand-navy mb-2">📎 Documentos</p>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                           <div><label className="block text-xs text-brand-gray-mid mb-1">Sales Tax Permit</label><input type="file" accept="image/*,.pdf" onChange={e=>setArchivoEditTax(e.target.files?.[0]||null)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1"/></div>
                           <div><label className="block text-xs text-brand-gray-mid mb-1">ID / Identificacion</label><input type="file" accept="image/*,.pdf" onChange={e=>setArchivoEditId(e.target.files?.[0]||null)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1"/></div>
                           <div><label className="block text-xs text-brand-gray-mid mb-1">CRT-61 Firmado</label><input type="file" accept="image/*,.pdf" onChange={e=>setArchivoEditCrt(e.target.files?.[0]||null)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1"/></div>
@@ -1171,9 +1317,9 @@ export default function AdminPage() {
                       </div>
                     </div>
                   ):(
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs mt-3 border-t pt-3">
+                    <div className="mt-3 grid grid-cols-1 gap-2 border-t pt-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
                       {[{label:'Negocio',value:c.negocio},{label:'Telefono',value:c.telefono},{label:'EIN',value:c.ein},{label:'Fecha Nacimiento',value:c.fecha_nacimiento?new Date(c.fecha_nacimiento).toLocaleDateString('es-MX',{timeZone:'UTC'}):null},{label:'Direccion',value:c.direccion,full:true},{label:'Ultimo pedido',value:ultimoPedido?new Date(ultimoPedido.created_at).toLocaleDateString('es-MX'):null},{label:'Registro',value:new Date(c.created_at).toLocaleDateString('es-MX')}].map(({label,value,full}:any)=>(
-                        <div key={label} className={`bg-gray-50 rounded-lg p-2 border border-gray-100 ${full?'col-span-2':''}`}><p className="text-brand-gray-mid">{label}</p><p className="font-medium text-brand-navy">{value||'—'}</p></div>
+                        <div key={label} className={`rounded-xl border border-slate-100 bg-slate-50 p-2.5 ${full?'sm:col-span-2 xl:col-span-2':''}`}><p className="text-brand-gray-mid">{label}</p><p className="break-words font-medium text-brand-navy">{value||'—'}</p></div>
                       ))}
                     </div>
                   )}
@@ -1738,9 +1884,8 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+        </main>
       </div>
     </div>
   )
 }
-
-

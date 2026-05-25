@@ -366,7 +366,6 @@ export default function VendedorPage() {
         )}
 
         {/* PEDIDOS */}
-}
         {tab === 'mis_pedidos' && (
           <div className="space-y-3">
             <h2 className="font-heading font-bold text-brand-navy text-xl mb-4">Pedidos - {pedidos.length}</h2>
