@@ -674,45 +674,95 @@ export default function AdminPage() {
 
   if (loading) return <div className="min-h-screen bg-brand-gray-light flex items-center justify-center"><div className="text-brand-gray-mid">Cargando...</div></div>
 
+  const esVendedor = perfil?.role === 'vendedor'
+  const navItems = [
+    {key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion,group:'principal'},
+    {key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0,group:'principal'},
+    {key:'invoices',label:'Invoices',icon:Receipt,badge:0,group:'principal'},
+    {key:'finanzas',label:'Finanzas',icon:BarChart2,badge:0,group:'finanzas'},
+    {key:'analytics',label:'Analytics',icon:TrendingUp,badge:0,group:'finanzas'},
+    {key:'rutas',label:'Rutas',icon:Map,badge:0,group:'operaciones'},
+    {key:'mensajes',label:'Mensajes',icon:Mail,badge:0,group:'operaciones'},
+    {key:'productos',label:'Productos',icon:Package,badge:0,group:'operaciones'},
+    {key:'categorias',label:'Categorias',icon:Tag,badge:0,group:'operaciones'},
+  ].filter(({key}) => esVendedor ? ['pedidos','invoices'].includes(key) : true)
+
   return (
-    <div className="min-h-screen bg-brand-gray-light">
+    <div className="min-h-screen flex bg-[#F0F2F5]">
       {usuarioCreado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">Usuario creado y correo enviado</div>}
 
-      <nav className="bg-brand-navy text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3"><Package size={22} className="text-brand-orange"/><span className="font-heading font-bold text-lg">Admin - BOOD SUPPLY</span></div>
-        <div className="flex items-center gap-4">
-          <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-white transition-colors text-sm">Facebook</a>
-          <span className="text-blue-300 text-sm hidden md:block">{user?.email}</span>
-          <button onClick={() => { supabase.auth.signOut(); window.location.href = '/es' }} className="flex items-center gap-2 text-sm text-blue-300 hover:text-white transition-colors"><LogOut size={16}/> Salir</button>
+      {/* SIDEBAR */}
+      <aside className="w-56 min-h-screen bg-[#0A1F3D] flex flex-col fixed left-0 top-0 bottom-0 z-30">
+        <div className="px-5 py-5 border-b border-white/10">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-brand-orange rounded-lg flex items-center justify-center flex-shrink-0">
+              <Package size={16} className="text-white"/>
+            </div>
+            <div>
+              <div className="font-heading font-bold text-white text-sm tracking-wide">BOOD <span className="text-brand-orange">SUPPLY</span></div>
+              <div className="text-[10px] text-white/30 uppercase tracking-widest mt-0.5">Distribution Platform</div>
+            </div>
+          </div>
         </div>
-      </nav>
-
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[{label:'Pedidos totales',value:pedidos.length,color:'text-brand-navy'},{label:'Recibidos',value:pedidos.filter(p=>p.estado==='pendiente').length,color:'text-yellow-600'},{label:'Clientes',value:clientes.length,color:'text-brand-orange'},{label:'Total ventas',value:`$${totalVentas.toFixed(2)}`,color:'text-green-600'}].map(({label,value,color})=>(
-            <div key={label} className="card text-center py-4"><div className={`font-heading text-2xl font-bold ${color}`}>{value}</div><div className="text-brand-gray-mid text-sm mt-1">{label}</div></div>
+        <div className="px-3 py-3 border-b border-white/10 grid grid-cols-2 gap-2">
+          {[
+            {label:'Pedidos',value:pedidos.length,color:'text-white'},
+            {label:'Ventas',value:`$${(totalVentas/1000).toFixed(1)}k`,color:'text-brand-orange'},
+            {label:'Clientes',value:clientes.length,color:'text-white'},
+            {label:'Pendientes',value:pedidos.filter(p=>p.estado==='pendiente').length,color:'text-yellow-400'},
+          ].map(({label,value,color})=>(
+            <div key={label} className="bg-white/5 rounded-lg px-2 py-2">
+              <div className={`font-heading font-bold text-sm ${color}`}>{value}</div>
+              <div className="text-[10px] text-white/35">{label}</div>
+            </div>
           ))}
         </div>
-
-        <div className="flex gap-2 flex-wrap mb-8">
-          {[
-            {key:'clientes',label:'Clientes',icon:Users,badge:pendientesAprobacion},
-            {key:'pedidos',label:'Pedidos',icon:ShoppingBag,badge:0},
-            {key:'invoices',label:'Invoices',icon:Receipt,badge:0},
-            {key:'finanzas',label:'Finanzas',icon:BarChart2,badge:0},
-            {key:'analytics',label:'Analytics',icon:TrendingUp,badge:0},
-            {key:'rutas',label:'Rutas',icon:Map,badge:0},
-            {key:'mensajes',label:'Mensajes',icon:Mail,badge:0},
-            {key:'productos',label:'Productos',icon:Package,badge:0},
-            {key:'categorias',label:'Categorias',icon:Tag,badge:0}
-          ].map(({key,label,icon:Icon,badge})=>(
-            <button key={key} onClick={()=>setTab(key as any)} className={`font-heading font-semibold px-5 py-2.5 rounded-button transition-all flex items-center gap-2 ${tab===key?'bg-brand-navy text-white':'bg-white text-brand-navy border border-gray-200 hover:border-brand-navy'}`}>
-              <Icon size={16}/> {label}
-              {badge>0&&<span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${tab===key?'bg-white text-brand-navy':'bg-red-500 text-white'}`}>{badge}</span>}
+        <nav className="flex-1 px-3 py-3 overflow-y-auto">
+          {!esVendedor && <div className="text-[9px] text-white/30 uppercase tracking-widest px-2 mb-2">Principal</div>}
+          {navItems.filter(i=>i.group==='principal').map(({key,label,icon:Icon,badge})=>(
+            <button key={key} onClick={()=>setTab(key as any)} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5 transition-all text-left ${tab===key?'bg-brand-orange text-white':'text-white/60 hover:bg-white/6 hover:text-white'}`}>
+              <Icon size={15}/><span className="text-[13px] font-medium flex-1">{label}</span>
+              {badge>0&&<span className={`text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center ${tab===key?'bg-white/25 text-white':'bg-red-500 text-white'}`}>{badge}</span>}
             </button>
           ))}
+          {!esVendedor && <>
+            <div className="text-[9px] text-white/30 uppercase tracking-widest px-2 mb-2 mt-4">Operaciones</div>
+            {navItems.filter(i=>i.group==='operaciones').map(({key,label,icon:Icon,badge})=>(
+              <button key={key} onClick={()=>setTab(key as any)} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5 transition-all text-left ${tab===key?'bg-brand-orange text-white':'text-white/60 hover:bg-white/6 hover:text-white'}`}>
+                <Icon size={15}/><span className="text-[13px] font-medium flex-1">{label}</span>
+                {badge>0&&<span className={`text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center ${tab===key?'bg-white/25 text-white':'bg-red-500 text-white'}`}>{badge}</span>}
+              </button>
+            ))}
+            <div className="text-[9px] text-white/30 uppercase tracking-widest px-2 mb-2 mt-4">Finanzas</div>
+            {navItems.filter(i=>i.group==='finanzas').map(({key,label,icon:Icon})=>(
+              <button key={key} onClick={()=>setTab(key as any)} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5 transition-all text-left ${tab===key?'bg-brand-orange text-white':'text-white/60 hover:bg-white/6 hover:text-white'}`}>
+                <Icon size={15}/><span className="text-[13px] font-medium">{label}</span>
+              </button>
+            ))}
+          </>}
+        </nav>
+        <div className="px-4 py-3 border-t border-white/10 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-brand-orange flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            {(user?.email||'A')[0].toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white text-[12px] font-medium truncate">{user?.email?.split('@')[0]}</div>
+            <div className="text-white/35 text-[10px]">{esVendedor?'Vendedor':'Administrador'}</div>
+          </div>
+          <button onClick={()=>{supabase.auth.signOut();window.location.href='/es'}} className="text-white/25 hover:text-white/70 transition-colors"><LogOut size={14}/></button>
         </div>
+      </aside>
 
+      {/* MAIN */}
+      <div className="flex-1 ml-56 min-h-screen flex flex-col">
+        <header className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center justify-between sticky top-0 z-20">
+          <h1 className="font-heading font-bold text-brand-navy text-lg capitalize">{tab}</h1>
+          <div className="flex items-center gap-3">
+            <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-brand-navy/40 hover:text-brand-navy text-sm">Facebook</a>
+            <span className="text-brand-gray-mid text-sm hidden md:block">{user?.email}</span>
+          </div>
+        </header>
+        <div className="flex-1 p-6">
         {/* FINANZAS */}
         {tab === 'finanzas' && (
           <div>
