@@ -630,7 +630,6 @@ export default function VendedorPage() {
           </div>
         </div>
       )}
-      </div>
         </div>
       </div>
     </div>
