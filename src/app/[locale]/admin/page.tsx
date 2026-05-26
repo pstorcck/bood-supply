@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map, Receipt, TrendingUp, TrendingDown, DollarSign, BarChart2, AlertTriangle, ShoppingCart} from 'lucide-react'
+import { Plus, Trash2, LogOut, Package, Eye, EyeOff, Users, ShoppingBag, Tag, CheckSquare, Square, Pencil, X, Save, Download, CheckCircle, XCircle, FileText, ImageIcon, Mail, UserPlus, Map, Receipt, TrendingUp, TrendingDown, DollarSign, BarChart2, AlertTriangle, ShoppingCart, Menu} from 'lucide-react'
 import MapaRutas from '@/components/MapaRutas'
 
 const ADMIN_EMAIL = 'boodsupplies@gmail.com'
@@ -42,6 +42,7 @@ function descargarCSV(nombre: string, filas: string[][], headers: string[]) {
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices' | 'finanzas' | 'analytics'>('clientes')
   const [perfil, setPerfil] = useState<any>(null)
   const [productos, setProductos] = useState<any[]>([])
@@ -692,17 +693,18 @@ export default function AdminPage() {
       {usuarioCreado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">Usuario creado y correo enviado</div>}
 
       {/* SIDEBAR */}
-      <aside className="w-56 min-h-screen bg-[#0A1F3D] flex flex-col fixed left-0 top-0 bottom-0 z-30">
+      <aside className={`${sidebarOpen?'w-56':'w-14'} min-h-screen bg-[#0A1F3D] flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300`}>
         <div className="px-5 py-5 border-b border-white/10">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-brand-orange rounded-lg flex items-center justify-center flex-shrink-0">
               <Package size={16} className="text-white"/>
             </div>
             <div>
-              <div className="font-heading font-bold text-white text-sm tracking-wide">BOOD <span className="text-brand-orange">SUPPLY</span></div>
-              <div className="text-[10px] text-white/30 uppercase tracking-widest mt-0.5">Distribution Platform</div>
+              {sidebarOpen && <><div className="font-heading font-bold text-white text-sm tracking-wide">BOOD <span className="text-brand-orange">SUPPLY</span></div>
+              <div className="text-[10px] text-white/30 uppercase tracking-widest mt-0.5">Distribution Platform</div></>}
             </div>
           </div>
+          <button onClick={()=>setSidebarOpen(o=>!o)} className="ml-auto text-white/40 hover:text-white transition-colors"><Menu size={18}/></button>
         </div>
         <div className="px-3 py-3 border-b border-white/10 grid grid-cols-2 gap-2">
           {[
@@ -754,7 +756,7 @@ export default function AdminPage() {
       </aside>
 
       {/* MAIN */}
-      <div className="flex-1 ml-56 min-h-screen flex flex-col">
+      <div className={`flex-1 ${sidebarOpen?'ml-56':'ml-14'} min-h-screen flex flex-col transition-all duration-300`}>
         <header className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center justify-between sticky top-0 z-20">
           <h1 className="font-heading font-bold text-brand-navy text-lg capitalize">{tab}</h1>
           <div className="flex items-center gap-3">
