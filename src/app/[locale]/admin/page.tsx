@@ -693,7 +693,7 @@ export default function AdminPage() {
       {usuarioCreado && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium">Usuario creado y correo enviado</div>}
 
       {/* SIDEBAR */}
-      <aside className={`${sidebarOpen?'w-56':'w-14'} min-h-screen bg-[#0A1F3D] flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300`}>
+      <aside className={`${sidebarOpen?'w-56':'w-0'} min-h-screen bg-[#0A1F3D] flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300 overflow-hidden`}>
         <div className="px-5 py-5 border-b border-white/10">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-brand-orange rounded-lg flex items-center justify-center flex-shrink-0">
@@ -704,7 +704,6 @@ export default function AdminPage() {
               <div className="text-[10px] text-white/30 uppercase tracking-widest mt-0.5">Distribution Platform</div></>}
             </div>
           </div>
-          <button onClick={()=>setSidebarOpen(o=>!o)} className="ml-auto text-white/40 hover:text-white transition-colors"><Menu size={18}/></button>
         </div>
         <div className="px-3 py-3 border-b border-white/10 grid grid-cols-2 gap-2">
           {[
@@ -756,8 +755,13 @@ export default function AdminPage() {
       </aside>
 
       {/* MAIN */}
-      <div className={`flex-1 ${sidebarOpen?'ml-56':'ml-14'} min-h-screen flex flex-col transition-all duration-300`}>
+      <div className={`flex-1 ${sidebarOpen?'ml-56':'ml-0'} min-h-screen flex flex-col transition-all duration-300`}>
         <header className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center justify-between sticky top-0 z-20">
+          <button onClick={()=>setSidebarOpen(o=>!o)} className="flex flex-col gap-1.5 mr-4 group">
+            <span className="block w-5 h-0.5 bg-brand-navy group-hover:bg-brand-orange transition-colors"></span>
+            <span className="block w-5 h-0.5 bg-brand-navy group-hover:bg-brand-orange transition-colors"></span>
+            <span className="block w-5 h-0.5 bg-brand-navy group-hover:bg-brand-orange transition-colors"></span>
+          </button>
           <h1 className="font-heading font-bold text-brand-navy text-lg capitalize">{tab}</h1>
           <div className="flex items-center gap-3">
             <a href="https://www.facebook.com/profile.php?id=61582953226409" target="_blank" rel="noopener noreferrer" className="text-brand-navy/40 hover:text-brand-navy text-sm">Facebook</a>
