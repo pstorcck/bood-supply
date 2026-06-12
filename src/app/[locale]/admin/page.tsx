@@ -43,6 +43,8 @@ export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [busquedaProductosAdmin, setBusquedaProductosAdmin] = useState('')
+  const [clienteHistorialId, setClienteHistorialId] = useState<string|null>(null)
   const [tab, setTab] = useState<'pedidos' | 'clientes' | 'productos' | 'categorias' | 'mensajes' | 'rutas' | 'invoices' | 'finanzas' | 'analytics'>('clientes')
   const [perfil, setPerfil] = useState<any>(null)
   const [productos, setProductos] = useState<any[]>([])
@@ -58,7 +60,7 @@ export default function AdminPage() {
   const [npItems, setNpItems] = useState<{producto_id:string,nombre:string,precio:number,costo:number,cantidad:number,stock:number}[]>([])
   const [npBusqueda, setNpBusqueda] = useState('')
   const [npHistorial, setNpHistorial] = useState<any[]>([])
-  const [npExtras, setNpExtras] = useState<{nombre:string,precio:number,cantidad:number}[]>([])
+  const [npExtras, setNpExtras] = useState<{nombre:string,precio:number,costo:number,cantidad:number}[]>([])
   const [npFuel, setNpFuel] = useState(5)
   const [npMetodo, setNpMetodo] = useState('Efectivo')
   const [npCreando, setNpCreando] = useState(false)
@@ -1233,6 +1235,36 @@ export default function AdminPage() {
                       ))}
                     </div>
                   )}
+                {clienteHistorialId === c.id && (
+                  <div className="mt-3 border-t pt-3">
+                    <h4 className="text-xs font-bold text-brand-navy mb-2 flex items-center gap-1"><Receipt size={12}/> Historial de compras</h4>
+                    {getPedidosCliente(c.id).length === 0 ? (
+                      <p className="text-xs text-brand-gray-mid">Sin pedidos aun</p>
+                    ) : (
+                      <div className="space-y-2 max-h-72 overflow-y-auto">
+                        {getPedidosCliente(c.id).sort((a:any,b:any)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).map((ped:any)=>(
+                          <div key={ped.id} className="bg-gray-50 rounded-lg p-2 text-xs border border-gray-100">
+                            <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                              <span className="font-semibold text-brand-navy">#{ped.id.slice(0,8).toUpperCase()}</span>
+                              <span className="text-brand-gray-mid">{new Date(ped.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
+                              <span className="font-bold text-brand-orange">${ped.total?.toFixed(2)}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${estadoColor[ped.estado]||'bg-gray-100 text-gray-600'}`}>{ped.estado?.replace('_',' ')}</span>
+                            </div>
+                            <div className="space-y-0.5 pl-2 border-l-2 border-brand-orange/30">
+                              {ped.pedido_items?.map((item:any,idx:number)=>(
+                                <div key={idx} className="flex justify-between text-brand-gray-dark">
+                                  <span className="flex-1 truncate">{item.productos?.nombre || item.descripcion || '—'}</span>
+                                  <span className="ml-2 text-brand-gray-mid">x{item.cantidad}</span>
+                                  <span className="ml-2 font-semibold text-brand-navy">${item.precio_unitario?.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 </div>
               )
             })}
@@ -1552,6 +1584,9 @@ export default function AdminPage() {
         {/* PRODUCTOS */}
         {tab === 'productos' && (
           <>
+            <div className="mb-4">
+              <input type="text" placeholder="🔍 Buscar producto..." value={busquedaProductosAdmin} onChange={e=>setBusquedaProductosAdmin(e.target.value)} className="w-full max-w-sm border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/>
+            </div>
             <div className="flex items-center justify-between mb-6"><p className="text-brand-gray-mid text-sm">{productos.length} productos · {productos.filter(p=>p.activo).length} activos</p><button onClick={()=>setShowFormProducto(!showFormProducto)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Agregar Producto</button></div>
             {showFormProducto&&(
               <div className="card mb-6 border-2 border-brand-orange/30">
@@ -1742,7 +1777,7 @@ export default function AdminPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold text-brand-navy">Extras (tomates, cilantro, etc.)</label>
-                  <button onClick={()=>setNpExtras(prev=>[...prev,{nombre:'',precio:0,cantidad:1}])} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg">+ Agregar extra</button>
+                  <button onClick={()=>setNpExtras(prev=>[...prev,{nombre:'',precio:0,costo:0,cantidad:1}])} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg">+ Agregar extra</button>
                 </div>
                 {npExtras.map((ex,i)=>(
                   <div key={i} className="flex items-center gap-2 mb-1">
