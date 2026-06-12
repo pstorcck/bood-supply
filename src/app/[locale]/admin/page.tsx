@@ -1780,10 +1780,16 @@ export default function AdminPage() {
                   <button onClick={()=>setNpExtras(prev=>[...prev,{nombre:'',precio:0,costo:0,cantidad:1}])} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg">+ Agregar extra</button>
                 </div>
                 {npExtras.map((ex,i)=>(
-                  <div key={i} className="flex items-center gap-2 mb-1">
-                    <input placeholder="Descripción" value={ex.nombre} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,nombre:e.target.value}:x))} className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
-                    <span className="text-xs text-brand-gray-mid">$</span>
-                    <input type="number" placeholder="0.00" value={ex.precio||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,precio:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                  <div key={i} className="flex items-center gap-2 mb-1 flex-wrap">
+                    <input placeholder="Descripción" value={ex.nombre} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,nombre:e.target.value}:x))} className="flex-1 min-w-32 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-brand-orange font-medium">Precio $</span>
+                      <input type="number" placeholder="0.00" value={ex.precio||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,precio:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-brand-gray-mid font-medium">Costo $</span>
+                      <input type="number" placeholder="0.00" value={ex.costo||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,costo:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                    </div>
                     <input type="number" min={1} value={ex.cantidad} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,cantidad:parseInt(e.target.value)||1}:x))} className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-xs text-center"/>
                     <button onClick={()=>setNpExtras(prev=>prev.filter((_,j)=>j!==i))} className="text-red-400 text-xs">✕</button>
                   </div>
