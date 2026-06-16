@@ -278,7 +278,7 @@ export default function HomePage() {
           {t.footer_rights}
         </div>
       </footer>
-    </div>
       <ChatBot />
+    </div>
   )
 }
