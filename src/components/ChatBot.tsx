@@ -55,12 +55,21 @@ export default function ChatBot() {
   return (
     <>
       <button onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:brightness-110"
-        style={{ background: 'linear-gradient(135deg, #F47B20 0%, #e55a00 100%)', boxShadow: '0 8px 32px rgba(244,123,32,0.45)' }}>
+        className="fixed bottom-6 right-6 z-50 w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:brightness-110"
+        style={{ background: 'linear-gradient(135deg, #F47B20 0%, #e55a00 100%)', boxShadow: '0 8px 40px rgba(244,123,32,0.5)' }}>
         {open ? (
-          <svg width="22" height="22" fill="white" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          <svg width="26" height="26" fill="white" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         ) : (
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 4-3 6-3 6H8s-3-2-3-6a7 7 0 0 1 7-7z"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/><circle cx="9" cy="9" r="1" fill="white" stroke="none"/><circle cx="12" cy="8" r="1" fill="white" stroke="none"/><circle cx="15" cy="9" r="1" fill="white" stroke="none"/></svg>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="10" rx="2"/>
+            <path d="M9 11V7a3 3 0 0 1 6 0v4"/>
+            <circle cx="9" cy="16" r="1.2" fill="white" stroke="none"/>
+            <circle cx="15" cy="16" r="1.2" fill="white" stroke="none"/>
+            <path d="M12 3v1"/>
+            <path d="M8 11h8"/>
+            <path d="M5 21v-2"/>
+            <path d="M19 21v-2"/>
+          </svg>
         )}
         {!open && unread > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">{unread}</span>}
       </button>
