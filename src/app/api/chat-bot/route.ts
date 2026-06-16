@@ -114,7 +114,7 @@ INSTRUCCIONES DE COMPORTAMIENTO:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        'Authorization': 'Bearer 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'
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
