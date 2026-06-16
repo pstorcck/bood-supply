@@ -55,12 +55,12 @@ export default function ChatBot() {
   return (
     <>
       <button onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110"
-        style={{ background: 'linear-gradient(135deg, #0A1F3D 0%, #1a3a6b 100%)' }}>
+        className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:brightness-110"
+        style={{ background: 'linear-gradient(135deg, #F47B20 0%, #e55a00 100%)', boxShadow: '0 8px 32px rgba(244,123,32,0.45)' }}>
         {open ? (
-          <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          <svg width="22" height="22" fill="white" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         ) : (
-          <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 4-3 6-3 6H8s-3-2-3-6a7 7 0 0 1 7-7z"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/><circle cx="9" cy="9" r="1" fill="white" stroke="none"/><circle cx="12" cy="8" r="1" fill="white" stroke="none"/><circle cx="15" cy="9" r="1" fill="white" stroke="none"/></svg>
         )}
         {!open && unread > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">{unread}</span>}
       </button>
