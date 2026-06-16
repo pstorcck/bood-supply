@@ -110,11 +110,14 @@ INSTRUCCIONES DE COMPORTAMIENTO:
 - Respuestas concisas pero completas
 - Tu objetivo principal es facilitar y cerrar ventas`
 
+    const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_AI_KEY
+    console.log('API Key exists:', !!apiKey, 'Length:', apiKey?.length)
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
