@@ -114,7 +114,7 @@ INSTRUCCIONES DE COMPORTAMIENTO:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer \${process.env.OPEN_AI_KEY}`
+        'Authorization': `Bearer ${process.env.OPEN_AI_KEY}`
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
