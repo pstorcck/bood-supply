@@ -114,7 +114,7 @@ INSTRUCCIONES DE COMPORTAMIENTO:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer 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'
+        'Authorization': 'Bearer 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'
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
