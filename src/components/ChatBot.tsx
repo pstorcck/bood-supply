@@ -55,21 +55,21 @@ export default function ChatBot() {
   return (
     <>
       <button onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:brightness-110"
-        style={{ background: 'linear-gradient(135deg, #F47B20 0%, #e55a00 100%)', boxShadow: '0 8px 40px rgba(244,123,32,0.5)' }}>
+        className="fixed bottom-28 right-6 z-50 w-20 h-20 rounded-full flex flex-col items-center justify-center transition-all duration-300 hover:scale-110 group"
+        style={{ background: 'linear-gradient(135deg, #F47B20 0%, #c94f00 100%)', boxShadow: '0 0 0 0 rgba(244,123,32,0.4), 0 8px 40px rgba(244,123,32,0.5)', animation: open ? 'none' : 'pulse-ring 2s infinite' }}>
+        <style>{`@keyframes pulse-ring { 0%,100%{box-shadow:0 0 0 0 rgba(244,123,32,0.4),0 8px 40px rgba(244,123,32,0.5)} 50%{box-shadow:0 0 0 12px rgba(244,123,32,0),0 8px 40px rgba(244,123,32,0.5)} }`}</style>
         {open ? (
           <svg width="26" height="26" fill="white" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         ) : (
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="10" rx="2"/>
-            <path d="M9 11V7a3 3 0 0 1 6 0v4"/>
-            <circle cx="9" cy="16" r="1.2" fill="white" stroke="none"/>
-            <circle cx="15" cy="16" r="1.2" fill="white" stroke="none"/>
-            <path d="M12 3v1"/>
-            <path d="M8 11h8"/>
-            <path d="M5 21v-2"/>
-            <path d="M19 21v-2"/>
-          </svg>
+          <>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              <circle cx="9" cy="10" r="1" fill="white" stroke="none"/>
+              <circle cx="12" cy="10" r="1" fill="white" stroke="none"/>
+              <circle cx="15" cy="10" r="1" fill="white" stroke="none"/>
+            </svg>
+            <span style={{fontSize:'9px',color:'white',fontWeight:700,letterSpacing:'0.5px',marginTop:'2px',opacity:0.9}}>BOOD AI</span>
+          </>
         )}
         {!open && unread > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">{unread}</span>}
       </button>
