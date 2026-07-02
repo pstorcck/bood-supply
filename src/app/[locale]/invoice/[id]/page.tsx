@@ -7,12 +7,23 @@ export default function InvoicePage() {
   const params = useParams()
   const [invoice, setInvoice] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [pendientes, setPendientes] = useState<any[]>([])
   const supabase = createClient()
 
   useEffect(() => {
     async function cargar() {
       const { data } = await supabase.from('invoices').select('*').eq('id', params.id).single()
       setInvoice(data)
+      if (data?.cliente_id) {
+        const { data: invs } = await supabase
+          .from('invoices')
+          .select('id, created_at, total, estado, numero')
+          .eq('cliente_id', data.cliente_id)
+          .in('estado', ['pendiente', 'enviado', 'vencido'])
+          .neq('id', params.id)
+          .order('created_at', { ascending: true })
+        setPendientes(invs || [])
+      }
       setLoading(false)
     }
     cargar()
@@ -145,6 +156,45 @@ export default function InvoicePage() {
           Thank you for your business
         </div>
       </div>
+      {pendientes.length > 0 && (
+        <div style={{marginTop:'24px',padding:'12px 16px',borderTop:'2px solid #E2E8F0',fontFamily:'Arial'}}>
+          <div style={{fontSize:'11px',fontWeight:'bold',color:'#0F2B5B',marginBottom:'8px',letterSpacing:'0.5px'}}>
+            OUTSTANDING INVOICES — CUENTAS PENDIENTES
+          </div>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'10px'}}>
+            <thead>
+              <tr style={{background:'#0F2B5B',color:'white'}}>
+                <th style={{padding:'5px 8px',textAlign:'left'}}>Date</th>
+                <th style={{padding:'5px 8px',textAlign:'left'}}>Invoice #</th>
+                <th style={{padding:'5px 8px',textAlign:'right'}}>Amount Due</th>
+                <th style={{padding:'5px 8px',textAlign:'center'}}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendientes.map((inv, i) => (
+                <tr key={inv.id} style={{background: i%2===0?'#F8FAFC':'white'}}>
+                  <td style={{padding:'4px 8px',color:'#4A5568'}}>{new Date(inv.created_at).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})}</td>
+                  <td style={{padding:'4px 8px',color:'#0F2B5B',fontWeight:'bold'}}>{inv.numero || inv.id.slice(0,8).toUpperCase()}</td>
+                  <td style={{padding:'4px 8px',textAlign:'right',color:'#E53E3E',fontWeight:'bold'}}>${Number(inv.total).toFixed(2)}</td>
+                  <td style={{padding:'4px 8px',textAlign:'center'}}>
+                    <span style={{background: inv.estado==='vencido'?'#FED7D7':'#FEEBC8',color:inv.estado==='vencido'?'#C53030':'#C05621',padding:'2px 8px',borderRadius:'4px',fontSize:'9px',fontWeight:'bold',textTransform:'uppercase'}}>{inv.estado}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{borderTop:'2px solid #0F2B5B',background:'#EBF4FF'}}>
+                <td colSpan={2} style={{padding:'6px 8px',fontWeight:'bold',color:'#0F2B5B',fontSize:'11px'}}>Total Balance Due</td>
+                <td style={{padding:'6px 8px',textAlign:'right',fontWeight:'bold',color:'#E53E3E',fontSize:'12px'}}>${pendientes.reduce((s,inv)=>s+Number(inv.total),0).toFixed(2)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+          <div style={{marginTop:'8px',fontSize:'9px',color:'#718096',fontStyle:'italic'}}>
+            Please remit payment promptly. For questions call (312) 409-0106 or email boodsupplies@gmail.com
+          </div>
+        </div>
+      )}
     </>
   )
 }
