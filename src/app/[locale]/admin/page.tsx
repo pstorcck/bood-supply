@@ -910,7 +910,7 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {productos.filter(p => p.activo).map(p => {
+                      {productos.filter(p => p.activo && (!busquedaProductosAdmin || p.nombre.toLowerCase().includes(busquedaProductosAdmin.toLowerCase()))).map(p => {
                         const costo = p.costo || 0; const precio = p.precio || 0; const ganancia = precio - costo
                         const margenSCosto = costo > 0 ? (ganancia / costo * 100) : 0
                         const margenSPrecio = precio > 0 ? (ganancia / precio * 100) : 0
