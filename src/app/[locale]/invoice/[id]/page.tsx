@@ -19,7 +19,7 @@ export default function InvoicePage() {
           .from('invoices')
           .select('id, created_at, total, estado, numero')
           .eq('cliente_id', data.cliente_id)
-          .in('estado', ['pendiente', 'enviado', 'vencido'])
+          .eq('pagado', false)
           .neq('id', params.id)
           .order('created_at', { ascending: true })
         setPendientes(invs || [])

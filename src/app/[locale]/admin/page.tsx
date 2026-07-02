@@ -1604,7 +1604,7 @@ export default function AdminPage() {
             )}
             <div className="space-y-6">
               {categorias.map(cat=>{
-                const prods=productos.filter(p=>p.categoria===cat)
+                const prods=productos.filter(p=>p.categoria===cat&&(!busquedaProductosAdmin||p.nombre.toLowerCase().includes(busquedaProductosAdmin.toLowerCase())))
                 if(prods.length===0) return null
                 return(
                   <div key={cat} className="card">
