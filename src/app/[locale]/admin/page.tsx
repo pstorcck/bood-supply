@@ -54,7 +54,7 @@ export default function AdminPage() {
   const [invoices, setInvoices] = useState<any[]>([])
   const [gastos, setGastos] = useState<any[]>([])
   const [generandoInvoice, setGenerandoInvoice] = useState<string | null>(null)
-  const [filtroInvEstado, setFiltroInvEstado] = useState<'todos'|'pagados'|'pendientes'|'vencidos'|'void'>('todos')
+  const [filtroInvEstado, setFiltroInvEstado] = useState<'todos'|'pagados'|'pendientes'|'vencidos'|'void'|'con_tax'>('todos')
   const [showNuevoPedido, setShowNuevoPedido] = useState(false)
   const [npCliente, setNpCliente] = useState('')
   const [npItems, setNpItems] = useState<{producto_id:string,nombre:string,precio:number,costo:number,cantidad:number,stock:number}[]>([])
@@ -351,6 +351,7 @@ export default function AdminPage() {
     if (filtroInvEstado === 'pendientes' && (inv.pagado || inv.anulado || vencido)) return false
     if (filtroInvEstado === 'vencidos' && !vencido) return false
     if (filtroInvEstado === 'void' && !inv.anulado) return false
+    if (filtroInvEstado === 'con_tax' && !(inv.tax > 0)) return false
     if (filtroInvDesde && new Date(inv.created_at) < new Date(filtroInvDesde + 'T00:00:00')) return false
     if (filtroInvHasta && new Date(inv.created_at) > new Date(filtroInvHasta + 'T23:59:59')) return false
     return true
@@ -1442,6 +1443,7 @@ export default function AdminPage() {
                   <option value="pendientes">⏳ Pendientes</option>
                   <option value="vencidos">⚠ Vencidos</option>
                   <option value="void">✕ VOID</option>
+                  <option value="con_tax">💰 Con Tax</option>
                 </select>
               </div>
               <div>
@@ -1455,11 +1457,11 @@ export default function AdminPage() {
               <button onClick={()=>{setFiltroInvEstado('todos');setFiltroInvDesde('');setFiltroInvHasta('')}} className="text-xs text-brand-gray-mid hover:text-brand-orange underline">Limpiar</button>
               <button onClick={()=>{
                 const filtered = invoicesFiltrados
-                const csv = ['Numero,Cliente,Negocio,Total,Metodo Pago,Estado,Fecha,Fecha Pago']
+                const csv = ['Numero,Cliente,Negocio,Subtotal,Tax,Total,Metodo Pago,Estado,Fecha,Fecha Pago']
                 filtered.forEach(inv=>{
                   const cl = clientes.find(c=>c.id===inv.cliente_id)
                   const estado = inv.anulado?'VOID':inv.pagado?'Pagado':'Pendiente'
-                  csv.push(`${inv.numero},"${cl?.nombre||''}","${cl?.negocio||''}",${inv.total},${inv.metodo_pago||''},${estado},${new Date(inv.created_at).toLocaleDateString('es-MX')},${inv.fecha_pago?new Date(inv.fecha_pago).toLocaleDateString('es-MX'):''}`)
+                  csv.push(`${inv.numero},"${cl?.nombre||''}","${cl?.negocio||''}",${inv.subtotal||''},${inv.tax||0},${inv.total},${inv.metodo_pago||''},${estado},${new Date(inv.created_at).toLocaleDateString('es-MX')},${inv.fecha_pago?new Date(inv.fecha_pago).toLocaleDateString('es-MX'):''}`)
                 })
                 const blob = new Blob([csv.join('\n')],{type:'text/csv'})
                 const url = URL.createObjectURL(blob)
@@ -1467,6 +1469,10 @@ export default function AdminPage() {
               }} className="flex items-center gap-1 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80">
                 ↓ Exportar CSV
               </button>
+              <div className="text-right">
+                <p className="text-xs text-brand-gray-mid">Tax cobrado (filtrado)</p>
+                <p className="font-heading font-bold text-brand-navy text-lg">${invoicesFiltrados.reduce((s,i)=>s+(i.tax||0),0).toFixed(2)}</p>
+              </div>
               <div className="ml-auto text-right">
                 <p className="text-xs text-brand-gray-mid">Total filtrado</p>
                 <p className="font-heading font-bold text-brand-orange text-lg">${invoicesFiltrados.reduce((s,i)=>s+(i.total||0),0).toFixed(2)}</p>
@@ -1505,6 +1511,7 @@ export default function AdminPage() {
                           <div className="text-right">
                             <p className="font-heading font-bold text-brand-orange">${inv.total?.toFixed(2)}</p>
                             <p className="text-xs text-brand-gray-mid">{inv.metodo_pago}</p>
+                            {inv.tax > 0 && <p className="text-xs text-brand-navy">Tax: ${inv.tax.toFixed(2)}</p>}
                           </div>
                           <div className="flex flex-col gap-1.5">
                             <a href={`/es/invoice/${inv.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80"><Eye size={15}/> Ver</a>
