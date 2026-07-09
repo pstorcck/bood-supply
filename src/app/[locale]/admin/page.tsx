@@ -1594,7 +1594,7 @@ export default function AdminPage() {
             <div className="mb-4">
               <input type="text" placeholder="🔍 Buscar producto..." value={busquedaProductosAdmin} onChange={e=>setBusquedaProductosAdmin(e.target.value)} className="w-full max-w-sm border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/>
             </div>
-            <div className="flex items-center justify-between mb-6"><p className="text-brand-gray-mid text-sm">{productos.length} productos · {productos.filter(p=>p.activo).length} activos</p><button onClick={()=>setShowFormProducto(!showFormProducto)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Agregar Producto</button></div>
+            <div className="flex items-center justify-between mb-6"><p className="text-brand-gray-mid text-sm">{productos.length} productos · {productos.filter(p=>p.activo).length} activos</p><div className="flex items-center gap-2"><a href="/es/lista-precios" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-navy/80"><Receipt size={16}/> Generar Lista de Precios</a><button onClick={()=>setShowFormProducto(!showFormProducto)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Agregar Producto</button></div></div>
             {showFormProducto&&(
               <div className="card mb-6 border-2 border-brand-orange/30">
                 <h2 className="font-heading font-bold text-brand-navy text-lg mb-5">Nuevo Producto</h2>

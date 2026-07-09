@@ -255,6 +255,9 @@ export default function VendedorPage() {
               <Icon size={15}/><span className="text-[13px] font-medium">{label}</span>
             </button>
           ))}
+          <a href="/es/lista-precios" target="_blank" rel="noopener noreferrer" className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5 transition-all text-left text-white/60 hover:bg-white/6 hover:text-white">
+            <Package size={15}/><span className="text-[13px] font-medium">Lista de Precios</span>
+          </a>
         </nav>
         <div className="px-4 py-3 border-t border-white/10 flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-brand-orange flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
