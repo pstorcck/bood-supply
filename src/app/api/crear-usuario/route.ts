@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
     const resend = new Resend(process.env.RESEND_API_KEY)
-    const { email, nombre, negocio, telefono, direccion, ein, fecha_nacimiento } = await req.json()
+    const { email, nombre, negocio, telefono, direccion, ciudad, estado, tipo_precio, vendedor_id, ein, fecha_nacimiento } = await req.json()
 
     if (!email || !nombre) {
       return NextResponse.json({ error: 'Email y nombre son requeridos' }, { status: 400 })
@@ -36,6 +36,10 @@ export async function POST(req: NextRequest) {
       negocio: negocio || '',
       telefono: telefono || '',
       direccion: direccion || '',
+      ciudad: ciudad || '',
+      estado: (estado || 'IL').toUpperCase(),
+      tipo_precio: tipo_precio === 'B' ? 'B' : 'A',
+      vendedor_id: vendedor_id || null,
       ein: ein || '',
       fecha_nacimiento: fecha_nacimiento || null,
       aprobado: true,

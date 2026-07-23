@@ -81,7 +81,7 @@ export default function AdminPage() {
   const [nuevaCategoria, setNuevaCategoria] = useState('')
   const [editandoCategoria, setEditandoCategoria] = useState<string | null>(null)
   const [categoriaEditNombre, setCategoriaEditNombre] = useState('')
-  const [formProducto, setFormProducto] = useState({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' })
+  const [formProducto, setFormProducto] = useState({ nombre: '', descripcion: '', categoria: '', precio: '', precio_b: '', unidad: '' })
   const [imagenProducto, setImagenProducto] = useState<File | null>(null)
   const [editandoProducto, setEditandoProducto] = useState<string | null>(null)
   const [formEditProducto, setFormEditProducto] = useState<any>({})
@@ -94,7 +94,7 @@ export default function AdminPage() {
   const [enviandoMensaje, setEnviandoMensaje] = useState(false)
   const [mensajeEnviado, setMensajeEnviado] = useState(false)
   const [showFormUsuario, setShowFormUsuario] = useState(false)
-  const [formUsuario, setFormUsuario] = useState({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '', fecha_nacimiento: '' })
+  const [formUsuario, setFormUsuario] = useState({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ciudad: '', estado: 'IL', tipo_precio: 'A', vendedor_id: '', ein: '', fecha_nacimiento: '' })
   const [archivoTaxUsuario, setArchivoTaxUsuario] = useState<File | null>(null)
   const [archivoIdUsuario, setArchivoIdUsuario] = useState<File | null>(null)
   const [archivoCRTUsuario, setArchivoCRTUsuario] = useState<File | null>(null)
@@ -136,8 +136,10 @@ export default function AdminPage() {
       if (user.email !== ADMIN_EMAIL && perfilData?.role !== 'vendedor') { window.location.href = '/es/login'; return }
       if (perfilData?.role === 'vendedor') setTab('pedidos')
       setUser(user)
-      await Promise.all([cargarProductos(), cargarPedidos(), cargarClientes(), cargarInvoices()])
-      await cargarGastos()
+      const esVendedorLogin = perfilData?.role === 'vendedor'
+      const clienteIds = await cargarClientes(esVendedorLogin ? user.id : undefined)
+      await Promise.all([cargarProductos(), cargarPedidos(clienteIds), cargarInvoices(clienteIds)])
+      if (!esVendedorLogin) await cargarGastos()
       setLoading(false)
     }
     init()
@@ -166,8 +168,11 @@ export default function AdminPage() {
     setGastos(data || [])
   }
 
-  async function cargarInvoices() {
-    const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false })
+  async function cargarInvoices(clienteIds?: string[]) {
+    const ids = clienteIds ?? (perfil?.role === 'vendedor' ? clientes.map((c: any) => c.id) : undefined)
+    let query = supabase.from('invoices').select('*').order('created_at', { ascending: false })
+    if (ids) { if (ids.length === 0) { setInvoices([]); return }; query = query.in('cliente_id', ids) }
+    const { data } = await query
     setInvoices(data || [])
   }
 
@@ -182,6 +187,11 @@ export default function AdminPage() {
     const { data: items } = await supabase.from('pedido_items').select('precio_unitario, cantidad').eq('id', itemId)
     await cargarPedidos()
     return true
+  }
+
+  function precioParaCliente(p: any, clienteId?: string) {
+    const cliente = clientes.find(c => c.id === (clienteId ?? npCliente))
+    return cliente?.tipo_precio === 'B' ? (p.precio_b ?? p.precio) : p.precio
   }
 
   async function crearPedidoAdmin() {
@@ -292,14 +302,21 @@ export default function AdminPage() {
     setCategorias(cats)
   }
 
-  async function cargarPedidos() {
-    const { data } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').order('created_at', { ascending: false })
+  async function cargarPedidos(clienteIds?: string[]) {
+    const ids = clienteIds ?? (perfil?.role === 'vendedor' ? clientes.map((c: any) => c.id) : undefined)
+    let query = supabase.from('pedidos').select('*, pedido_items(*, productos(*))').order('created_at', { ascending: false })
+    if (ids) { if (ids.length === 0) { setPedidos([]); return }; query = query.in('cliente_id', ids) }
+    const { data } = await query
     setPedidos(data || [])
   }
 
-  async function cargarClientes() {
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+  async function cargarClientes(vendedorId?: string) {
+    const vid = vendedorId ?? (perfil?.role === 'vendedor' ? user?.id : undefined)
+    let query = supabase.from('profiles').select('*').order('created_at', { ascending: false })
+    if (vid) query = query.eq('vendedor_id', vid)
+    const { data } = await query
     setClientes(data || [])
+    return (data || []).map((c: any) => c.id)
   }
 
   function getCliente(cliente_id: string) { return clientes.find(c => c.id === cliente_id) }
@@ -427,7 +444,7 @@ export default function AdminPage() {
       if (archivoCRTUsuario) { const ext = archivoCRTUsuario.name.split('.').pop(); const { error: ue } = await supabase.storage.from('documentos').upload(`crt61/${userId}.${ext}`, archivoCRTUsuario, { upsert: true }); if (!ue) { const { data: ud } = supabase.storage.from('documentos').getPublicUrl(`crt61/${userId}.${ext}`); crt61_url = ud.publicUrl } }
       await supabase.from('profiles').update({ fecha_nacimiento: formUsuario.fecha_nacimiento || null, sales_tax_url, id_foto_url, crt61_url }).eq('id', userId)
       setUsuarioCreado(true)
-      setFormUsuario({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ein: '', fecha_nacimiento: '' })
+      setFormUsuario({ email: '', nombre: '', negocio: '', telefono: '', direccion: '', ciudad: '', estado: 'IL', tipo_precio: 'A', vendedor_id: '', ein: '', fecha_nacimiento: '' })
       setArchivoTaxUsuario(null); setArchivoIdUsuario(null); setArchivoCRTUsuario(null)
       setShowFormUsuario(false)
       setTimeout(() => setUsuarioCreado(false), 4000)
@@ -525,7 +542,7 @@ export default function AdminPage() {
 
   function iniciarEdicionCliente(c: any) {
     setEditandoCliente(c.id)
-    setFormCliente({ nombre: c.nombre || '', negocio: c.negocio || '', telefono: c.telefono || '', direccion: c.direccion || '', ein: c.ein || '' })
+    setFormCliente({ nombre: c.nombre || '', negocio: c.negocio || '', telefono: c.telefono || '', direccion: c.direccion || '', ciudad: c.ciudad || '', estado: c.estado || 'IL', tipo_precio: c.tipo_precio || 'A', vendedor_id: c.vendedor_id || '', ein: c.ein || '' })
   }
 
   async function guardarCliente(id: string) {
@@ -574,19 +591,19 @@ export default function AdminPage() {
     }
     const nombre_en = await traducirTexto(formProducto.nombre)
     const descripcion_en = formProducto.descripcion ? await traducirTexto(formProducto.descripcion) : ''
-    await supabase.from('productos').insert({ ...formProducto, precio: parseFloat(formProducto.precio), activo: true, imagen_url, nombre_en, descripcion_en })
-    setFormProducto({ nombre: '', descripcion: '', categoria: '', precio: '', unidad: '' }); setImagenProducto(null); setShowFormProducto(false)
+    await supabase.from('productos').insert({ ...formProducto, precio: parseFloat(formProducto.precio), precio_b: formProducto.precio_b ? parseFloat(formProducto.precio_b) : parseFloat(formProducto.precio), activo: true, imagen_url, nombre_en, descripcion_en })
+    setFormProducto({ nombre: '', descripcion: '', categoria: '', precio: '', precio_b: '', unidad: '' }); setImagenProducto(null); setShowFormProducto(false)
     await cargarProductos(); setGuardando(false)
   }
 
   function iniciarEdicionProducto(p: any) {
     setEditandoProducto(p.id)
-    setFormEditProducto({ nombre: p.nombre || '', descripcion: p.descripcion || '', categoria: p.categoria || '', precio: String(p.precio || ''), unidad: p.unidad || '', nombre_en: p.nombre_en || '', descripcion_en: p.descripcion_en || '' })
+    setFormEditProducto({ nombre: p.nombre || '', descripcion: p.descripcion || '', categoria: p.categoria || '', precio: String(p.precio || ''), precio_b: String(p.precio_b ?? p.precio ?? ''), unidad: p.unidad || '', nombre_en: p.nombre_en || '', descripcion_en: p.descripcion_en || '' })
   }
 
   async function guardarProducto(id: string) {
     setGuardando(true)
-    await supabase.from('productos').update({ nombre: formEditProducto.nombre, descripcion: formEditProducto.descripcion, categoria: formEditProducto.categoria, precio: parseFloat(formEditProducto.precio), unidad: formEditProducto.unidad, nombre_en: formEditProducto.nombre_en, descripcion_en: formEditProducto.descripcion_en }).eq('id', id)
+    await supabase.from('productos').update({ nombre: formEditProducto.nombre, descripcion: formEditProducto.descripcion, categoria: formEditProducto.categoria, precio: parseFloat(formEditProducto.precio), precio_b: parseFloat(formEditProducto.precio_b || formEditProducto.precio), unidad: formEditProducto.unidad, nombre_en: formEditProducto.nombre_en, descripcion_en: formEditProducto.descripcion_en }).eq('id', id)
     setEditandoProducto(null); await cargarProductos(); setGuardando(false)
   }
 
@@ -1169,6 +1186,10 @@ export default function AdminPage() {
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">EIN</label><input value={formUsuario.ein} onChange={e=>setFormUsuario({...formUsuario,ein:e.target.value})} placeholder="XX-XXXXXXX" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Fecha de Nacimiento</label><input value={formUsuario.fecha_nacimiento} onChange={e=>setFormUsuario({...formUsuario,fecha_nacimiento:e.target.value})} type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formUsuario.direccion} onChange={e=>setFormUsuario({...formUsuario,direccion:e.target.value})} placeholder="Direccion del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Ciudad</label><input value={formUsuario.ciudad} onChange={e=>setFormUsuario({...formUsuario,ciudad:e.target.value})} placeholder="Ciudad" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Estado *</label><input value={formUsuario.estado} onChange={e=>setFormUsuario({...formUsuario,estado:e.target.value.toUpperCase()})} placeholder="IL" maxLength={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange uppercase"/><p className="text-[10px] text-brand-gray-mid mt-0.5">Clientes fuera de IL no pagan tax de quimicos</p></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Lista de Precios</label><select value={formUsuario.tipo_precio} onChange={e=>setFormUsuario({...formUsuario,tipo_precio:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white"><option value="A">Precio A</option><option value="B">Precio B</option></select></div>
+                  <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Vendedor Asignado</label><select value={formUsuario.vendedor_id} onChange={e=>setFormUsuario({...formUsuario,vendedor_id:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white"><option value="">Sin asignar</option>{clientes.filter(c=>c.role==='vendedor').map(v=><option key={v.id} value={v.id}>{v.nombre||v.email}</option>)}</select></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Sales Tax Permit</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoTaxUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoTaxUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoTaxUsuario.name}</p>}</div></div>
                   <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Foto de ID</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e=>setArchivoIdUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoIdUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoIdUsuario.name}</p>}</div></div>
                   <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">CRT-61 Firmado</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-3 py-2 hover:border-brand-orange transition-colors"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setArchivoCRTUsuario(e.target.files?.[0]||null)} className="w-full text-xs text-brand-gray-mid file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-orange file:text-white cursor-pointer"/>{archivoCRTUsuario&&<p className="text-xs text-green-600 mt-1">✓ {archivoCRTUsuario.name}</p>}</div></div>
@@ -1220,6 +1241,10 @@ export default function AdminPage() {
                         <div key={key}><label className="block text-xs font-medium text-brand-gray-dark mb-1">{label}</label><input value={formCliente[key]||''} onChange={e=>setFormCliente({...formCliente,[key]:e.target.value})} placeholder={ph} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                       ))}
                       <div className="col-span-2"><label className="block text-xs font-medium text-brand-gray-dark mb-1">Direccion</label><input value={formCliente.direccion||''} onChange={e=>setFormCliente({...formCliente,direccion:e.target.value})} placeholder="Direccion del negocio" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                      <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Ciudad</label><input value={formCliente.ciudad||''} onChange={e=>setFormCliente({...formCliente,ciudad:e.target.value})} placeholder="Ciudad" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                      <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Estado *</label><input value={formCliente.estado||''} onChange={e=>setFormCliente({...formCliente,estado:e.target.value.toUpperCase()})} placeholder="IL" maxLength={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange uppercase"/></div>
+                      <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Lista de Precios</label><select value={formCliente.tipo_precio||'A'} onChange={e=>setFormCliente({...formCliente,tipo_precio:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white"><option value="A">Precio A</option><option value="B">Precio B</option></select></div>
+                      <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Vendedor Asignado</label><select value={formCliente.vendedor_id||''} onChange={e=>setFormCliente({...formCliente,vendedor_id:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white"><option value="">Sin asignar</option>{clientes.filter(v=>v.role==='vendedor').map(v=><option key={v.id} value={v.id}>{v.nombre||v.email}</option>)}</select></div>
                       <div className="col-span-2 border-t pt-3 mt-1">
                         <p className="text-xs font-semibold text-brand-navy mb-2">📎 Documentos</p>
                         <div className="grid grid-cols-3 gap-2">
@@ -1231,7 +1256,7 @@ export default function AdminPage() {
                     </div>
                   ):(
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs mt-3 border-t pt-3">
-                      {[{label:'Negocio',value:c.negocio},{label:'Telefono',value:c.telefono},{label:'EIN',value:c.ein},{label:'Fecha Nacimiento',value:c.fecha_nacimiento?new Date(c.fecha_nacimiento).toLocaleDateString('es-MX',{timeZone:'UTC'}):null},{label:'Direccion',value:c.direccion,full:true},{label:'Ultimo pedido',value:ultimoPedido?new Date(ultimoPedido.created_at).toLocaleDateString('es-MX'):null},{label:'Registro',value:new Date(c.created_at).toLocaleDateString('es-MX')}].map(({label,value,full}:any)=>(
+                      {[{label:'Negocio',value:c.negocio},{label:'Telefono',value:c.telefono},{label:'EIN',value:c.ein},{label:'Fecha Nacimiento',value:c.fecha_nacimiento?new Date(c.fecha_nacimiento).toLocaleDateString('es-MX',{timeZone:'UTC'}):null},{label:'Direccion',value:[c.direccion,c.ciudad,c.estado].filter(Boolean).join(', '),full:true},{label:'Lista de Precios',value:`Precio ${c.tipo_precio||'A'}`},{label:'Vendedor',value:clientes.find(v=>v.id===c.vendedor_id)?.nombre},{label:'Ultimo pedido',value:ultimoPedido?new Date(ultimoPedido.created_at).toLocaleDateString('es-MX'):null},{label:'Registro',value:new Date(c.created_at).toLocaleDateString('es-MX')}].map(({label,value,full}:any)=>(
                         <div key={label} className={`bg-gray-50 rounded-lg p-2 border border-gray-100 ${full?'col-span-2':''}`}><p className="text-brand-gray-mid">{label}</p><p className="font-medium text-brand-navy">{value||'—'}</p></div>
                       ))}
                     </div>
@@ -1601,7 +1626,8 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Nombre *</label><input value={formProducto.nombre} onChange={e=>setFormProducto({...formProducto,nombre:e.target.value})} placeholder="Ej: Vaso 8oz" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Categoria *</label><select value={formProducto.categoria} onChange={e=>setFormProducto({...formProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white"><option value="">Selecciona categoria</option>{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
-                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Precio * (USD)</label><input value={formProducto.precio} onChange={e=>setFormProducto({...formProducto,precio:e.target.value})} placeholder="Ej: 9.99" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Precio A * (USD)</label><input value={formProducto.precio} onChange={e=>setFormProducto({...formProducto,precio:e.target.value})} placeholder="Ej: 9.99" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                  <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Precio B (USD)</label><input value={formProducto.precio_b} onChange={e=>setFormProducto({...formProducto,precio_b:e.target.value})} placeholder="Si es igual al Precio A, dejar vacio" type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div><label className="block text-sm font-medium text-brand-gray-dark mb-1">Unidad *</label><input value={formProducto.unidad} onChange={e=>setFormProducto({...formProducto,unidad:e.target.value})} placeholder="Ej: paquete 100u" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Descripcion</label><input value={formProducto.descripcion} onChange={e=>setFormProducto({...formProducto,descripcion:e.target.value})} placeholder="Descripcion breve" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                   <div className="md:col-span-2"><label className="block text-sm font-medium text-brand-gray-dark mb-1">Imagen</label><div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 hover:border-brand-orange transition-colors"><input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={e=>setImagenProducto(e.target.files?.[0]||null)} className="w-full text-sm text-brand-gray-mid file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-orange file:text-white hover:file:bg-orange-600 cursor-pointer"/>{imagenProducto&&<p className="text-xs text-green-600 mt-2">✓ {imagenProducto.name}</p>}</div></div>
@@ -1622,7 +1648,10 @@ export default function AdminPage() {
                           <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${p.activo?'border-gray-100 bg-gray-50':'border-red-100 bg-red-50 opacity-60'}`}>
                             <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">{p.imagen_url?<img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-contain"/>:<ImageIcon size={20} className="text-gray-400"/>}</div>
                             <div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium text-brand-navy text-sm">{p.nombre}</span>{p.nombre_en&&<span className="text-xs text-gray-400">/ {p.nombre_en}</span>}{!p.activo&&<span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactivo</span>}</div><div className="text-xs text-brand-gray-mid mt-0.5">{p.descripcion} · {p.unidad}</div></div>
-                            <div className="font-heading font-bold text-brand-navy">${p.precio}</div>
+                            <div className="text-right">
+                              <div className="font-heading font-bold text-brand-navy">${p.precio}</div>
+                              {p.precio_b != null && Number(p.precio_b) !== Number(p.precio) && <div className="text-xs text-brand-gray-mid">B: ${p.precio_b}</div>}
+                            </div>
                             <div className="flex items-center gap-1">
                               <button onClick={()=>iniciarEdicionProducto(p)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-yellow-50 transition-colors text-yellow-500"><Pencil size={15}/></button>
                               <button onClick={()=>seleccionarImagen(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors text-blue-400"><ImageIcon size={15}/></button>
@@ -1637,7 +1666,8 @@ export default function AdminPage() {
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Name (EN)</label><input value={formEditProducto.nombre_en} onChange={e=>setFormEditProducto({...formEditProducto,nombre_en:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Descripcion (ES)</label><input value={formEditProducto.descripcion} onChange={e=>setFormEditProducto({...formEditProducto,descripcion:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Description (EN)</label><input value={formEditProducto.descripcion_en} onChange={e=>setFormEditProducto({...formEditProducto,descripcion_en:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
-                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Precio (USD)</label><input value={formEditProducto.precio} onChange={e=>setFormEditProducto({...formEditProducto,precio:e.target.value})} type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Precio A (USD)</label><input value={formEditProducto.precio} onChange={e=>setFormEditProducto({...formEditProducto,precio:e.target.value})} type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
+                                <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Precio B (USD)</label><input value={formEditProducto.precio_b} onChange={e=>setFormEditProducto({...formEditProducto,precio_b:e.target.value})} type="number" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Unidad</label><input value={formEditProducto.unidad} onChange={e=>setFormEditProducto({...formEditProducto,unidad:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange"/></div>
                                 <div><label className="block text-xs font-medium text-brand-gray-dark mb-1">Categoria</label><select value={formEditProducto.categoria} onChange={e=>setFormEditProducto({...formEditProducto,categoria:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-orange bg-white">{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
                               </div>
@@ -1734,11 +1764,11 @@ export default function AdminPage() {
                       <div className="border border-gray-200 rounded-lg bg-white shadow-sm max-h-40 overflow-y-auto">
                         {productos.filter(p=>p.activo!==false && p.nombre.toLowerCase().includes(npBusqueda.toLowerCase())).slice(0,10).map(p=>(
                           <div key={p.id} onClick={()=>{
-                            if(!npItems.find(i=>i.producto_id===p.id)) setNpItems(prev=>[...prev,{producto_id:p.id,nombre:p.nombre,precio:p.precio,costo:p.costo||0,cantidad:1,stock:p.stock??0}])
+                            if(!npItems.find(i=>i.producto_id===p.id)) setNpItems(prev=>[...prev,{producto_id:p.id,nombre:p.nombre,precio:precioParaCliente(p),costo:p.costo||0,cantidad:1,stock:p.stock??0}])
                             setNpBusqueda('')
                           }} className="px-3 py-1.5 text-xs hover:bg-brand-orange/10 cursor-pointer flex justify-between items-center">
                             <span>{p.nombre}</span>
-                            <span className="text-brand-orange font-semibold ml-2">${p.precio}</span>
+                            <span className="text-brand-orange font-semibold ml-2">${precioParaCliente(p)}</span>
                           </div>
                         ))}
                         {productos.filter(p=>p.activo!==false && p.nombre.toLowerCase().includes(npBusqueda.toLowerCase())).length === 0 && (
@@ -1812,9 +1842,9 @@ export default function AdminPage() {
                         const nombre = item.productos?.nombre || item.descripcion
                         const prod = productos.find(p=>p.id===item.producto_id)
                         if (prod && !npItems.find(x=>x.producto_id===prod.id)) {
-                          setNpItems(prev=>[...prev,{producto_id:prod.id,nombre:prod.nombre,precio:prod.precio,costo:prod.costo||0,cantidad:1,stock:prod.stock??0}])
+                          setNpItems(prev=>[...prev,{producto_id:prod.id,nombre:prod.nombre,precio:precioParaCliente(prod),costo:prod.costo||0,cantidad:1,stock:prod.stock??0}])
                         } else if (!item.producto_id && nombre && !npExtras.find(x=>x.nombre===nombre)) {
-                          setNpExtras(prev=>[...prev,{nombre, precio:item.precio_unitario||0, cantidad:1}])
+                          setNpExtras(prev=>[...prev,{nombre, precio:item.precio_unitario||0, costo:0, cantidad:1}])
                         }
                       }} className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg transition-colors">
                         {item.productos?.nombre || item.descripcion || '—'}
