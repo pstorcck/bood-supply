@@ -17,6 +17,9 @@ export async function POST(req: NextRequest) {
       .eq('id', pedido_id)
       .single()
     if (pedidoError) return NextResponse.json({ error: pedidoError.message }, { status: 400 })
+    if (!pedido.pedido_items || pedido.pedido_items.length === 0) {
+      return NextResponse.json({ error: 'Este pedido no tiene productos registrados, no se puede generar la invoice' }, { status: 400 })
+    }
 
     const { data: cliente } = await supabase
       .from('profiles')
