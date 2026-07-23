@@ -261,7 +261,13 @@ export default function DashboardPage() {
       metodo_pago: metodoPago, comprobante_url, estado: carrito.some(i => (i.stock ?? -1) === 0) ? 'esperando_stock' : 'pendiente'
     }).select().single()
     if (pedido) {
-      await supabase.from('pedido_items').insert(carrito.map(i => ({ pedido_id: pedido.id, producto_id: i.id, cantidad: i.cantidad, precio_unitario: i.precio })))
+      const { error: itemsError } = await supabase.from('pedido_items').insert(carrito.map(i => ({ pedido_id: pedido.id, producto_id: i.id, cantidad: i.cantidad, precio_unitario: i.precio })))
+      if (itemsError) {
+        await supabase.from('pedidos').delete().eq('id', pedido.id)
+        alert(lang === 'es' ? 'Hubo un error guardando tu pedido, intenta de nuevo.' : 'There was an error saving your order, please try again.')
+        setEnviando(false)
+        return
+      }
       // Rebajar stock de cada producto
       for (const item of carrito) {
         const stockActual = item.stock ?? 0
