@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     if (items?.length > 0) {
       const { error: itemsError } = await supabase.from('pedido_items').insert(
-        items.map((i: any) => ({ pedido_id: pedido.id, producto_id: i.producto_id, cantidad: i.cantidad, precio_unitario: i.precio }))
+        items.map((i: any) => ({ pedido_id: pedido.id, producto_id: i.producto_id, cantidad: i.cantidad, precio_unitario: i.precio, costo_unitario: i.costo || 0 }))
       )
       if (itemsError) {
         await supabase.from('pedidos').delete().eq('id', pedido.id)
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     if (extras?.length > 0) {
       const { error: extrasError } = await supabase.from('pedido_items').insert(
-        extras.map((i: any) => ({ pedido_id: pedido.id, producto_id: null, cantidad: i.cantidad, precio_unitario: i.precio, descripcion: i.nombre }))
+        extras.map((i: any) => ({ pedido_id: pedido.id, producto_id: null, cantidad: i.cantidad, precio_unitario: i.precio, costo_unitario: i.costo || 0, descripcion: i.nombre }))
       )
       if (extrasError) {
         await supabase.from('pedidos').delete().eq('id', pedido.id)

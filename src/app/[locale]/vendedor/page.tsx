@@ -17,7 +17,7 @@ export default function VendedorPage() {
   const [showNuevoPedido, setShowNuevoPedido] = useState(false)
   const [npCliente, setNpCliente] = useState('')
   const [npItems, setNpItems] = useState<{producto_id:string,nombre:string,precio:number,costo:number,cantidad:number,stock:number}[]>([])
-  const [npExtras, setNpExtras] = useState<{nombre:string,precio:number,cantidad:number}[]>([])
+  const [npExtras, setNpExtras] = useState<{nombre:string,precio:number,costo:number,cantidad:number}[]>([])
   const [npFuel, setNpFuel] = useState(5)
   const [npMetodo, setNpMetodo] = useState('Efectivo')
   const [npCreando, setNpCreando] = useState(false)
@@ -48,15 +48,22 @@ export default function VendedorPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'vendedor' && user.email !== 'boodsupplies@gmail.com') { window.location.href = '/es/login'; return }
       setUser(user)
-      await Promise.all([cargarClientes(), cargarProductos(), cargarPedidos(), cargarInvoices()])
+      const clienteIds = await cargarClientes(user.id)
+      await Promise.all([cargarProductos(), cargarPedidos(clienteIds), cargarInvoices(clienteIds)])
       setLoading(false)
     }
     init()
   }, [])
 
-  async function cargarClientes() {
-    const { data } = await supabase.from('profiles').select('*').eq('aprobado', true).order('nombre')
+  async function cargarClientes(vendedorId: string) {
+    const { data } = await supabase.from('profiles').select('*').eq('aprobado', true).eq('vendedor_id', vendedorId).order('nombre')
     setClientes(data || [])
+    return (data || []).map((c: any) => c.id)
+  }
+
+  function precioParaCliente(p: any, clienteId?: string) {
+    const cliente = clientes.find(c => c.id === (clienteId ?? npCliente))
+    return cliente?.tipo_precio === 'B' ? (p.precio_b ?? p.precio) : p.precio
   }
 
   async function cargarProductos() {
@@ -67,13 +74,17 @@ export default function VendedorPage() {
     setCategorias(cats)
   }
 
-  async function cargarPedidos() {
-    const { data } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').order('created_at', { ascending: false })
+  async function cargarPedidos(clienteIds?: string[]) {
+    const ids = clienteIds ?? clientes.map(c => c.id)
+    if (ids.length === 0) { setPedidos([]); return }
+    const { data } = await supabase.from('pedidos').select('*, pedido_items(*, productos(*))').in('cliente_id', ids).order('created_at', { ascending: false })
     setPedidos(data || [])
   }
 
-  async function cargarInvoices() {
-    const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false })
+  async function cargarInvoices(clienteIds?: string[]) {
+    const ids = clienteIds ?? clientes.map(c => c.id)
+    if (ids.length === 0) { setInvoices([]); return }
+    const { data } = await supabase.from('invoices').select('*').in('cliente_id', ids).order('created_at', { ascending: false })
     setInvoices(data || [])
   }
 
@@ -130,11 +141,11 @@ export default function VendedorPage() {
     try {
       const res = await fetch('/api/crear-usuario', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formCliente)
+        body: JSON.stringify({ ...formCliente, vendedor_id: user?.id })
       })
       const data = await res.json()
       if (data.error) { setErrorCliente(data.error); setCreandoCliente(false); return }
-      await cargarClientes()
+      await cargarClientes(user.id)
       setFormCliente({ nombre: '', email: '', negocio: '', telefono: '', direccion: '', ein: '' })
       setShowFormCliente(false)
     } catch (e: any) { setErrorCliente(e.message) }
@@ -322,7 +333,7 @@ export default function VendedorPage() {
                     {npHistorial.map((item:any,i:number)=>(
                       <button key={i} onClick={()=>{
                         const prod = productos.find(p=>p.id===item.producto_id)
-                        if(prod && !npItems.find(x=>x.producto_id===prod.id)) setNpItems(prev=>[...prev,{producto_id:prod.id,nombre:prod.nombre,precio:prod.precio,costo:prod.costo||0,cantidad:1,stock:prod.stock??0}])
+                        if(prod && !npItems.find(x=>x.producto_id===prod.id)) setNpItems(prev=>[...prev,{producto_id:prod.id,nombre:prod.nombre,precio:precioParaCliente(prod),costo:prod.costo||0,cantidad:1,stock:prod.stock??0}])
                         else if(!item.producto_id && item.descripcion && !npExtras.find(x=>x.nombre===item.descripcion)) setNpExtras(prev=>[...prev,{nombre:item.descripcion,precio:item.precio_unitario||0,cantidad:1}])
                       }} className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg">
                         {item.productos?.nombre||item.descripcion||'—'}
@@ -339,10 +350,10 @@ export default function VendedorPage() {
                   <div className="border border-gray-200 rounded-lg bg-white shadow-sm max-h-48 overflow-y-auto mb-2">
                     {productos.filter(p=>p.activo!==false && p.nombre.toLowerCase().includes(npBusqueda.toLowerCase())).slice(0,10).map(p=>(
                       <div key={p.id} onClick={()=>{
-                        if(!npItems.find(i=>i.producto_id===p.id)) setNpItems(prev=>[...prev,{producto_id:p.id,nombre:p.nombre,precio:p.precio,costo:p.costo||0,cantidad:1,stock:p.stock??0}])
+                        if(!npItems.find(i=>i.producto_id===p.id)) setNpItems(prev=>[...prev,{producto_id:p.id,nombre:p.nombre,precio:precioParaCliente(p),costo:p.costo||0,cantidad:1,stock:p.stock??0}])
                         setNpBusqueda('')
                       }} className="px-3 py-2 text-xs hover:bg-brand-orange/10 cursor-pointer flex justify-between items-center border-b last:border-0">
-                        <span>{p.nombre}</span><span className="text-brand-orange font-semibold ml-2">${p.precio}</span>
+                        <span>{p.nombre}</span><span className="text-brand-orange font-semibold ml-2">${precioParaCliente(p)}</span>
                       </div>
                     ))}
                     {productos.filter(p=>p.activo!==false && p.nombre.toLowerCase().includes(npBusqueda.toLowerCase())).length===0 && <div className="px-3 py-2 text-xs text-brand-gray-mid">Sin resultados</div>}
@@ -372,13 +383,15 @@ export default function VendedorPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold text-brand-navy">Extras</label>
-                  <button onClick={()=>setNpExtras(prev=>[...prev,{nombre:'',precio:0,cantidad:1}])} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg">+ Agregar extra</button>
+                  <button onClick={()=>setNpExtras(prev=>[...prev,{nombre:'',precio:0,costo:0,cantidad:1}])} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg">+ Agregar extra</button>
                 </div>
                 {npExtras.map((ex,i)=>(
                   <div key={i} className="flex items-center gap-2 mb-1">
                     <input placeholder="Descripción" value={ex.nombre} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,nombre:e.target.value}:x))} className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
                     <span className="text-xs">$</span>
-                    <input type="number" placeholder="0.00" value={ex.precio||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,precio:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                    <input type="number" placeholder="Precio" value={ex.precio||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,precio:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                    <span className="text-xs text-brand-gray-mid">costo $</span>
+                    <input type="number" placeholder="Costo" value={ex.costo||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,costo:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
                     <input type="number" min={1} value={ex.cantidad} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,cantidad:parseInt(e.target.value)||1}:x))} className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-xs text-center"/>
                     <button onClick={()=>setNpExtras(prev=>prev.filter((_,j)=>j!==i))} className="text-red-400 text-xs">✕</button>
                   </div>
@@ -562,7 +575,7 @@ export default function VendedorPage() {
                     {npHistorial.map((item:any,i:number)=>(
                       <button key={i} onClick={()=>{
                         const prod = productos.find(p=>p.id===item.producto_id)
-                        if(prod && !npItems.find(x=>x.producto_id===prod.id)) setNpItems(prev=>[...prev,{producto_id:prod.id,nombre:prod.nombre,precio:prod.precio,costo:prod.costo||0,cantidad:1,stock:prod.stock??0}])
+                        if(prod && !npItems.find(x=>x.producto_id===prod.id)) setNpItems(prev=>[...prev,{producto_id:prod.id,nombre:prod.nombre,precio:precioParaCliente(prod),costo:prod.costo||0,cantidad:1,stock:prod.stock??0}])
                         else if(!item.producto_id && item.descripcion && !npExtras.find(x=>x.nombre===item.descripcion)) setNpExtras(prev=>[...prev,{nombre:item.descripcion,precio:item.precio_unitario||0,cantidad:1}])
                       }} className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg">
                         {item.productos?.nombre||item.descripcion||'—'}
@@ -580,10 +593,10 @@ export default function VendedorPage() {
                   <div className="border border-gray-200 rounded-lg bg-white shadow-sm max-h-40 overflow-y-auto mb-2">
                     {productos.filter(p=>p.activo!==false && p.nombre.toLowerCase().includes(npBusqueda.toLowerCase())).slice(0,10).map(p=>(
                       <div key={p.id} onClick={()=>{
-                        if(!npItems.find(i=>i.producto_id===p.id)) setNpItems(prev=>[...prev,{producto_id:p.id,nombre:p.nombre,precio:p.precio,costo:p.costo||0,cantidad:1,stock:p.stock??0}])
+                        if(!npItems.find(i=>i.producto_id===p.id)) setNpItems(prev=>[...prev,{producto_id:p.id,nombre:p.nombre,precio:precioParaCliente(p),costo:p.costo||0,cantidad:1,stock:p.stock??0}])
                         setNpBusqueda('')
                       }} className="px-3 py-1.5 text-xs hover:bg-brand-orange/10 cursor-pointer flex justify-between">
-                        <span>{p.nombre}</span><span className="text-brand-orange font-semibold">${p.precio}</span>
+                        <span>{p.nombre}</span><span className="text-brand-orange font-semibold">${precioParaCliente(p)}</span>
                       </div>
                     ))}
                   </div>
@@ -611,13 +624,15 @@ export default function VendedorPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold text-brand-navy">Extras</label>
-                  <button onClick={()=>setNpExtras(prev=>[...prev,{nombre:'',precio:0,cantidad:1}])} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg">+ Agregar extra</button>
+                  <button onClick={()=>setNpExtras(prev=>[...prev,{nombre:'',precio:0,costo:0,cantidad:1}])} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg">+ Agregar extra</button>
                 </div>
                 {npExtras.map((ex,i)=>(
                   <div key={i} className="flex items-center gap-2 mb-1">
                     <input placeholder="Descripción" value={ex.nombre} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,nombre:e.target.value}:x))} className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
                     <span className="text-xs">$</span>
-                    <input type="number" placeholder="0.00" value={ex.precio||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,precio:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                    <input type="number" placeholder="Precio" value={ex.precio||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,precio:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
+                    <span className="text-xs text-brand-gray-mid">costo $</span>
+                    <input type="number" placeholder="Costo" value={ex.costo||''} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,costo:parseFloat(e.target.value)||0}:x))} className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs"/>
                     <input type="number" min={1} value={ex.cantidad} onChange={e=>setNpExtras(prev=>prev.map((x,j)=>j===i?{...x,cantidad:parseInt(e.target.value)||1}:x))} className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-xs text-center"/>
                     <button onClick={()=>setNpExtras(prev=>prev.filter((_,j)=>j!==i))} className="text-red-400 text-xs">✕</button>
                   </div>

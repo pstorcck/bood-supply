@@ -208,11 +208,15 @@ export default function DashboardPage() {
     return catES
   }
 
+  function precioCliente(p: any) {
+    return profile?.tipo_precio === 'B' ? (p.precio_b ?? p.precio) : p.precio
+  }
+
   function agregarAlCarrito(producto: any, preorder = false) {
     setCarrito(prev => {
       const existe = prev.find(i => i.id === producto.id)
       if (existe) return prev.map(i => i.id === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i)
-      return [...prev, { ...producto, cantidad: 1 }]
+      return [...prev, { ...producto, precio: precioCliente(producto), cantidad: 1 }]
     })
   }
 
@@ -224,9 +228,10 @@ export default function DashboardPage() {
     setCarrito(prev => prev.filter(i => i.id !== id))
   }
 
+  const clienteEsIL = (profile?.estado || 'IL') === 'IL'
   const subtotal = carrito.reduce((sum, i) => sum + i.precio * i.cantidad, 0)
   const subtotalQuimicos = carrito.filter(i => i.categoria === 'Químicos y Limpieza').reduce((sum, i) => sum + i.precio * i.cantidad, 0)
-  const taxQuimicos = subtotalQuimicos * TAX_QUIMICOS
+  const taxQuimicos = clienteEsIL ? subtotalQuimicos * TAX_QUIMICOS : 0
   const total = subtotal + taxQuimicos + (carrito.length > 0 ? FUEL_SURCHARGE : 0)
   const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0)
 
@@ -379,7 +384,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-yellow-600 bg-yellow-50 px-3 py-1.5 rounded-lg mb-4">⚠️ {t.tax_note}</p>
               )}
               <div className="flex items-center justify-between">
-                <span className="font-heading font-bold text-3xl text-brand-navy">${productoModal.precio}</span>
+                <span className="font-heading font-bold text-3xl text-brand-navy">${precioCliente(productoModal)}</span>
                 <button onClick={() => { agregarAlCarrito(productoModal); setProductoModal(null) }} className="btn-primary flex items-center gap-2">
                   <Plus size={16} /> {t.add}
                 </button>
@@ -478,7 +483,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-gray-400 mb-1">{p.unidad}</p>
                       {p.categoria === 'Químicos y Limpieza' && <p className="text-xs text-yellow-600 mb-2">{t.tax_note}</p>}
                       <div className="flex items-center justify-between mt-auto">
-                        <span className="font-heading font-bold text-xl text-brand-navy">${p.precio}</span>
+                        <span className="font-heading font-bold text-xl text-brand-navy">${precioCliente(p)}</span>
                         {enCarrito ? (
                           <div className="flex items-center gap-1.5">
                             <button onClick={() => cambiarCantidad(p.id, -1)} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-red-50"><Minus size={12} /></button>

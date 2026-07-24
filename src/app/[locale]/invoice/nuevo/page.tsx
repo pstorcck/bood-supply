@@ -39,17 +39,21 @@ export default function NuevoInvoicePage() {
     init()
   }, [])
 
+  function precioParaCliente(prod: any) {
+    return clienteSeleccionado?.tipo_precio === 'B' ? (prod.precio_b ?? prod.precio) : prod.precio
+  }
+
   function agregarProducto(prod: any) {
     setItems(prev => {
       const existe = prev.find(i => i.producto_id === prod.id)
       if (existe) return prev.map(i => i.producto_id === prod.id ? { ...i, cantidad: i.cantidad + 1 } : i)
-      return [...prev, { producto_id: prod.id, descripcion: prod.nombre, precio_unitario: prod.precio, cantidad: 1, esCustom: false, productos: prod }]
+      return [...prev, { producto_id: prod.id, descripcion: prod.nombre, precio_unitario: precioParaCliente(prod), costo_unitario: prod.costo || 0, cantidad: 1, esCustom: false, productos: prod }]
     })
     setBusquedaProducto('')
   }
 
   function agregarLineaCustom() {
-    setItems(prev => [...prev, { producto_id: null, descripcion: '', precio_unitario: 0, cantidad: 1, esCustom: true, productos: null }])
+    setItems(prev => [...prev, { producto_id: null, descripcion: '', precio_unitario: 0, costo_unitario: 0, cantidad: 1, esCustom: true, productos: null }])
   }
 
   function actualizarItem(idx: number, campo: string, valor: any) {
@@ -60,8 +64,9 @@ export default function NuevoInvoicePage() {
     setItems(prev => prev.filter((_, i) => i !== idx))
   }
 
+  const clienteEsIL = (clienteSeleccionado?.estado || 'IL') === 'IL'
   const subtotal = items.reduce((sum, i) => sum + Number(i.precio_unitario) * Number(i.cantidad), 0)
-  const tax = items.filter(i => i.productos?.categoria === 'Quimicos y Limpieza').reduce((sum, i) => sum + Number(i.precio_unitario) * Number(i.cantidad) * 0.1025, 0)
+  const tax = clienteEsIL ? items.filter(i => i.productos?.categoria === 'Quimicos y Limpieza').reduce((sum, i) => sum + Number(i.precio_unitario) * Number(i.cantidad) * 0.1025, 0) : 0
   const total = subtotal + tax
 
   async function generarInvoice() {
@@ -88,6 +93,7 @@ export default function NuevoInvoicePage() {
         datos_items: items.map(i => ({
           descripcion: i.descripcion,
           precio_unitario: Number(i.precio_unitario),
+          costo_unitario: Number(i.costo_unitario || 0),
           cantidad: Number(i.cantidad),
           productos: i.productos,
         })),
@@ -129,6 +135,7 @@ export default function NuevoInvoicePage() {
                 <p className="font-medium text-brand-navy">{clienteSeleccionado.nombre}</p>
                 <p className="text-xs text-brand-gray-mid">{clienteSeleccionado.negocio} · {clienteSeleccionado.email}</p>
                 <p className="text-xs text-brand-gray-mid">{clienteSeleccionado.direccion}</p>
+                {!clienteEsIL && <p className="text-xs text-blue-600 mt-1">Cliente fuera de Illinois ({clienteSeleccionado.estado}) — exento de tax</p>}
               </div>
               <button onClick={() => setClienteSeleccionado(null)} className="text-brand-gray-mid hover:text-red-400"><X size={18}/></button>
             </div>
@@ -170,7 +177,7 @@ export default function NuevoInvoicePage() {
                     <p className="text-sm font-medium text-brand-navy">{p.nombre}</p>
                     <p className="text-xs text-brand-gray-mid">{p.categoria} · {p.unidad}</p>
                   </div>
-                  <span className="text-brand-orange font-bold text-sm">${p.precio}</span>
+                  <span className="text-brand-orange font-bold text-sm">${precioParaCliente(p)}</span>
                 </div>
               ))}
             </div>
@@ -185,6 +192,7 @@ export default function NuevoInvoicePage() {
                     <th className="text-left py-2 text-xs text-brand-gray-mid font-medium">Descripcion</th>
                     <th className="text-center py-2 text-xs text-brand-gray-mid font-medium w-20">Cant.</th>
                     <th className="text-right py-2 text-xs text-brand-gray-mid font-medium w-24">Precio</th>
+                    <th className="text-right py-2 text-xs text-brand-gray-mid font-medium w-24">Costo</th>
                     <th className="text-right py-2 text-xs text-brand-gray-mid font-medium w-24">Total</th>
                     <th className="w-8"></th>
                   </tr>
@@ -204,6 +212,13 @@ export default function NuevoInvoicePage() {
                       </td>
                       <td className="py-2 px-2">
                         <input type="number" min="0" step="0.01" value={item.precio_unitario} onChange={e => actualizarItem(idx, 'precio_unitario', e.target.value)} className="w-full border border-gray-200 rounded px-2 py-1 text-xs text-right focus:outline-none focus:border-brand-orange"/>
+                      </td>
+                      <td className="py-2 px-2">
+                        {item.esCustom ? (
+                          <input type="number" min="0" step="0.01" value={item.costo_unitario} onChange={e => actualizarItem(idx, 'costo_unitario', e.target.value)} className="w-full border border-gray-200 rounded px-2 py-1 text-xs text-right focus:outline-none focus:border-brand-orange"/>
+                        ) : (
+                          <span className="text-brand-gray-mid text-xs">${Number(item.costo_unitario || 0).toFixed(2)}</span>
+                        )}
                       </td>
                       <td className="py-2 pl-2 text-right font-medium text-brand-navy text-xs">
                         ${(Number(item.precio_unitario) * Number(item.cantidad)).toFixed(2)}

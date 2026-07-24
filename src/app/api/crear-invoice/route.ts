@@ -39,10 +39,11 @@ export async function POST(req: NextRequest) {
 
     const { data: numero } = await supabase.rpc('get_next_invoice_number')
 
+    const clienteEsIL = (cliente?.estado || 'IL') === 'IL'
     const subtotal = pedido.pedido_items.reduce((sum: number, item: any) => sum + item.precio_unitario * item.cantidad, 0)
-    const tax = pedido.pedido_items
+    const tax = clienteEsIL ? pedido.pedido_items
       .filter((i: any) => i.productos?.categoria === 'Quimicos y Limpieza')
-      .reduce((sum: number, i: any) => sum + i.precio_unitario * i.cantidad * 0.1025, 0)
+      .reduce((sum: number, i: any) => sum + i.precio_unitario * i.cantidad * 0.1025, 0) : 0
     const fuel = fuel_override !== undefined && fuel_override !== null ? parseFloat(fuel_override) : (pedido.fuel_surcharge || 5)
 
     const { data: invoice, error: invError } = await supabase.from('invoices').insert({
