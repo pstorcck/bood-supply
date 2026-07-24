@@ -8,6 +8,7 @@ export default function InvoicePage() {
   const [invoice, setInvoice] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [pendientes, setPendientes] = useState<any[]>([])
+  const [vendedorNombre, setVendedorNombre] = useState('House')
   const supabase = createClient()
 
   useEffect(() => {
@@ -23,6 +24,11 @@ export default function InvoicePage() {
           .neq('id', params.id)
           .order('created_at', { ascending: true })
         setPendientes(invs || [])
+      }
+      const vendedorId = data?.datos_cliente?.vendedor_id
+      if (vendedorId) {
+        const { data: vendedor } = await supabase.from('profiles').select('nombre').eq('id', vendedorId).single()
+        if (vendedor?.nombre) setVendedorNombre(vendedor.nombre)
       }
       setLoading(false)
     }
@@ -113,6 +119,7 @@ export default function InvoicePage() {
             {invoice.pedido_id && <div className="info-row"><span className="info-label">Order</span><span className="info-value">#{invoice.pedido_id?.slice(0,8).toUpperCase()}</span></div>}
             <div className="info-row"><span className="info-label">Date</span><span className="info-value">{fecha}</span></div>
             <div className="info-row"><span className="info-label">Payment</span><span className="info-value">{invoice.metodo_pago || '—'}</span></div>
+            <div className="info-row"><span className="info-label">Sales Person</span><span className="info-value">{vendedorNombre}</span></div>
           </div>
         </div>
 
